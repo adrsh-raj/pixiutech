@@ -6,7 +6,7 @@ import type { CircuitState, PartType, PinRef, PlacedPart } from "@/lib/circuit-t
 import { BREADBOARD_COLUMNS, CATALOG } from "@/lib/components-catalog"
 import { getLegacyBreadboardPinMappings } from "@/lib/breadboard-pins"
 import { samePin } from "@/lib/geometry"
-import { computeRuntime, type ArduinoPinState, type DisplayOutputState } from "@/lib/simulation"
+import { computeRuntime, type ArduinoPinState, type DisplayOutputState, type NeoPixelOutputState } from "@/lib/simulation"
 import { defineArduinoBlocks, setAiClassContext, arduino, normalizeBlocklyXml } from "@/lib/arduino-blocks"
 import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type BlockStepInfo } from "@/lib/blockly-runner"
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
@@ -20,7 +20,7 @@ import * as Blockly from "blockly"
 import { Boxes, Camera, Sparkles, Terminal, Trash2, Gauge, Sliders, ShieldAlert, RotateCw, Copy, X, Smartphone } from "lucide-react"
 import { computeWireCurrents } from "@/lib/current-flow"
 import { writePinStateAliases } from "@/lib/pin-state"
-import { isBoardPart, getActiveBoard, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
+import { isBoardPart, getActiveBoard, getBoardForPart, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
@@ -77,6 +77,79 @@ const DEFAULT_XML = `<xml xmlns="https://developers.google.com/blockly/xml">
 const INITIAL_STATE: CircuitState = {
   parts: [],
   wires: [],
+}
+
+function findNeoPixelDataPin(
+  circuit: CircuitState,
+  ringPartId: string,
+): { partId: string; pinId: string } | null {
+  const start = `${ringPartId}:di`
+  const adjacency = new Map<string, string[]>()
+  const addLink = (a: string, b: string) => {
+    if (!adjacency.has(a)) adjacency.set(a, [])
+    if (!adjacency.has(b)) adjacency.set(b, [])
+    adjacency.get(a)!.push(b)
+    adjacency.get(b)!.push(a)
+  }
+
+  for (const wire of circuit.wires) {
+    addLink(`${wire.from.partId}:${wire.from.pinId.toLowerCase()}`, `${wire.to.partId}:${wire.to.pinId.toLowerCase()}`)
+  }
+  for (const part of circuit.parts) {
+    const key = (pin: string) => `${part.id}:${pin}`
+    if (part.type === "resistor") addLink(key("a"), key("b"))
+    if (part.type === "breadboard") {
+      for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
+        const top = ["a", "b", "c", "d", "e"]
+        const bottom = ["f", "g", "h", "i", "j"]
+        for (const rows of [top, bottom]) {
+          for (let index = 0; index < rows.length - 1; index++) {
+            addLink(key(`${rows[index]}_${column}`), key(`${rows[index + 1]}_${column}`))
+          }
+        }
+      }
+      for (let column = 1; column < BREADBOARD_COLUMNS; column++) {
+        for (const rail of ["pos_t", "neg_t", "pos_b", "neg_b"]) {
+          addLink(key(`${rail}_${column}`), key(`${rail}_${column + 1}`))
+        }
+      }
+      addLink(key("pos_top"), key("pos_t_1"))
+      addLink(key("neg_top"), key("neg_t_1"))
+      addLink(key("pos_bot"), key("pos_b_1"))
+      addLink(key("neg_bot"), key("neg_b_1"))
+      for (const [legacy, canonical] of getLegacyBreadboardPinMappings()) {
+        addLink(key(legacy.toLowerCase()), key(canonical.toLowerCase()))
+      }
+    }
+  }
+
+  const queue = [start]
+  const visited = new Set(queue)
+  for (let index = 0; index < queue.length; index++) {
+    const node = queue[index]
+    const separator = node.indexOf(":")
+    const partId = node.slice(0, separator)
+    const pinId = node.slice(separator + 1)
+    const part = circuit.parts.find((candidate) => candidate.id === partId)
+    if (part && isBoardPart(part.type)) {
+      const board = getBoardForPart(part)
+      const pin = board?.pins.find((candidate) =>
+        candidate.id.toLowerCase() === pinId ||
+        candidate.label.toLowerCase() === pinId ||
+        (candidate.alternateNames ?? []).some((alias) => alias.toLowerCase() === pinId),
+      )
+      if (pin && pin.kind === "digital" && !pin.capabilities?.inputOnly) {
+        return { partId, pinId: pin.id }
+      }
+    }
+
+    for (const neighbor of adjacency.get(node) ?? []) {
+      if (visited.has(neighbor)) continue
+      visited.add(neighbor)
+      queue.push(neighbor)
+    }
+  }
+  return null
 }
 
 function getPlacedBounds(part: Pick<PlacedPart, "type" | "x" | "y" | "rotation">) {
@@ -264,9 +337,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [pinStates, setPinStates] = useState<Record<string, ArduinoPinState>>({})
   const [displayOutputs, setDisplayOutputs] = useState<DisplayOutputState>({})
   const displayOutputsRef = useRef<DisplayOutputState>({})
+  const [neoPixelOutputs, setNeoPixelOutputs] = useState<NeoPixelOutputState>({})
+  const neoPixelOutputsRef = useRef<NeoPixelOutputState>({})
   useEffect(() => {
     displayOutputsRef.current = displayOutputs
   }, [displayOutputs])
+  useEffect(() => {
+    neoPixelOutputsRef.current = neoPixelOutputs
+    runtimeCacheRef.current = null
+  }, [neoPixelOutputs])
   const pinStatesRef = useRef<Record<string, ArduinoPinState>>({})
   useEffect(() => {
     pinStatesRef.current = pinStates
@@ -430,6 +509,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     pressed: Set<string>
     pins: Record<string, ArduinoPinState>
     display: DisplayOutputState
+    neoPixels: NeoPixelOutputState
     value: ReturnType<typeof computeRuntime>
   } | null>(null)
   const nodalCacheRef = useRef<{
@@ -443,12 +523,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     const pressedNow = pressedRef.current
     const pinsNow = pinStatesRef.current
     const displayNow = displayOutputsRef.current
+    const neoPixelsNow = neoPixelOutputsRef.current
     const cached = runtimeCacheRef.current
-    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow && cached.display === displayNow) {
+    if (cached?.state === currentState && cached.pressed === pressedNow && cached.pins === pinsNow && cached.display === displayNow && cached.neoPixels === neoPixelsNow) {
       return cached.value
     }
-    const value = computeRuntime(currentState, pressedNow, pinsNow, displayNow)
-    runtimeCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, display: displayNow, value }
+    const value = computeRuntime(currentState, pressedNow, pinsNow, displayNow, neoPixelsNow)
+    runtimeCacheRef.current = { state: currentState, pressed: pressedNow, pins: pinsNow, display: displayNow, neoPixels: neoPixelsNow, value }
     return value
   }, [])
 
@@ -466,6 +547,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     partsRef.current = state.parts
     stateRef.current = state
   }, [state])
+
+  const neoPixelPartSignature = state.parts
+    .filter((part) => part.type === "neopixel-ring")
+    .map((part) => part.id)
+    .sort()
+    .join("|")
+  useEffect(() => {
+    const empty: NeoPixelOutputState = {}
+    neoPixelOutputsRef.current = empty
+    setNeoPixelOutputs(empty)
+  }, [neoPixelPartSignature])
 
   // Synchronize dynamic IoT sensor telemetry to virtual web server responses
   useEffect(() => {
@@ -519,7 +611,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
   const runtime = useMemo(() => {
     if (!running) return {}
-    const baseRuntime = computeRuntime(state, pressed, pinStates, displayOutputs)
+    const baseRuntime = computeRuntime(state, pressed, pinStates, displayOutputs, neoPixelOutputs)
     const microbitPart = state.parts.find((p) => p.type === "microbit-v2")
     if (microbitPart) {
       const btnA = pressed.has(`${microbitPart.id}_a`) || pressed.has("microbit_a")
@@ -532,7 +624,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       }
     }
     return baseRuntime
-  }, [running, state, pressed, pinStates, displayOutputs, microbitMatrix])
+  }, [running, state, pressed, pinStates, displayOutputs, neoPixelOutputs, microbitMatrix])
 
   const oscilloscopeSimulationRef = useRef({ state, pinStates, running, pressed })
   useEffect(() => {
