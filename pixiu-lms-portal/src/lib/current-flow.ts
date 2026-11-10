@@ -199,6 +199,12 @@ export function computeWireCurrents(
       addInternal(part.id, "p1a", "p1b")
       addInternal(part.id, "p2a", "p2b")
       if (pressed.has(part.id)) addInternal(part.id, "p1a", "p2a", 0.05)
+    } else if (part.type === "relay") {
+      // Mirror the same contact state and contact resistance as the nodal solver.
+      const activeContact = runtime[part.id]?.relayActive === true ? "no" : "nc"
+      addInternal(part.id, "com", activeContact, 0.05)
+    } else if (part.type === "npn-transistor" && runtime[part.id]?.conducting === true) {
+      addInternal(part.id, "collector", "emitter", 0.2)
     }
   }
 
