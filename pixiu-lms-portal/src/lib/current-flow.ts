@@ -205,9 +205,14 @@ export function computeWireCurrents(
       if (!info || info.isFloating || info.isConflicted) continue
       if (info.isDriven || info.isGnd || info.isDigitalLow) fixed.set(node, info.voltage)
     }
-    // A branch-current source without any defined electrical reference is not
-    // presented as a measurable current path.
-    if (fixed.size === 0) continue
+    // With fixed-voltage anchors, their ideal supplies absorb/source the
+    // net current. For a floating inter-component wire segment, choose one
+    // arbitrary 0V reference only when its injected currents balance; current
+    // differences remain reference-invariant.
+    if (fixed.size === 0) {
+      if (Math.abs(componentInjection) > 1e-8) continue
+      fixed.set(component[0], 0)
+    }
 
     const unknown = component.filter((node) => !fixed.has(node))
     const indexByNode = new Map(unknown.map((node, index) => [node, index]))
