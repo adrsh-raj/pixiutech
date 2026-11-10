@@ -1,10 +1,10 @@
 # Virtual Lab Electrical Engine Audit — Resume Checkpoint
 
 **Checkpoint updated:** 2026-11-10 (Asia/Kolkata)  
-**Status:** Electrical engine and catalogue topology audit implemented; latest Browser Gate green. PR remains draft.  
+**Status:** Electrical engine, catalogue topology audit and RGB polarity diagnostics implemented; latest Browser Gate green. PR remains draft.  
 **Repository:** `adrsh-raj/pixiutech`  
 **Working branch:** `fix/virtual-lab-electrical-engine-audit-2026-11-09`  
-**Latest verified branch head:** `ef47fb2225a3f51033d2caab7862c1fc206eab8d`  
+**Latest verified branch head:** `9612c23a9e0ec5f77581857d6c976735fba68bc2`  
 **Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425`  
 **Pull request:** [#82 — Virtual Lab electrical engine audit](https://github.com/adrsh-raj/pixiutech/pull/82)  
 **PR state:** open, draft, mergeable, not merged.  
@@ -39,6 +39,7 @@ The audit also rejects nominal resistor presence when a wire-only path bypasses 
 - Added `electrical-model.ts` to resolve LED forward voltage, nominal current and maximum current from component catalogue metadata, with per-instance electrical overrides.
 - Simulation and nodal solver use the same LED electrical definition.
 - RGB red, green and blue channels resolve their own forward-voltage values and current; the nodal solver models three separate diode branches.
+- RGB reverse polarity is now checked per channel using solved signed node potentials relative to the common cathode. A reverse-biased channel appears in runtime warning state and Circuit Doctor surfaces a dedicated RGB reverse-polarity issue; valid forward RGB wiring is covered by a no-warning regression.
 - Corrected the insufficient-supply case: a 3V source cannot illuminate a white LED whose configured forward voltage is 3.3V, and the runtime reports zero current.
 - Reverse-polarity detection uses signed solved node potentials across the LED terminals. It no longer treats an unrelated potentiometer divider or any remote power/ground path as proof of reverse polarity. A genuine reversed LED remains covered by regression tests.
 
@@ -70,27 +71,27 @@ The audit also rejects nominal resistor presence when a wire-only path bypasses 
 ### Latest verified source head: `ef47fb2225a3f51033d2caab7862c1fc206eab8d`
 
 **PIXIU CyberLab Browser Gate — SUCCESS**  
-- Run: `42746619389`
-- Job: `129600141918`
-- `test:lab`: **158 tests, 158 passed, 0 failed**.
+- Run: `42747449401`
+- Job: `129602835267`
+- `test:lab`: **159 tests, 159 passed, 0 failed**.
 - Browser gate completed; output includes `PIXIU CyberLab browser gate PASSED` and `Runtime AI origin policy · PASS`.
 - Catalogue audit in the same test run: 75 circuits, 353 parts, 586 wires, 0 errors, 0 warnings.
 
 Other latest-head successful workflows:
-- Phase 0–3 Gate: run `42746619348` — SUCCESS.
-- Phase 4–6 Gate: run `42746619329` — SUCCESS.
-- Phase 4–9 Reliability Gate: run `42746619709` — SUCCESS.
-- Part 4 Current Verification: run `42746619340` — SUCCESS.
-- Production Security Smoke: run `42746619304` — SUCCESS.
-- Deployment Smoke Test workflows: runs `42746668901` and `42746647806` — SUCCESS.
+- Phase 0–3 Gate: run `42747448943` — SUCCESS.
+- Phase 4–6 Gate: run `42747448977` — SUCCESS.
+- Phase 4–9 Reliability Gate: run `42747448820` — SUCCESS.
+- Part 4 Current Verification: run `42747448907` — SUCCESS.
+- Production Security Smoke: run `42747448842` — SUCCESS.
+- Deployment Smoke Test on the previous documentation checkpoint: run `42747150190` — SUCCESS.
 
 ### Known unrelated CI blocker
 
 The following latest-head workflows fail after the public-site bundle itself builds:
-- Phase 9 Final Green Gate: run `42746619344`.
-- Production Verification: run `42746619262`.
+- Phase 9 Final Green Gate: run `42747448909`.
+- Production Verification: run `42747448862` (still running Django backend verification when this checkpoint was prepared).
 
-Both report the same unrelated public website audit finding:
+The latest Phase 9 run reports the same unrelated public website audit finding:
 
 `src/pages/EightSquareAI.jsx -> interactive cursor/scroll reveal pattern detected`
 
