@@ -1063,6 +1063,60 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const toneHz = freq ?? undefined
           setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz, outputMode: "tone" }))
         },
+        setNeoPixelColor: (sensorId, pixel, color) => {
+          const ring = partsRef.current.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            ?? partsRef.current.find((part) => part.type === "neopixel-ring")
+          if (!ring) return
+          const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
+          const pixelIndex = Math.floor(Number(pixel))
+          if (!Number.isFinite(pixelIndex) || pixelIndex < 0 || pixelIndex >= count) return
+          const safeColor = /^#[0-9a-f]{6}$/i.test(String(color)) ? String(color) : "#ef4444"
+          setNeoPixelOutputs((previous) => {
+            const current = previous[ring.id] ?? {
+              bufferColors: Array(count).fill("#0f172a"),
+              displayedColors: Array(count).fill("#0f172a"),
+              hasShown: false,
+              dataPin: null,
+            }
+            const bufferColors = Array.from({ length: count }, (_, index) =>
+              current.bufferColors[index] ?? "#0f172a",
+            )
+            bufferColors[pixelIndex] = safeColor
+            const next = {
+              ...previous,
+              [ring.id]: { ...current, bufferColors },
+            }
+            neoPixelOutputsRef.current = next
+            runtimeCacheRef.current = null
+            return next
+          })
+        },
+        showNeoPixel: (sensorId) => {
+          const currentState = stateRef.current
+          const ring = currentState.parts.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            ?? currentState.parts.find((part) => part.type === "neopixel-ring")
+          if (!ring) return
+          const dataPin = findNeoPixelDataPin(currentState, ring.id)
+          const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
+          setNeoPixelOutputs((previous) => {
+            const current = previous[ring.id] ?? {
+              bufferColors: Array(count).fill("#0f172a"),
+              displayedColors: Array(count).fill("#0f172a"),
+              hasShown: false,
+              dataPin: null,
+            }
+            const displayedColors = Array.from({ length: count }, (_, index) =>
+              current.bufferColors[index] ?? "#0f172a",
+            )
+            const next = {
+              ...previous,
+              [ring.id]: { ...current, displayedColors, hasShown: true, dataPin },
+            }
+            neoPixelOutputsRef.current = next
+            runtimeCacheRef.current = null
+            return next
+          })
+        },
         serialPrint: (text) => {
           setSerialLines((prev) => [...prev, { text, timestamp: Date.now(), type: "output" }])
         },
