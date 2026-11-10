@@ -641,7 +641,9 @@ export function getPinVoltage(
   if (pin?.kind === "power") {
     if (board.powerPins.v5?.includes(pin.id)) return 5.0
     if (board.powerPins.v33?.includes(pin.id)) return 3.3
-    // Raw VIN/VSYS input terminals do not have a defined output voltage.
+    // Input-only VIN/VSYS has no defined output voltage; never fall through
+    // and substitute the board's GPIO logic voltage.
+    return undefined
   }
   if (pin?.kind === "ground") return 0.0
 
