@@ -5,9 +5,9 @@
 **Scope:** Virtual Lab / PIXIU CYBERLAB only.  
 **Branch:** fix/virtual-lab-current-flow-model-audit-2026-11-10  
 **Branch base:** main @ 5e86bb161b6b9b372961df66671f636360b12ecc  
-**Verified source/test head:** 47a87eeab6263822a8ab64881b5edc5ae40d3b71  
+**Verified source/test head:** 6945fb098770fef26273aad69c716d32ae9427ad  
 **Pull request:** #83 — https://github.com/adrsh-raj/pixiutech/pull/83  
-**Status:** Implementation and exact-head CI verification complete. PR merge is pending the final integration action. Do not call every component model datasheet-accurate; see limitations below.
+**Status:** Implementation and exact-head CI verification complete, including board VIN/VSYS power-input correction. PR merge is pending the final integration action. Do not call every component model datasheet-accurate; see limitations below.
 
 ## 1. Repository and branch state
 
@@ -16,7 +16,7 @@
 - The earlier Virtual Lab electrical-engine audit branch was already merged into main before this follow-up; it was not re-merged.
 - PR #83 contains the follow-up electrical solver, current-flow, model metadata, tests and this checkpoint.
 - No production deployment or direct write to main was performed during implementation.
-- PR changes are limited to 11 Virtual Lab/test/engineering files. The implementation branch accumulated multiple API commits during incremental work; use a squash merge to land the reviewed result as one main commit.
+- PR changes are limited to 16 Virtual Lab/board-registry/validator/test/engineering files. The implementation branch accumulated multiple API commits during incremental work; use a squash merge to land the reviewed result as one main commit.
 
 ## 2. Implemented electrical solver and measurement changes
 
@@ -129,3 +129,76 @@ The test suite includes:
 - Do not force-push, reset, clean, stash, rebase or overwrite unrelated files.
 - Do not treat this simulator as hardware power-budget certification. Retain the fidelity limitations above in any user-facing claims.
 - After merge, verify main's merge SHA and confirm the PR state. Do not report success until GitHub confirms the merge.
+
+
+## 8. Board power-input semantics correction (2026-11-10)
+
+A cross-file review found that raw power-input pins were being treated as fixed 5V board sources in the solver, simulation, current-flow router and validators. This was physically incorrect for boards whose VIN/VSYS pins are external inputs.
+
+### Corrected roles
+
+- **Arduino Uno R3:** VIN is an input-only regulator terminal with a recommended external range of 7–12V. It is no longer a fixed 5V source; the regulated 5V and 3V3 rails remain modeled outputs. Official Arduino documentation identifies Uno Rev3 VIN as voltage input and states the 7–12V recommended range: https://docs.arduino.cc/learn/electronics/power-pins/ and https://docs.arduino.cc/resources/datasheets/A000066-datasheet.pdf
+- **ESP32 DevKit V1:** the VIN/5V header is modeled as a dual-role 5V input/output in the default USB-powered state; the 3V3 pin remains an output source. Espressif documents USB, 5V+GND and 3V3+GND as mutually exclusive supply options: https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32/esp32-devkitc/user_guide.html
+- **Raspberry Pi Pico:** VBUS is a USB 5V input and the default USB-powered 5V rail; VSYS is an input-only system rail with a 1.8–5.5V range and is not treated as a fixed 5V source. Official sources: https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html and https://datasheets.raspberrypi.com/pico/pico-datasheet.pdf
+- **micro:bit V2:** 3V is dual-role: input if the board is externally powered through that pin, and output when the board is powered by USB/battery. The simulator documents/assumes the default USB/battery-powered output state. Source: https://makecode.microbit.org/device/Pins and https://tech.microbit.org/hardware/power-supply/
+
+### Code paths aligned
+
+- Added BoardPowerInputSpec metadata with pin ID, min/max/nominal voltage, role and description.
+- getPinVoltage() now returns undefined for input-only VIN/VSYS pins; it no longer falls through to the MCU's logic voltage.
+- circuit-solver.ts, simulation.ts and current-flow.ts use only actual v5/v33 board output rails as fixed sources/anchors. Raw vin inputs are not board supply sources.
+- circuit-doctor.ts no longer treats raw VIN as an available supply for connected modules. It still includes power-input pins in direct-short detection.
+- circuit-validator.ts no longer appends raw VIN/VSYS to the 5V source group. It checks externally connected battery/board output voltage against each board's declared power-input range, warning on undervoltage and rejecting overvoltage.
+- The 75-circuit template solver audit no longer classifies raw VIN/VSYS as an ideal source.
+
+### VIN/VSYS regression tests
+
+Added tests proving:
+- Uno VIN and Pico VSYS are floating/input-only when no external supply is connected.
+- Uno 5V and Pico VBUS remain 5V source outputs in the default powered-board model.
+- Uno 5V connected into VIN triggers the 7V minimum warning; 9V is accepted; 13V exceeds the 12V maximum.
+- Pico VSYS accepts 5V but rejects 9V.
+- The release validator no longer emits a false direct 5V-to-GND classification merely because a raw VIN input is part of the board definition.
+
+## 9. Final exact-head verification (2026-11-10)
+
+All eight GitHub Actions workflows completed successfully on source/test head 6945fb098770fef26273aad69c716d32ae9427ad:
+
+| Workflow | Run ID | Result |
+|---|---:|---|
+| PIXIU CyberLab Browser Gate | 42788280884 | PASS |
+| PIXIU Production Verification | 42788280933 | PASS |
+| PIXIU Phase 9 Final Green Gate | 42788281172 | PASS |
+| PIXIU AI Lab Phase 4-6 Gate | 42788281090 | PASS |
+| PIXIU AI Lab Phase 4-9 Reliability Gate | 42788280890 | PASS |
+| PIXIU Part 4 Current Verification | 42788280961 | PASS |
+| PIXIU AI Lab Phase 0-3 Gate | 42788281356 | PASS |
+| PIXIU Production Security Smoke | 42788281439 | PASS |
+
+Browser Gate on this exact head:
+- 197 tests, 197 pass, 0 fail.
+- 35 project templates + 40 curriculum seed circuits = 75 circuits.
+- 55 curriculum lessons total.
+- 355 parts, 590 wires.
+- Topology audit: 0 errors, 0 warnings.
+- The runtime-aware MNA/KCL circuit audit runs every circuit with computed runtime state, checks finite voltages/currents, rejects solver diagnostics, and enforces KCL residual <= 0.01mA at every non-source/non-floating/non-conflicted net.
+- Includes the three new VIN/VSYS input-role and release-validation regressions.
+
+Production Verification:
+- Django backend verification: PASS.
+- Public website build/audit: PASS.
+- LMS lint, safety scans and production build: PASS.
+- Lint: 257 warnings, 0 errors; warnings are reported, not suppressed.
+- Live launch smoke step: skipped in this PR verification workflow; no production deployment was performed.
+- Production Release Report: all 10 dataset acceptance gates passed for 796 released records.
+
+Deployment providers:
+- Netlify PR preview: PASS, https://deploy-preview-83--clever-sopapillas-afab2e.netlify.app
+- Vercel – portal and Vercel – pixiutech: provider/account build-rate-limit failures. These are external deploy-provider blockers, not failed GitHub Actions build/test gates.
+
+## 10. Final merge state
+
+- Exact source/test head above passed all 8 GitHub Actions workflows.
+- PR #83 is open against main, mergeable, and has no review threads/inline objections recorded at last review.
+- Intended integration is one squash merge of PR #83 only. Do not merge the earlier electrical-engine audit branch again.
+- Preserve all fidelity notes above: this is a teaching simulator, not SPICE or hardware power-budget certification.
