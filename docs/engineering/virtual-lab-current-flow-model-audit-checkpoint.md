@@ -91,3 +91,23 @@ The nodal solver models resistors, LDRs, potentiometers, LEDs/RGB channels, rela
 - No production deployment.
 - Do not merge follow-up work until exact-head tests and review pass. User has explicitly asked for main integration, but that does not waive test gates.
 - If connection drops, fetch this checkpoint and current branch head first; compare against main before resuming.
+
+
+## 7. Additional solver / current-measurement review (2026-11-10)
+
+Further inspection of the MNA solver and its measurement helpers found these risks requiring targeted tests:
+
+- `solveCircuitNodalPotentials` clamps every solved unknown node voltage with `Math.max(0, ...)`. This discards negative node potentials. If negative rails or reversed external supplies are within the supported circuit domain, the solver cannot represent them faithfully. Establish whether negative supplies are supported; either preserve signed node voltages and add tests, or explicitly constrain/document the simulator's supported voltage domain.
+- Fixed voltage nets are inserted into a `Map` by iterating boards and batteries. A later source silently overwrites an earlier fixed voltage if two sources are wired onto the same net. Conflicting 3.3V/5V/9V sources or a direct source-to-source short can therefore be hidden instead of diagnosed. Add a source-conflict/short-circuit check before solving; never rely on iteration order.
+- The MNA matrix receives a diagonal regularizer (`1e-9`) and rounds solved node potentials to 3 decimals before later calculations. Validate that the regularizer does not create misleading finite readings on floating/high-impedance nodes, and quantify the error for large resistance ratios.
+- The active diode set is chosen using reachable fixed source voltages, then rechecked for at most two solve passes. Add cases for multiple LED branches, series diodes, reverse-biased branches and mixed source networks to prove convergence and correct current limiting.
+- The current measurement helper's LED path falls back to runtime level/current estimates rather than deriving current from the actual diode branch; ensure its result matches solver branch current when the resistor, supply voltage or LED forward voltage changes.
+- The ohmmeter resistance path uses shortest-path resistance for resistors/potentiometers; this is not equivalent resistance for parallel networks. Verify whether this UI is meant to measure a component path or whole-network equivalent resistance; if the latter, implement a network equivalent-resistance solve instead of Dijkstra's shortest path.
+
+### Priority order
+P0: detect conflicting ideal voltage sources / shorts; eliminate false current readings on parallel networks.  
+P1: current-flow branch allocation and remove unlabeled fixed current constants.  
+P1: signed voltage support (or explicit non-support) and diode convergence tests.  
+P2: validate resistance-meter semantics and floating-net numerical tolerances.
+
+No source-code fix has been applied in this follow-up yet. The only change on this branch so far is this persistent audit checkpoint. Do not describe the current-flow or MNA implementation as fully audited or mathematically certified.
