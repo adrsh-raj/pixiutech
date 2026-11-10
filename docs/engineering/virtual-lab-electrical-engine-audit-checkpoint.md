@@ -1,12 +1,12 @@
 # Virtual Lab Electrical Engine Audit — Resume Checkpoint
 
 **Checkpoint updated:** 2026-11-10 (Asia/Kolkata)  
-**Status:** Shared electrical model, catalogue topology audit, PWM/DAC signal semantics, relay/motor paths, and end-to-end NeoPixel DI/show behavior implemented. Last fully verified Browser Gate is green; latest source head has one exact-pin-alias correction pending its rerun. PR remains draft.  
+**Status:** Follow-up audit added catalogue-driven real-rail checks, fail-closed sensor reads, powered servo control, LDR/pot divider topology validation, corrected potentiometer orientation, shared-wire current aggregation, and solver-backed passive/motor current calculations. Relay + LDR wire-current regressions pass on the last completed run; the latest test-only correction is under a fresh Browser Gate run. Do not call the current head fully green or production-ready until that run completes.  
 **Repository:** `adrsh-raj/pixiutech`  
 **Working branch:** `fix/virtual-lab-electrical-engine-audit-2026-11-09`  
-**Latest source commit:** `94549fae71a065af1151a61ec6780688157f813f`  
-**Latest fully CI-verified source commit:** `afac7541c1577cbf086ce89d71342f4c1f4fe784`  
-**Resume branch head at checkpoint:** `94549fae71a065af1151a61ec6780688157f813f` (fetch the branch endpoint below before continuing).  
+**Latest source commit:** `3eed1ec8f059efa047a1f710592ca85fe81220dc`  
+**Latest fully CI-verified Browser Gate checkpoint:** `24925d1a5a22cff1e45b4fb033f81479c17b1ed8` (168/168 tests; later follow-up commits still under validation).  
+**Resume branch head at checkpoint:** `3eed1ec8f059efa047a1f710592ca85fe81220dc` (fetch the branch endpoint below before continuing).  
 **Base commit:** `b5ec151c2392f560b5d5c4c85347f0ffa9795425`  
 **Pull request:** [#82 — Virtual Lab electrical engine audit](https://github.com/adrsh-raj/pixiutech/pull/82)  
 **PR state:** open, draft, mergeable, not merged.  
@@ -119,7 +119,7 @@ The fully verified-head Production Verification run `42751508091` ran **180 Djan
 
 ## Current branch/PR safety status
 
-- Latest branch head and PR head at checkpoint: `94549fae71a065af1151a61ec6780688157f813f`.
+- Latest branch head and PR head at checkpoint: `3eed1ec8f059efa047a1f710592ca85fe81220dc`.
 - PR #82 remains open, draft and mergeable; it is not merged.
 - `main` remains untouched.
 - No manual production deployment was performed.
@@ -141,3 +141,42 @@ After a connection timeout or in a new chat:
    `https://api.github.com/repos/adrsh-raj/pixiutech/branches/fix/virtual-lab-electrical-engine-audit-2026-11-09`
 3. Inspect the latest commits and CI runs for PR #82.
 4. Continue from **Next actions on resumption**. Do not recreate the branch or repeat completed audit stages.
+---
+## 2026-11-10 follow-up checkpoint — source head `3eed1ec8f059efa047a1f710592ca85fe81220dc`
+
+Same branch and PR; no second branch, no main changes.
+
+### New atomic commits
+- `24925d1a5a22cff1e45b4fb033f81479c17b1ed8`: catalogue-driven required power/ground diagnostics; rotary encoder solver power gate; fail-closed live sensor reads; NeoPixel stop/reset cleanup and strict explicit ID targeting.
+- `d9420805ba46d5b6576cd1246e4731bde34a2187`: servo requires real VCC/GND, explicit `outputMode="servo"`, and wired board-pin signal.
+- `83154af16bea7eb9f5049dd3e4724699d8417d1c`: added LDR 10kΩ divider legs in ESP32 weather and G6 LDR templates; corrected potentiometer track orientation in runtime/nodal/ohmmeter models; added all-template/lesson LDR/pot topology audit and 0/380/512/700/1023 tests.
+- `131d31ecd6d7fb700e4b0213835932658fe3b83b`: restored audit helper syntax.
+- `502190677d9231a1d9e8f3d0cfacb2e5cfe0fbf4`: fixed duplicate ESP32 weather LDR return-wire ID.
+- `434105436b4ae8641c97542be1ee378c93fed8ed`: Doctor now follows real board/battery power and breadboard copper rows/rails; GPIO HIGH is not module VCC; buzzer + is a signal pin; added regressions.
+- `0663435fb08038368a6244fb197e742df86815f5`: shared-wire currents aggregate algebraically; resistor/LDR/pot internal paths; buzzer/motor/LDR/pot current calculated via solver instead of per-branch constants.
+- `5674d977cc7bbeb10c5ed38c61a12ad0dbace170`: removed artificial minimum current from tracer; added dark/bright LDR current test.
+- `cd43b455f9a4f0deade64f1f2c64731c662f64c9` + `b3e73271d0e479a0f2889fea94123daa34284a6f`: relay COM–NO/COM–NC switch branch in nodal solver; closed contact resistance corrected to 0.05Ω.
+- `12105ebca00fc023153e98c0ef6b065c26343424`: added modeled resistance/current handling for LDR, motor and buzzer; direct solver current tests.
+- `3eed1ec8f059efa047a1f710592ca85fe81220dc`: moved direct nodal LDR current assertion into runtime-core test bundle that imports the solver; test-harness correction only.
+
+### Latest verification evidence
+- Last fully green Browser Gate checkpoint: `24925d1a5a22cff1e45b4fb033f81479c17b1ed8`, 168/168 tests.
+- On `12105ebca00fc023153e98c0ef6b065c26343424`, Browser Gate had 178 tests: 177 pass / 1 fail because the new direct solver test was in a bundle that did not import `solveCircuitNodalPotentials`.
+- In that run, relay NO-contact motor-current test, dark/bright LDR wire-current test, potentiometer ADC values test, all-template/lesson passive-divider audit and the 75-circuit uniqueness/integrity audit passed.
+- Latest Browser Gate for `3eed1ec8f059efa047a1f710592ca85fe81220dc`: run `42756899894`, job `129633250166`. At this checkpoint the Virtual Lab build, browser runner installation and preview start had passed; browser gate was still running. Fetch exact status before reporting PASS.
+- Previous `b3e73271d0e479a0f2889fea94123daa34284a6f` workflows: Phase 0–3, Phase 4–6, Phase 4–9 Reliability, Part 4 Current Verification and Production Security Smoke passed. Browser Gate had relay/LDR current failures, fixed in follow-up. Production Verification and Phase 9 failed on unrelated `src/pages/EightSquareAI.jsx` public-site audit.
+
+### Still open — not production-ready
+1. Verify Browser Gate and all required workflows for the exact current head; don't infer green from a build step.
+2. Remove remaining inline fixed current assumptions in `current-flow.ts` for RGB/seven-segment, servo, displays, ultrasonic, MQ-2/soil, DHT, PIR/IR, relay coil, NeoPixel and L298N. Move supported typical-load values to explicit electrical metadata or derive actual currents from solved branches. Label estimated loads as estimates when an internal load model is unavailable.
+3. Review sensor input loading, display/sensor signal paths and parallel branches.
+4. Inspect latest production/Django logs. Preserve the unrelated `EightSquareAI.jsx` public-site audit finding; do not weaken/bypass it.
+5. Update this checkpoint on every meaningful milestone.
+
+### Resume safety
+- Repo `adrsh-raj/pixiutech`; branch `fix/virtual-lab-electrical-engine-audit-2026-11-09`; PR #82 open/draft, not merged.
+- Base/main `b5ec151c2392f560b5d5c4c85347f0ffa9795425`; main untouched.
+- Latest source/test head before this documentation commit: `3eed1ec8f059efa047a1f710592ca85fe81220dc`.
+- No manual deployment.
+- On resume, fetch branch endpoint and compare head before editing. Use parent-checked atomic commits; never force-push, reset, clean, merge, deploy or modify main without explicit authorization.
+
