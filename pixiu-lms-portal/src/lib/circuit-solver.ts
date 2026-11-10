@@ -1085,6 +1085,8 @@ export function solveCircuitNodalPotentials(
       sourceLabel: invalidNets.has(netId)
         ? "Connected to conflicting ideal voltage sources"
         : fixedInfo?.label ?? (floatingNets.has(netId) ? "Floating / open circuit" : undefined),
+      // A fixed negative rail is still an active voltage source; don't
+      // classify it as floating merely because its voltage is below ground.
       isDriven: !invalidNets.has(netId) && fixedInfo !== undefined && Math.abs(fixedInfo.voltage) > 1e-9,
       isGnd: !invalidNets.has(netId) && fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
       isDigitalLow: fixedInfo?.isDigitalLow,
@@ -1179,8 +1181,6 @@ export function solveCircuitNodalPotentials(
         addResistance(w, v, r2, `Potentiometer Wiper-T2 (${r2.toFixed(1)}Ω)`)
       } else if (part.type === "dc-motor") {
         addResistance(pinToNetId(part.id, "pos"), pinToNetId(part.id, "neg"), 50, "DC motor winding model (50Ω)")
-      } else if (part.type === "buzzer") {
-        addResistance(pinToNetId(part.id, "pos"), pinToNetId(part.id, "neg"), 100, "Buzzer resistive proxy (100Ω)")
       }
     }
 
