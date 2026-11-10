@@ -1,4 +1,4 @@
-import type { CircuitState, PinRef, PlacedPart } from "./circuit-types"
+import type { CircuitState, PinRef } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
