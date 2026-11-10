@@ -58,8 +58,10 @@ export interface PartRuntime {
   keypadKey?: string
   /** Transistor: conducting */
   conducting?: boolean
-  /** NeoPixel WS2812B 8-RGB pixel colors */
+  /** NeoPixel WS2812B output after a data frame has been committed. */
   pixelColors?: string[]
+  neopixelDataActive?: boolean
+  neopixelDataPin?: { partId: string; pinId: string }
   /** MQ-2 Gas sensor runtime values */
   gasLevel?: number
   gasAlert?: boolean
@@ -1705,10 +1707,7 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
     }
 
     case "neopixel-ring": {
-      const colors = runtime?.pixelColors ?? [
-        "#ef4444", "#f97316", "#eab308", "#22c55e",
-        "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
-      ]
+      const colors = runtime?.pixelColors ?? Array(8).fill("#0f172a")
       return (
         <g className="select-none">
           {/* Circular Matte Black PCB Ring */}
