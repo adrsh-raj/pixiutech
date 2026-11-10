@@ -666,3 +666,79 @@ test("NeoPixel ring requires a committed show frame and a physical DI-to-GPIO pa
   assert.equal(notDriven.ring.neopixelDataActive, false)
 })
 
+test("Circuit Doctor derives required supply and ground diagnostics from component pin metadata", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("ir", "ir-sensor")],
+    wires: [wire("signal", "ir", "out", "uno", "d2")],
+  }
+  const missingPower = diagnoseCircuit(circuit)
+  assert.ok(missingPower.issues.some((issue) => issue.id === "sensor-unpowered-ir"))
+
+  const powered = {
+    ...circuit,
+    wires: [
+      ...circuit.wires,
+      wire("vcc", "uno", "3v3", "ir", "vcc"),
+      wire("gnd", "uno", "gnd_pwr", "ir", "gnd"),
+    ],
+  }
+  const connected = diagnoseCircuit(powered)
+  assert.equal(connected.issues.some((issue) => issue.id === "sensor-unpowered-ir"), false)
+})
+
+test("Circuit Doctor checks servo and motor-driver supply groups from catalogue metadata", () => {
+  const servoCircuit = {
+    parts: [part("uno", "arduino-uno"), part("servo", "servo")],
+    wires: [
+      wire("signal", "uno", "d9", "servo", "sig"),
+      wire("power", "uno", "5v", "servo", "vcc"),
+    ],
+  }
+  assert.ok(diagnoseCircuit(servoCircuit).issues.some((issue) => issue.id === "sensor-unpowered-servo"))
+
+  const driverCircuit = {
+    parts: [part("pico", "rpi-pico"), part("driver", "l298n")],
+    wires: [
+      wire("logic", "pico", "3v3", "driver", "5v"),
+      wire("ground", "pico", "gnd_1", "driver", "gnd"),
+      wire("enable", "pico", "gp2", "driver", "ena"),
+      wire("input", "pico", "gp3", "driver", "in1"),
+    ],
+  }
+  assert.ok(diagnoseCircuit(driverCircuit).issues.some((issue) => issue.id === "sensor-unpowered-driver"))
+})
+
+test("rotary encoder switch output is solved only when its required supply and ground are connected", () => {
+  const circuit = {
+    parts: [part("pico", "rpi-pico"), part("encoder", "rotary-encoder", { pressed: "true", value: 7 })],
+    wires: [
+      wire("vcc", "pico", "3v3", "encoder", "vcc"),
+      wire("gnd", "pico", "gnd_1", "encoder", "gnd"),
+      wire("sw", "encoder", "sw", "pico", "gp15"),
+    ],
+  }
+  const powered = solveCircuitNodalPotentials(circuit)
+  assert.ok(powered.getPinVoltage({ partId: "pico", pinId: "gp15" }) > 3.0)
+
+  const unpowered = solveCircuitNodalPotentials({
+    ...circuit,
+    wires: circuit.wires.filter((item) => item.id !== "vcc"),
+  })
+  assert.equal(unpowered.getPinInfo({ partId: "pico", pinId: "gp15" }).isFloating, true)
+})
+
+test("rotary encoder runtime suppresses readings while its supply path is missing", () => {
+  const circuit = {
+    parts: [part("pico", "rpi-pico"), part("encoder", "rotary-encoder", { pressed: "true", value: 23 })],
+    wires: [
+      wire("vcc", "pico", "3v3", "encoder", "vcc"),
+      wire("gnd", "pico", "gnd_1", "encoder", "gnd"),
+    ],
+  }
+  assert.equal(computeRuntime(circuit, new Set()).encoder.sensorValue, 23)
+  const disconnected = {
+    ...circuit,
+    wires: circuit.wires.filter((item) => item.id !== "vcc"),
+  }
+  assert.equal(computeRuntime(disconnected, new Set()).encoder.sensorValue, undefined)
+})

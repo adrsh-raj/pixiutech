@@ -2,6 +2,7 @@ import type { CircuitState, PlacedPart } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, isBoardPart } from "./board-registry"
+import { CATALOG } from "./components-catalog"
 
 export type DiagnosticSeverity = "critical" | "warning" | "tip" | "success"
 
@@ -189,37 +190,48 @@ export function diagnoseCircuit(
     }
   }
 
-  // 4. Check for Active Sensors missing Power or Ground
-  const activeSensorTypes = ["ultrasonic", "dht11", "mq2-gas", "neopixel-ring", "oled-i2c", "lcd-i2c", "joystick", "l298n"]
+  // 4. Check missing supply/return wiring from component catalogue metadata.
+  // Required pin groups define acceptable alternatives; keep diagnostics aligned
+  // with the same pin metadata used by the template validator.
   for (const part of state.parts) {
-    if (activeSensorTypes.includes(part.type)) {
-      const vccPin = `${part.id}:vcc`
-      const gndPin = `${part.id}:gnd`
-      const vsPin = `${part.id}:vs`
+    if (isBoardPart(part.type) || part.type === "battery" || part.type === "breadboard") continue
 
-      const hasVcc = pinWires.has(vccPin) || pinWires.has(vsPin)
-      const hasGnd = pinWires.has(gndPin)
+    const definition = CATALOG[part.type]
+    if (!definition) continue
 
-      const hasDataWires = state.wires.some(
-        (w) =>
-          (w.from.partId === part.id && w.from.pinId !== "vcc" && w.from.pinId !== "gnd" && w.from.pinId !== "vs") ||
-          (w.to.partId === part.id && w.to.pinId !== "vcc" && w.to.pinId !== "gnd" && w.to.pinId !== "vs"),
-      )
+    const pinsById = new Map(definition.pins.map((pin) => [pin.id, pin]))
+    const connected = (pinId: string) => pinWires.has(part.id + ":" + pinId)
+    const requiredGroups = definition.requiredPinGroups ?? []
+    const powerGroups = requiredGroups.filter((group) =>
+      group.some((pinId) => pinsById.get(pinId)?.kind === "power"),
+    )
+    const groundGroups = requiredGroups.filter((group) =>
+      group.some((pinId) => pinsById.get(pinId)?.kind === "ground"),
+    )
+    if (powerGroups.length === 0 || groundGroups.length === 0) continue
+    if (!definition.pins.some((pin) => connected(pin.id))) continue
 
-      if (hasDataWires && (!hasVcc || !hasGnd)) {
-        issues.push({
-          id: `sensor-unpowered-${part.id}`,
-          severity: "warning",
-          title: `Unpowered Module: ${partMap.get(part.id)?.type.toUpperCase()}`,
-          message: `The ${part.type} has signal lines connected, but ${!hasVcc ? "VCC" : ""}${!hasVcc && !hasGnd ? " and " : ""}${!hasGnd ? "GND" : ""} is disconnected. Active IC modules cannot operate unpowered.`,
-          suggestion: `Connect ${part.type}'s VCC to ${boardDef?.name ?? "Arduino"} power (${boardDef?.logicVoltage ?? 5}V) and GND to GND.`,
-          involvedPartIds: [part.id],
-          category: "wiring",
-        })
-      }
-    }
+    const missingPowerGroups = powerGroups.filter((group) => !group.some(connected))
+    const missingGroundGroups = groundGroups.filter((group) => !group.some(connected))
+    if (missingPowerGroups.length === 0 && missingGroundGroups.length === 0) continue
+
+    const describeGroup = (group: string[]) =>
+      group.map((pinId) => pinsById.get(pinId)?.label ?? pinId).join(" / ")
+    const missing = [
+      ...missingPowerGroups.map((group) => "power (" + describeGroup(group) + ")"),
+      ...missingGroundGroups.map((group) => "ground (" + describeGroup(group) + ")"),
+    ]
+
+    issues.push({
+      id: "sensor-unpowered-" + part.id,
+      severity: "warning",
+      title: "Unpowered Module: " + definition.name,
+      message: definition.name + " is wired into the circuit but is missing a required " + missing.join(" and ") + " connection. Its readings or outputs cannot be trusted until its supply and return are connected.",
+      suggestion: "Connect the module power pin group (" + powerGroups.map(describeGroup).join("; ") + ") to an appropriate supply and its ground pin group (" + groundGroups.map(describeGroup).join("; ") + ") to common ground.",
+      involvedPartIds: [part.id],
+      category: "wiring",
+    })
   }
-
   // 5. Check for Hardware Serial Pin Conflicts
   if (boardDef && boardPart && boardDef.serialPins) {
     const serialSet = new Set([boardDef.serialPins.rx.toLowerCase(), boardDef.serialPins.tx.toLowerCase()])

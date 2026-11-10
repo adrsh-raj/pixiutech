@@ -873,9 +873,17 @@ export function computeRuntime(
         }
       }
     } else if (part.type === "rotary-encoder") {
-      const value = Number(part.props.value ?? 0)
-      const previousValue = Number(part.props.previousValue ?? value)
-      const direction = value > previousValue ? "cw" : value < previousValue ? "ccw" : "idle"
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
+      const value = powered ? Number(part.props.value ?? 0) : undefined
+      const previousValue = powered ? Number(part.props.previousValue ?? value) : value
+      const direction =
+        value === undefined || previousValue === undefined
+          ? "idle"
+          : value > previousValue
+            ? "cw"
+            : value < previousValue
+              ? "ccw"
+              : "idle"
       runtime[part.id] = {
         encoderValue: value,
         encoderDirection: direction,

@@ -460,7 +460,7 @@ export function solveCircuitNodalPotentials(
   // 5. Expose deterministic module outputs only when their power and ground
   // nets are actually connected to a fixed source/sink.
   for (const part of state.parts) {
-    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "soil-moisture", "ldr", "tmp36", "mq2-gas"]
+    const poweredTypes = ["ir-sensor", "dht11", "oled-i2c", "joystick", "rotary-encoder", "soil-moisture", "tmp36", "mq2-gas"]
     if (!poweredTypes.includes(part.type)) continue
     const vccPin = pinToNetId(part.id, "vcc")
     const gndPin = pinToNetId(part.id, "gnd")
@@ -488,8 +488,6 @@ export function solveCircuitNodalPotentials(
       setOutputIfFree("sw", String(part.props.pressed ?? "false") === "true" ? vSupply : 0, "Rotary encoder " + part.id + " SW")
     } else if (part.type === "soil-moisture") {
       setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.moisture ?? 620) / 1023) * vSupply)), "Soil moisture " + part.id + " AO")
-    } else if (part.type === "ldr") {
-      setOutputIfFree("ao", Math.max(0, Math.min(vSupply, (Number(part.props.light ?? 512) / 1023) * vSupply)), "LDR " + part.id + " AO")
     } else if (part.type === "tmp36") {
       const vTemp = Math.max(0, Math.min(vSupply, (Number(part.props.temperature ?? 25) * 0.01) + 0.5))
       setOutputIfFree("out", vTemp, "TMP36 " + part.id + " OUT")

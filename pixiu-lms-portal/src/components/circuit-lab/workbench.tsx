@@ -885,6 +885,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     audioEngine.stopTone()
     setPinStates({})
     setDisplayOutputs({})
+    setNeoPixelOutputs({})
+    neoPixelOutputsRef.current = {}
+    runtimeCacheRef.current = null
     setIsPaused(false)
     isPausedRef.current = false
     setActiveStepBlock(null)
@@ -1066,8 +1069,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           setPinStates((prev) => writePinStateAliases(prev, pin, { state, value, toneHz, outputMode: "tone" }))
         },
         setNeoPixelColor: (sensorId, pixel, color) => {
-          const ring = partsRef.current.find((part) => part.id === sensorId && part.type === "neopixel-ring")
-            ?? partsRef.current.find((part) => part.type === "neopixel-ring")
+          const ring = sensorId
+            ? partsRef.current.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            : partsRef.current.find((part) => part.type === "neopixel-ring")
           if (!ring) return
           const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
           const pixelIndex = Math.floor(Number(pixel))
@@ -1095,8 +1099,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         },
         showNeoPixel: (sensorId) => {
           const currentState = stateRef.current
-          const ring = currentState.parts.find((part) => part.id === sensorId && part.type === "neopixel-ring")
-            ?? currentState.parts.find((part) => part.type === "neopixel-ring")
+          const ring = sensorId
+            ? currentState.parts.find((part) => part.id === sensorId && part.type === "neopixel-ring")
+            : currentState.parts.find((part) => part.type === "neopixel-ring")
           if (!ring) return
           const dataPin = findNeoPixelDataPin(currentState, ring.id)
           const count = Math.max(1, Math.min(8, Math.floor(Number(ring.props.numPixels ?? 8))))
@@ -1216,11 +1221,13 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           const liveRuntime = runningRef.current
             ? getLiveRuntime(state)[p?.id ?? ""]
             : undefined
+          const readLiveNumber = (value: number | undefined, fallback: number) =>
+            runningRef.current ? (typeof value === "number" && Number.isFinite(value) ? value : 0) : fallback
 
           if (type === "pushbutton") return p ? (pressedRef.current.has(p.id) ? 1 : 0) : 0
           if (type === "ultrasonic") {
             const currentDist = Number(p?.props?.distance ?? 100)
-            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentDist
+            return readLiveNumber(liveRuntime?.sensorValue, currentDist)
           }
           if (type === "ldr") {
             const currentLight = Number(p?.props?.light ?? 512)
@@ -1229,7 +1236,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           }
           if (type === "tmp36") {
             const currentTemp = Number(p?.props?.temperature ?? 25)
-            return liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentTemp
+            return readLiveNumber(liveRuntime?.sensorValue, currentTemp)
           }
           if (type === "pir") {
             return liveRuntime?.level !== undefined ? liveRuntime.level : (String(p?.props?.motion ?? "false") === "true" ? 1 : 0)
@@ -1243,34 +1250,36 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           }
           if (type === "dht_temperature") {
             const currentTemp = Number(p?.props?.temperature ?? 25)
-            return liveRuntime?.dhtTemperature !== undefined ? liveRuntime.dhtTemperature : currentTemp
+            return readLiveNumber(liveRuntime?.dhtTemperature, currentTemp)
           }
           if (type === "dht_humidity") {
             const currentHum = Number(p?.props?.humidity ?? 55)
-            return liveRuntime?.dhtHumidity !== undefined ? liveRuntime.dhtHumidity : currentHum
+            return readLiveNumber(liveRuntime?.dhtHumidity, currentHum)
           }
           if (type === "joystick_x") {
-            const raw = liveRuntime?.joystickX !== undefined ? liveRuntime.joystickX : Number(p?.props?.x ?? 512)
+            const raw = readLiveNumber(liveRuntime?.joystickX, Number(p?.props?.x ?? 512))
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "joystick_y") {
-            const raw = liveRuntime?.joystickY !== undefined ? liveRuntime.joystickY : Number(p?.props?.y ?? 512)
+            const raw = readLiveNumber(liveRuntime?.joystickY, Number(p?.props?.y ?? 512))
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "joystick_button") {
-            return liveRuntime?.joystickButton ? 1 : (String(p?.props?.pressed ?? "false") === "true" ? 1 : 0)
+            return runningRef.current
+              ? (liveRuntime?.joystickButton ? 1 : 0)
+              : (String(p?.props?.pressed ?? "false") === "true" ? 1 : 0)
           }
           if (type === "soil") {
             const currentMoist = Number(p?.props?.moisture ?? 620)
-            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentMoist
+            const raw = readLiveNumber(liveRuntime?.sensorValue, currentMoist)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1023)), activeBoard)
           }
           if (type === "encoder") {
-            return liveRuntime?.encoderValue !== undefined ? liveRuntime.encoderValue : Number(p?.props?.value ?? 0)
+            return readLiveNumber(liveRuntime?.encoderValue, Number(p?.props?.value ?? 0))
           }
           if (type === "mq2-gas" || type === "mq2_gas") {
             const currentGas = Number(p?.props?.gasLevel ?? p?.props?.gasPpm ?? 120)
-            const raw = liveRuntime?.sensorValue !== undefined ? liveRuntime.sensorValue : currentGas
+            const raw = readLiveNumber(liveRuntime?.sensorValue, currentGas)
             return scaleAdcReading(Math.max(0, Math.min(1, raw / 1000)), activeBoard)
           }
           if (type === "analog") {
