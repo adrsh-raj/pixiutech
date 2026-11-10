@@ -742,3 +742,35 @@ test("rotary encoder runtime suppresses readings while its supply path is missin
   }
   assert.equal(computeRuntime(disconnected, new Set()).encoder.sensorValue, undefined)
 })
+
+test("servo runtime requires component supply, return, a connected signal, and servo output mode", () => {
+  const circuit = {
+    parts: [part("uno", "arduino-uno"), part("servo", "servo", { angle: 45 })],
+    wires: [
+      wire("signal", "uno", "d9", "servo", "sig"),
+      wire("vcc", "uno", "5v", "servo", "vcc"),
+      wire("gnd", "uno", "gnd_pwr", "servo", "gnd"),
+    ],
+  }
+  const servoOutput = {
+    "9": { state: "HIGH", value: 19, angle: 90, outputMode: "servo" },
+  }
+  assert.equal(computeRuntime(circuit, new Set(), servoOutput).servo.angle, 90)
+
+  const unpowered = {
+    ...circuit,
+    wires: circuit.wires.filter((item) => item.id !== "vcc"),
+  }
+  assert.equal(computeRuntime(unpowered, new Set(), servoOutput).servo.angle, undefined)
+
+  const ordinaryDigitalOutput = {
+    "9": { state: "HIGH", value: 255, angle: 135, outputMode: "digital" },
+  }
+  assert.equal(computeRuntime(circuit, new Set(), ordinaryDigitalOutput).servo.angle, undefined)
+
+  const disconnectedSignal = {
+    ...circuit,
+    wires: circuit.wires.filter((item) => item.id !== "signal"),
+  }
+  assert.equal(computeRuntime(disconnectedSignal, new Set(), servoOutput).servo.angle, undefined)
+})

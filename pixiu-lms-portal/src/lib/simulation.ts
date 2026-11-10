@@ -652,46 +652,28 @@ export function computeRuntime(
       }
       runtime[part.id] = { level: active ? 1 : 0, toneFrequency }
     } else if (part.type === "servo") {
+      const powered = hasExternalPower(part.id, "vcc", "gnd")
       const sigKey = k("sig")
       let drivenAngle: number | undefined
-      const boardParts = state.parts.filter((pt) => isBoardPart(pt.type))
-      for (const bPart of boardParts) {
-        const bDef = getBoardForPart(bPart)
-        if (!bDef) continue
-        for (const [pinNum, p] of Object.entries(pinStates)) {
-          if (p?.angle !== undefined) {
-            const cleanPin = pinNum.toLowerCase().replace(/^(gpio|gp|d|p)/i, "")
-            const candidateKeys: { key: string }[] = [
-              { key: key(bPart.id, pinNum) },
-              { key: key(bPart.id, pinNum.toLowerCase()) },
-              { key: key(bPart.id, `d${cleanPin}`) },
-              { key: key(bPart.id, `gpio${cleanPin}`) },
-              { key: key(bPart.id, `gp${cleanPin}`) },
-              { key: key(bPart.id, `p${cleanPin}`) },
-              { key: key(bPart.id, cleanPin) },
-            ]
-            const bPin = bDef.pins.find(
-              (bp) =>
-                bp.id.toLowerCase() === pinNum.toLowerCase() ||
-                bp.label.toLowerCase() === pinNum.toLowerCase() ||
-                bp.id.replace(/^(gpio|gp|d|p)/i, "") === cleanPin
-            )
-            if (bPin) {
-              candidateKeys.push({ key: key(bPart.id, bPin.id) })
-              for (const alt of bPin.alternateNames ?? []) {
-                candidateKeys.push({ key: key(bPart.id, alt.toLowerCase()) })
-              }
-            }
-            const path = shortestResistance(candidateKeys, sigKey)
-            if (path) {
-              drivenAngle = p.angle
-              break
-            }
+      if (powered) {
+        for (const boardPart of boardParts) {
+          const board = getBoardForPart(boardPart)
+          if (!board) continue
+          for (const boardPin of board.pins) {
+            if (boardPin.kind !== "digital" && boardPin.kind !== "analog") continue
+            const pinState = lookupBoardPinState(pinStates, boardPin.id, board)
+            // A stored angle is not sufficient: only an explicit servo pulse
+            // written to this exact board pin can command the servo.
+            if (pinState?.outputMode !== "servo" || typeof pinState.angle !== "number") continue
+            const signalPath = shortestResistance([{ key: key(boardPart.id, boardPin.id) }], sigKey)
+            if (!signalPath) continue
+            drivenAngle = Math.max(0, Math.min(180, pinState.angle))
+            break
           }
+          if (drivenAngle !== undefined) break
         }
-        if (drivenAngle !== undefined) break
       }
-      runtime[part.id] = { angle: drivenAngle ?? Number(part.props.angle ?? 0) }
+      runtime[part.id] = drivenAngle === undefined ? {} : { angle: drivenAngle }
     } else if (part.type === "seven-segment") {
       const comKey = k("com")
       const toComGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), comKey)
