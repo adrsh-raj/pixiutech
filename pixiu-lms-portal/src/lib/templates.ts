@@ -295,7 +295,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w_lvcc", from: { partId: "esp", pinId: "v33" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
         { id: "w_lsig", from: { partId: "ldr", pinId: "t2" }, to: { partId: "esp", pinId: "d34" }, color: "#eab308" },
         { id: "w_lpull", from: { partId: "ldr", pinId: "t2" }, to: { partId: "r_ldr", pinId: "a" }, color: "#eab308" },
-        { id: "w_lgnd", from: { partId: "r_ldr", pinId: "b" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
+        { id: "w_ldr_return", from: { partId: "r_ldr", pinId: "b" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
         { id: "w_l1", from: { partId: "esp", pinId: "d2" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
         { id: "w_l2", from: { partId: "r_led", pinId: "b" }, to: { partId: "led_ok", pinId: "anode" }, color: "#22c55e" },
         { id: "w_lgnd", from: { partId: "led_ok", pinId: "cathode" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
