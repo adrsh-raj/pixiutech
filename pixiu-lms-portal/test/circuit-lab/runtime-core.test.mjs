@@ -907,18 +907,28 @@ test("MNA series branches carry equal current and satisfy KVL", () => {
 
 test("MNA reports conflicting ideal voltage sources instead of silently overwriting a net", () => {
   const circuit = {
-    parts: [part("uno", "arduino-uno"), part("esp", "esp32-devkit"), part("load", "resistor", { resistance: 1000 })],
+    parts: [
+      part("uno", "arduino-uno"),
+      part("esp", "esp32-devkit"),
+      part("r1", "resistor", { resistance: 1000 }),
+      part("r2", "resistor", { resistance: 1000 }),
+    ],
     wires: [
       wire("source-conflict", "uno", "5v", "esp", "3v3"),
-      wire("load-a", "uno", "5v", "load", "a"),
-      wire("load-b", "load", "b", "uno", "gnd_pwr"),
+      wire("load-a", "uno", "5v", "r1", "a"),
+      wire("load-series", "r1", "b", "r2", "a"),
+      wire("load-b", "r2", "b", "uno", "gnd_pwr"),
       wire("common-ground", "uno", "gnd_pwr", "esp", "gnd"),
     ],
   }
   const solved = solveCircuitNodalPotentials(circuit)
   assert.ok(solved.diagnostics.some((item) => item.code === "source-conflict"), "5V and 3.3V ideal sources on one net must be flagged")
   assert.equal(solved.getPinInfo({ partId: "uno", pinId: "5v" }).isConflicted, true)
-  assert.equal(solved.getBranchCurrent("load", "a", "b"), 0, "affected branches must fail closed rather than show a fabricated current")
+  assert.equal(solved.getPinInfo({ partId: "r2", pinId: "a" }).isConflicted, true,
+    "every conductive branch connected to an impossible source net must be marked invalid")
+  assert.equal(solved.getBranchCurrent("r1", "a", "b"), 0)
+  assert.equal(solved.getBranchCurrent("r2", "a", "b"), 0,
+    "a downstream resistor must not display current from an unsatisfiable source network")
 })
 
 test("MNA preserves negative battery potentials instead of clamping them to zero", () => {
