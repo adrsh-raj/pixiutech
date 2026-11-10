@@ -774,3 +774,20 @@ test("servo runtime requires component supply, return, a connected signal, and s
   }
   assert.equal(computeRuntime(disconnectedSignal, new Set(), servoOutput).servo.angle, undefined)
 })
+
+test("potentiometer A0 voltage follows its configured 0–1023 wiper position", () => {
+  for (const value of [0, 380, 512, 700, 1023]) {
+    const circuit = {
+      parts: [part("uno", "arduino-uno"), part("pot", "potentiometer", { value, resistance: 10000 })],
+      wires: [
+        wire("high", "uno", "5v", "pot", "t1"),
+        wire("low", "uno", "gnd", "pot", "t2"),
+        wire("wiper", "pot", "wiper", "uno", "a0"),
+      ],
+    }
+    const nodal = solveCircuitNodalPotentials(circuit)
+    const measured = nodal.getPinVoltage({ partId: "uno", pinId: "a0" })
+    const expected = 5 * value / 1023
+    assert.ok(Math.abs(measured - expected) < 0.03, `value ${value}: expected ${expected}V, received ${measured}V`)
+  }
+})

@@ -140,8 +140,8 @@ export function computeRuntime(
       case "potentiometer": {
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.1, (val / 1023) * rTotal)
-        const r2 = Math.max(0.1, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.1, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.1, (val / 1023) * rTotal)
         addEdge(k("t1"), k("wiper"), r1)
         addEdge(k("wiper"), k("t2"), r2)
         break

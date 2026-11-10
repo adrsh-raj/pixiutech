@@ -534,8 +534,8 @@ export function solveCircuitNodalPotentials(
         const netT2 = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.5, (val / 1023) * rTotal)
-        const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.5, (val / 1023) * rTotal)
         branches.push({ netA: netT1, netB: netWiper, conductance: 1 / r1 })
         branches.push({ netA: netWiper, netB: netT2, conductance: 1 / r2 })
         break
@@ -821,8 +821,8 @@ export function solveCircuitNodalPotentials(
         const v = pinToNetId(part.id, "t2")
         const val = Math.max(0, Math.min(1023, Number(part.props.value ?? 512)))
         const rTotal = Math.max(1, Number(part.props.resistance ?? 10000))
-        const r1 = Math.max(0.5, (val / 1023) * rTotal)
-        const r2 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r1 = Math.max(0.5, ((1023 - val) / 1023) * rTotal)
+        const r2 = Math.max(0.5, (val / 1023) * rTotal)
         addR(u, w, r1, "Potentiometer T1-Wiper")
         addR(w, v, r2, "Potentiometer Wiper-T2")
       }

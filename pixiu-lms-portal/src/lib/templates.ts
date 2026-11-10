@@ -284,6 +284,7 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "esp", type: "esp32-devkit", x: 40, y: 70, rotation: 0, props: {} },
         { id: "dht", type: "dht11", x: 380, y: 60, rotation: 0, props: { temperature: 25, humidity: 60 } },
         { id: "ldr", type: "ldr", x: 380, y: 190, rotation: 0, props: { light: 500 } },
+        { id: "r_ldr", type: "resistor", x: 500, y: 235, rotation: 0, props: { resistance: 10000 } },
         { id: "led_ok", type: "led", x: 550, y: 190, rotation: 0, props: { color: "green" } },
         { id: "r_led", type: "resistor", x: 550, y: 110, rotation: 0, props: { resistance: 220 } },
       ],
@@ -293,6 +294,8 @@ const BASE_TEMPLATES: ProjectTemplate[] = [
         { id: "w_ddat", from: { partId: "esp", pinId: "d4" }, to: { partId: "dht", pinId: "data" }, color: "#60a5fa" },
         { id: "w_lvcc", from: { partId: "esp", pinId: "v33" }, to: { partId: "ldr", pinId: "t1" }, color: "#ef4444" },
         { id: "w_lsig", from: { partId: "ldr", pinId: "t2" }, to: { partId: "esp", pinId: "d34" }, color: "#eab308" },
+        { id: "w_lpull", from: { partId: "ldr", pinId: "t2" }, to: { partId: "r_ldr", pinId: "a" }, color: "#eab308" },
+        { id: "w_lgnd", from: { partId: "r_ldr", pinId: "b" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
         { id: "w_l1", from: { partId: "esp", pinId: "d2" }, to: { partId: "r_led", pinId: "a" }, color: "#22c55e" },
         { id: "w_l2", from: { partId: "r_led", pinId: "b" }, to: { partId: "led_ok", pinId: "anode" }, color: "#22c55e" },
         { id: "w_lgnd", from: { partId: "led_ok", pinId: "cathode" }, to: { partId: "esp", pinId: "gnd_l" }, color: "#1e293b" },
@@ -856,7 +859,7 @@ const BASE_TEMPLATE_META: Record<string, { gradeBand: TemplateGrade; unit: strin
     gradeBand: 8,
     unit: "IoT & Cloud",
     tutorial: [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4, LDR ambient light sensor to analog GPIO 34, Green Telemetry TX Activity LED to GPIO 2 via 220Ω resistor, and supply 3.3V/GND rails to all sensors.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect DHT11 data to GPIO 4. Wire the LDR from 3.3V to GPIO 34 and add a 10kΩ pull-down from the GPIO 34 junction to GND. Connect the Green Telemetry TX LED to GPIO 2 through 220Ω.",
       "2. ⚙️ Code Architecture & Logic: ESP32 connects to 'SmartHome-WiFi' and registers an HTTP GET '/' endpoint. When queried, it pulses the GPIO 2 green TX LED for 150ms and streams dynamic HTML containing real-time temperature, humidity, and lux telemetry.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start the IoT server. Open the 📱 Smartphone Portal (movable floating device) and drag the DHT11 temperature or LDR light slider on the circuit canvas.",
       "4. 📊 Outcomes & Real-Time Observations: The smartphone dashboard live-updates with current temperature and lux metrics while the green GPIO 2 LED pulses on every data transmission packet.",
@@ -1160,7 +1163,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       "4. 📊 Output: Crisp red numeric digits illuminate smoothly across the 7-segment display with audio-visual synchronization.",
     ]),
   starter("g6-ldr-night-lamp", "💡 Smart Night Lamp & Perimeter Security (LDR + PIR Motion + Siren)", "Photosensitive ambient light controller and motion security system! A Light Dependent Resistor (LDR) monitors ambient illumination on analog pin A0. In daylight, lamps remain OFF; when darkness falls (<400), Arduino lights the Yellow Lamp on D13 and Blue Ambient LED on D12. If the PIR sensor on D7 trips motion at night, the security siren on D8 chirps an intruder warning.", 6, "Sensors", "Intermediate", ["LDR", "Analog", "PIR Motion", "Dual LED", "Buzzer"],
-    { parts: [part("uno","arduino-uno",60,110),part("ldr","ldr",300,90),part("pir","pir-sensor",440,60,{motion:"false"}),part("bz","buzzer",300,210),part("led1","led",600,70,{color:"yellow"}),part("r1","resistor",600,150,{resistance:220}),part("led2","led",710,70,{color:"blue"}),part("r2","resistor",710,150,{resistance:220})], wires: [wire("a","uno","5v","ldr","t1","#ef4444"),wire("b","ldr","t2","uno","a0","#eab308"),wire("c","uno","d13","r1","a","#facc15"),wire("d","r1","b","led1","anode","#facc15"),wire("e","led1","cathode","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_l2a","uno","d12","r2","a","#3b82f6"),wire("w_l2b","r2","b","led2","anode","#3b82f6"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
+    { parts: [part("uno","arduino-uno",60,110),part("ldr","ldr",300,90),part("rldr","resistor",390,160,{resistance:10000}),part("pir","pir-sensor",440,60,{motion:"false"}),part("bz","buzzer",300,210),part("led1","led",600,70,{color:"yellow"}),part("r1","resistor",600,150,{resistance:220}),part("led2","led",710,70,{color:"blue"}),part("r2","resistor",710,150,{resistance:220})], wires: [wire("a","uno","5v","ldr","t1","#ef4444"),wire("b","ldr","t2","uno","a0","#eab308"),wire("w_lr_a0","uno","a0","rldr","a","#eab308"),wire("w_lr_gnd","rldr","b","uno","gnd","#1e293b"),wire("c","uno","d13","r1","a","#facc15"),wire("d","r1","b","led1","anode","#facc15"),wire("e","led1","cathode","uno","gnd","#1e293b"),wire("w_pvcc","uno","5v","pir","vcc","#ef4444"),wire("w_pgnd","uno","gnd","pir","gnd","#1e293b"),wire("w_pout","uno","d7","pir","out","#60a5fa"),wire("w_l2a","uno","d12","r2","a","#3b82f6"),wire("w_l2b","r2","b","led2","anode","#3b82f6"),wire("w_l2gnd","led2","cathode","uno","gnd","#1e293b"),wire("w_bzpos","uno","d8","bz","pos","#eab308"),wire("w_bzgnd","bz","neg","uno","gnd","#1e293b")] },
     program([pinMode("13","OUTPUT"),pinMode("12","OUTPUT"),pinMode("8","OUTPUT"),pinMode("7","INPUT")],[
       ifElseBlock(
         compareBlock("LT", sensorBlock("ldr_read", "ldr"), numberBlock(400)),
@@ -1177,7 +1180,7 @@ const EXTRA_TEMPLATES: ProjectTemplate[] = [
       delay(100),
     ]),
     [
-      "1. 🔌 Circuit Wiring & Hardware Setup: Connect LDR between 5V and A0, PIR motion OUT to D7. Wire yellow street lamp to D13 and blue ambient LED to D12 via 220Ω resistors. Connect siren buzzer to D8.",
+      "1. 🔌 Circuit Wiring & Hardware Setup: Connect LDR between 5V and A0, then connect a 10kΩ pull-down resistor from the A0 junction to GND. Wire PIR OUT to D7. Connect the yellow street lamp to D13 and blue ambient LED to D12 through 220Ω resistors; connect the siren buzzer to D8.",
       "2. ⚙️ Code Architecture & Logic: Evaluates ldr_read on A0; if < 400 (darkness), powers D13 and D12. If PIR motion trips at night, sounds audible warning on D8.",
       "3. ▶️ Simulation Execution & Interaction Controls: Click Run to start illumination monitoring. Use the LDR slider to simulate night, then toggle the PIR motion trigger.",
       "4. 📊 Outcomes & Real-Time Observations: Dual lamps illuminate automatically in darkness, and intruder motion trips the audio security siren.",

@@ -214,7 +214,58 @@ function hasGroundPullResistor(circuit, graph, signalNode, grounds) {
   return false
 }
 
-function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) {
+
+function dividerSupplyAndGroundNodes(circuit, graph) {
+  const supplies = [], grounds = [], analogInputs = []
+  for (const boardPart of circuit.parts.filter((part) => isBoardPart(part.type))) {
+    const board = getBoardForPart(boardPart)
+    for (const pin of [...(board.powerPins.v5 ?? []), ...(board.powerPins.v33 ?? []), ...(board.powerPins.vin ?? [])]) supplies.push(graph.normalizeNode(boardPart.id, pin))
+    for (const pin of board.powerPins.gnd ?? []) grounds.push(graph.normalizeNode(boardPart.id, pin))
+    for (const pin of board.pins.filter((item) => item.kind === "analog" || item.capabilities?.adc === true)) analogInputs.push(graph.normalizeNode(boardPart.id, pin.id))
+  }
+  for (const battery of circuit.parts.filter((part) => part.type === "battery")) {
+    supplies.push(`${battery.id}:pos`)
+    grounds.push(`${battery.id}:neg`)
+  }
+  return { supplies: [...new Set(supplies)], grounds: [...new Set(grounds)], analogInputs: [...new Set(analogInputs)] }
+}
+
+function hasAnalogDividerForLdr(circuit, graph, ldr) {
+  const { supplies, grounds, analogInputs } = dividerSupplyAndGroundNodes(circuit, graph)
+  const terminals = ["t1", "t2"].map((pin) => graph.normalizeNode(ldr.id, pin))
+  const hasAnalog = (node) => analogInputs.some((input) => pathUsingOnlyWires(graph.adjacency, node, [input]))
+  const hasRail = (node, rail) => pathUsingOnlyWires(graph.adjacency, node, rail)
+  const resistors = circuit.parts.filter((part) => part.type === "resistor" && Number(part.props.resistance ?? 220) >= 1000 && Number(part.props.resistance ?? 220) <= 100000)
+  for (let i = 0; i < 2; i++) {
+    const signal = terminals[i], opposite = terminals[1 - i]
+    if (!hasAnalog(signal)) continue
+    for (const resistor of resistors) {
+      const a = graph.normalizeNode(resistor.id, "a"), b = graph.normalizeNode(resistor.id, "b")
+      const pullDown = hasRail(opposite, supplies) &&
+        ((pathUsingOnlyWires(graph.adjacency, signal, [a]) && hasRail(b, grounds)) ||
+         (pathUsingOnlyWires(graph.adjacency, signal, [b]) && hasRail(a, grounds)))
+      const pullUp = hasRail(opposite, grounds) &&
+        ((pathUsingOnlyWires(graph.adjacency, signal, [a]) && hasRail(b, supplies)) ||
+         (pathUsingOnlyWires(graph.adjacency, signal, [b]) && hasRail(a, supplies)))
+      if (pullDown || pullUp) return true
+    }
+  }
+  return false
+}
+
+function hasWiredPotentiometerDivider(circuit, graph, potentiometer) {
+  const { supplies, grounds, analogInputs } = dividerSupplyAndGroundNodes(circuit, graph)
+  const t1 = graph.normalizeNode(potentiometer.id, "t1")
+  const t2 = graph.normalizeNode(potentiometer.id, "t2")
+  const wiper = graph.normalizeNode(potentiometer.id, "wiper")
+  const correctRails =
+    (pathUsingOnlyWires(graph.adjacency, t1, supplies) && pathUsingOnlyWires(graph.adjacency, t2, grounds)) ||
+    (pathUsingOnlyWires(graph.adjacency, t2, supplies) && pathUsingOnlyWires(graph.adjacency, t1, grounds))
+  const wiperToAdc = analogInputs.some((input) => pathUsingOnlyWires(graph.adjacency, wiper, [input]))
+  return correctRails && wiperToAdc
+}
+
+function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {})
   const errors = []
   const warnings = []
   if (!circuit || !Array.isArray(circuit.parts) || !Array.isArray(circuit.wires)) {
@@ -497,6 +548,23 @@ const lessonResults = lessonCircuits.map((lesson) =>
 )
 const allErrors = [...templateResults, ...lessonResults].flatMap((result) => result.errors)
 const allWarnings = [...templateResults, ...lessonResults].flatMap((result) => result.warnings)
+
+const passiveAnalogErrors = [...TEMPLATES.map((template) => ({ label: `template ${template.id}`, circuit: template.circuit })),
+  ...lessonCircuits.map((lesson) => ({ label: `lesson ${lesson.id}`, circuit: lesson.seedCircuit }))].flatMap(({ label, circuit }) => {
+    const graph = circuitGraph(circuit)
+    const findings = []
+    for (const ldr of circuit.parts.filter((part) => part.type === "ldr")) {
+      if (!hasAnalogDividerForLdr(circuit, graph, ldr)) findings.push(`${label}: LDR ${ldr.id} has no complete ADC divider with a fixed 1kΩ–100kΩ resistor`)
+    }
+    for (const pot of circuit.parts.filter((part) => part.type === "potentiometer")) {
+      if (!hasWiredPotentiometerDivider(circuit, graph, pot)) findings.push(`${label}: potentiometer ${pot.id} must connect both outer pins to opposite rails and its wiper to an ADC pin`)
+    }
+    return findings
+  })
+
+test("all LDRs and potentiometers have complete powered ADC divider topology", () => {
+  assert.deepEqual(passiveAnalogErrors, [], passiveAnalogErrors.join("\\n"))
+})
 
 test("complete Virtual Lab project-template and curriculum circuit inventory is unique and audited", () => {
   assert.ok(TEMPLATES.length >= 20, `unexpectedly small project-template catalogue: ${TEMPLATES.length}`)
