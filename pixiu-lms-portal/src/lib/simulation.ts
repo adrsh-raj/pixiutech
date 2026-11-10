@@ -24,6 +24,18 @@ export interface DisplayOutputState {
   oled_line3?: string
 }
 
+export interface NeoPixelOutput {
+  /** Colors written by neopixel_set_color but not yet latched by neopixel_show. */
+  bufferColors: string[]
+  /** Most recent colors committed by neopixel_show. */
+  displayedColors: string[]
+  hasShown: boolean
+  /** Board GPIO physically connected to the ring's DI pad. */
+  dataPin: { partId: string; pinId: string } | null
+}
+
+export type NeoPixelOutputState = Record<string, NeoPixelOutput>
+
 const key = (partId: string, pinId: string) => `${partId}:${pinId}`
 
 interface GraphEdge {
@@ -44,6 +56,7 @@ export function computeRuntime(
   pressed: Set<string>,
   pinStates: Record<string, ArduinoPinState> = {},
   displayOutputs: DisplayOutputState = {},
+  neoPixelOutputs: NeoPixelOutputState = {},
 ): Record<string, PartRuntime> {
   // Preserve peak pulse amplitude for diode conduction analysis. The nodal
   // solver remains DC/average for meters; PWM duty is applied to load current
@@ -586,37 +599,22 @@ export function computeRuntime(
     } else if (part.type === "neopixel-ring") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
       const diKey = k("di")
-      const hasSignal = shortestResistance(activeSources, diKey)
-      const numPixels = Number(part.props.numPixels ?? 8)
-      const pattern = String(part.props.pattern ?? "rainbow")
-      const customColor = String(part.props.color ?? "#38bdf8")
-
-      const colors: string[] = []
-      if (powered && (hasSignal || pattern !== "off")) {
-        const rainbowPalette = [
-          "#ef4444", "#f97316", "#eab308", "#22c55e",
-          "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899",
-        ]
-        for (let i = 0; i < numPixels; i++) {
-          if (pattern === "rainbow") {
-            colors.push(rainbowPalette[i % rainbowPalette.length])
-          } else if (pattern === "chase") {
-            const step = Math.floor(Date.now() / 200) % numPixels
-            colors.push(i === step ? customColor : "#1e293b")
-          } else if (pattern === "solid") {
-            colors.push(customColor)
-          } else {
-            colors.push(customColor)
-          }
-        }
-      } else {
-        for (let i = 0; i < numPixels; i++) {
-          colors.push("#0f172a")
-        }
-      }
+      const output = neoPixelOutputs[part.id]
+      const numPixels = Math.max(1, Math.min(8, Math.floor(Number(part.props.numPixels ?? 8))))
+      const dataPath = output?.hasShown && output.dataPin
+        ? shortestResistance([{ key: key(output.dataPin.partId, output.dataPin.pinId) }], diKey)
+        : null
+      const dataActive = Boolean(powered && dataPath)
+      const offColor = "#0f172a"
+      const colors = Array.from({ length: numPixels }, (_, index) =>
+        dataActive ? (output?.displayedColors[index] ?? offColor) : offColor,
+      )
+      const hasIlluminatedPixel = colors.some((color) => color.toLowerCase() !== offColor)
       runtime[part.id] = {
         pixelColors: colors,
-        level: powered ? 1 : 0,
+        level: dataActive && hasIlluminatedPixel ? 1 : 0,
+        neopixelDataActive: dataActive,
+        neopixelDataPin: dataActive ? output?.dataPin ?? undefined : undefined,
       }
     } else if (part.type === "mq2-gas") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
