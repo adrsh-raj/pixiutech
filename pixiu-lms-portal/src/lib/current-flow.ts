@@ -124,14 +124,10 @@ export function computeWireCurrents(
         const pinState = lookupBoardPinState(pinStates, pin.id, board)
         if (!pinState) continue
         const activeOutput =
+          // The nodal solver treats a stored LOW pin state as a fixed 0V
+          // sink even for legacy pin-state records that only carry mode:"OUTPUT".
           pinState.state === "HIGH" ||
-          (pinState.state === "LOW" && (
-            pinState.outputMode === "digital" ||
-            pinState.outputMode === "pwm" ||
-            pinState.outputMode === "tone" ||
-            pinState.outputMode === "servo" ||
-            pinState.outputMode === "dac"
-          )) ||
+          pinState.state === "LOW" ||
           pinState.outputMode === "pwm" ||
           pinState.outputMode === "tone" ||
           pinState.outputMode === "servo" ||
