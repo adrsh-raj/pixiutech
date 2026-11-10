@@ -142,3 +142,28 @@ test("DMM: stopping an unpowered MCU output does not create a phantom LED forwar
   assert.equal(solution.getPinVoltage(resistorB), 0)
   assert.equal(solution.getPinInfo(resistorA).isFloating, true)
 })
+
+
+test("DMM resistance measures parallel equivalent resistance, not the shortest single branch", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 60, rotation: 0, props: { resistance: 1000 } },
+      { id: "r2", type: "resistor", x: 220, y: 140, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed1", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "feed2", from: { partId: "uno", pinId: "5v" }, to: { partId: "r2", pinId: "a" }, color: "#ef4444" },
+      { id: "return1", from: { partId: "r1", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "return2", from: { partId: "r2", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const solved = solveCircuitNodalPotentials(circuit)
+  const equivalent = solved.computeResistanceBetweenPins(
+    { partId: "uno", pinId: "5v" },
+    { partId: "uno", pinId: "gnd_pwr" },
+  )
+  assert.ok(Math.abs(equivalent.resistance - 500) < 0.1,
+    `Two 1kΩ parallel resistors must measure 500Ω, got ${equivalent.resistance}Ω`)
+  assert.match(equivalent.explanation, /Equivalent Resistance/i)
+})
