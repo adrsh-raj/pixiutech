@@ -238,8 +238,19 @@ export function computeWireCurrents(
   for (const [key, currentMa] of nodal.branchCurrents.entries()) {
     const match = key.match(/^(.*):([^:]+)->(.+)$/)
     if (!match || !Number.isFinite(currentMa) || Math.abs(currentMa) < 0.000001) continue
-    const pinA = match[1] + ":" + match[2]
-    const pinB = match[1] + ":" + match[3]
+    const partId = match[1]
+    const pinAName = match[2]
+    const pinBName = match[3]
+    const part = state.parts.find((item) => item.id === partId)
+    // Relay contacts and a conducting NPN transistor are already represented
+    // as real low-resistance conductor edges below. Injecting their solved
+    // branch current as well would double-count the same pass-through path.
+    if (
+      (part?.type === "relay" && pinAName === "com" && (pinBName === "no" || pinBName === "nc")) ||
+      (part?.type === "npn-transistor" && pinAName === "collector" && pinBName === "emitter")
+    ) continue
+    const pinA = partId + ":" + pinAName
+    const pinB = partId + ":" + pinBName
     nodes.add(pinA)
     nodes.add(pinB)
     const currentA = currentMa / 1000
