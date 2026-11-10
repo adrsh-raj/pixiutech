@@ -78,6 +78,20 @@ export function diagnoseCircuit(
           category: "wiring",
         })
       }
+    } else if (part.type === "rgb-led") {
+      const rt = runtime[part.id]
+      if (rt?.warning?.includes("Reverse Polarity")) {
+        issues.push({
+          id: `rgb-led-rev-pol-${part.id}`,
+          severity: "warning",
+          title: "RGB LED Reverse Polarity",
+          message: rt.warning,
+          suggestion: "Connect the RGB LED common cathode (GND) to circuit ground, and route each red, green and blue anode through its own current-limiting resistor to its driver pin.",
+          involvedPartIds: [part.id],
+          involvedPinIds: ["red", "green", "blue", "gnd"],
+          category: "wiring",
+        })
+      }
     }
   }
 
