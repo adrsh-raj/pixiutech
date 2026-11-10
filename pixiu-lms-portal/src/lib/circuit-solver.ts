@@ -33,6 +33,8 @@ export interface NodalSolution {
   branchCurrents: Map<string, number>
   diagnostics: CircuitSolverDiagnostic[]
   getBranchCurrent: (partId: string, pinA: string, pinB: string) => number
+  /** Algebraic sum of solved branch currents leaving the given net (mA). */
+  getNetCurrent: (netId: number) => number
   getPinVoltage: (ref: PinRef | null) => number
   getPinInfo: (ref: PinRef | null) => PinPotentialInfo
   getPotentialDifference: (
@@ -929,6 +931,13 @@ export function solveCircuitNodalPotentials(
   const getBranchCurrent = (partId: string, pinA: string, pinB: string) =>
     branchCurrents.get(branchKey(partId, pinA, pinB)) ?? 0
 
+  const getNetCurrent = (netId: number) => branches.reduce((total, branch) => {
+    const current = getBranchCurrent(branch.partId, branch.pinA, branch.pinB)
+    if (branch.netA === netId) return total + current
+    if (branch.netB === netId) return total - current
+    return total
+  }, 0)
+
   const getPinVoltage = (ref: PinRef | null): number => {
     if (!ref) return 0
     return pinPotentials.get(pinKey(ref.partId, ref.pinId))?.voltage ?? 0
@@ -966,41 +975,6 @@ export function solveCircuitNodalPotentials(
         resistance: 0,
         explanation: "0.0 Ω (Direct wire / continuous tie-point)",
         subtext: "Both probes are clipped to the same electrical net",
-      }
-    }
-
-    if (refA.partId === refB.partId) {
-      const component = state.parts.find((part) => part.id === refA.partId)
-      if (component?.type === "resistor") {
-        const resistance = Math.max(0.1, Number(component.props.resistance || 220))
-        return {
-          resistance,
-          explanation: `Component Resistance: ${resistance.toFixed(1)} Ω`,
-          subtext: `Marking bands denote ${resistance}Ω nominal resistance`,
-        }
-      }
-      if (component?.type === "ldr") {
-        const light = Math.max(0, Math.min(1023, Number(component.props.light ?? 512)))
-        const resistance = Math.max(200, Math.round(50000 / (1 + (light / 1023) * 99)))
-        return {
-          resistance,
-          explanation: `Photoresistor Resistance: ${resistance.toFixed(0)} Ω`,
-          subtext: `LDR resistance is resolved from the light level (${light}/1023)`,
-        }
-      }
-      if (component?.type === "dc-motor") {
-        return {
-          resistance: 50,
-          explanation: "DC motor winding model: 50.0 Ω",
-          subtext: "Simplified winding resistance used by the nodal motor branch",
-        }
-      }
-      if (component?.type === "buzzer") {
-        return {
-          resistance: 100,
-          explanation: "Piezo buzzer load model: 100.0 Ω",
-          subtext: "Simplified energized buzzer branch used by the nodal solver",
-        }
       }
     }
 
@@ -1391,13 +1365,12 @@ export function solveCircuitNodalPotentials(
 
     // 1. If probes are across a single resistor
     if (red.partId === black.partId && state.parts.find((p) => p.id === red.partId)?.type === "resistor") {
-      const part = state.parts.find((p) => p.id === red.partId)!
-      const r = Number(part.props.resistance || 220)
-      const currentMa = r > 0 ? (Math.abs(pd.diff) / r) * 1000 : 0
+      const currentMa = Math.abs(getBranchCurrent(red.partId, "a", "b"))
+      const r = Number(state.parts.find((p) => p.id === red.partId)?.props.resistance || 220)
       return {
-        currentMa: Number(currentMa.toFixed(1)),
-        explanation: `Branch Current through Resistor: ${currentMa.toFixed(1)} mA`,
-        subtext: `Ohm's Law: I = ΔV / R = ${Math.abs(pd.diff).toFixed(2)}V / ${r}Ω`,
+        currentMa: Number(currentMa.toFixed(3)),
+        explanation: `Solved resistor branch current: ${currentMa.toFixed(3)} mA`,
+        subtext: `MNA solved current using the connected network and configured ${r}Ω resistance.`,
       }
     }
 
@@ -1414,31 +1387,20 @@ export function solveCircuitNodalPotentials(
       }
     }
 
-    // 3. If probes are across power source and ground (e.g. Arduino Pin D13 & GND, or 5V & GND)
+    // 3. Source-to-return measurement: sum the solver's signed branch
+    // currents at the driven rail. Do not sum component runtime.currentMa,
+    // which mixed PWM averages, stale values, and unrelated components.
     const infoRed = getPinInfo(red)
     const infoBlack = getPinInfo(black)
     const hasSource = (infoRed.isDriven && infoBlack.isGnd) || (infoBlack.isDriven && infoRed.isGnd)
     if (hasSource) {
+      const sourceInfo = infoRed.isDriven ? infoRed : infoBlack
       const sourceRef = infoRed.isDriven ? red : black
-      const sourcePinName = sourceRef.pinId.toUpperCase()
-      let totalLoadMa = 0
-      const activeComponents: string[] = []
-
-      for (const part of state.parts) {
-        const r = runtime[part.id]
-        if (r && (r.currentMa || r.level)) {
-          const ma = r.currentMa ?? 15.0
-          totalLoadMa += ma
-          activeComponents.push(part.type.toUpperCase())
-        }
-      }
-
-      if (totalLoadMa > 0) {
-        return {
-          currentMa: Number(totalLoadMa.toFixed(1)),
-          explanation: `Total Circuit Current supplied by ${sourceRef.partId.toUpperCase()} (${sourcePinName}): ${totalLoadMa.toFixed(1)} mA`,
-          subtext: `Active loads: ${activeComponents.slice(0, 3).join(", ")} drawing power to Ground.`,
-        }
+      const currentMa = Math.abs(getNetCurrent(sourceInfo.netId))
+      return {
+        currentMa: Number(currentMa.toFixed(3)),
+        explanation: `Solved source current at ${sourceRef.partId.toUpperCase()} (${sourceRef.pinId.toUpperCase()}): ${currentMa.toFixed(3)} mA`,
+        subtext: "Algebraic sum of the MNA branch currents leaving the driven source net (KCL).",
       }
     }
 
@@ -1466,6 +1428,7 @@ export function solveCircuitNodalPotentials(
     branchCurrents,
     diagnostics,
     getBranchCurrent,
+    getNetCurrent,
     getPinVoltage,
     getPinInfo,
     getPotentialDifference,
