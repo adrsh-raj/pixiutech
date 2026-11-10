@@ -198,6 +198,9 @@ function pathUsingOnlyWires(adjacency, start, targets) {
 }
 
 function hasGroundPullResistor(circuit, graph, signalNode, grounds) {
+  // A parallel wire-only path would short the pulled-down signal to ground
+  // when the button drives it HIGH; the resistor must be the actual shunt.
+  if (pathUsingOnlyWires(graph.adjacency, signalNode, grounds)) return false
   for (const part of circuit.parts.filter((item) => item.type === "resistor")) {
     const a = graph.normalizeNode(part.id, "a")
     const b = graph.normalizeNode(part.id, "b")
@@ -310,17 +313,29 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
 
   for (const part of circuit.parts) {
     if (part.type === "seven-segment") {
+      const common = graph.normalizeNode(part.id, "com")
       for (const segment of ["a", "b", "c", "d", "e", "f", "g"]) {
         const pin = graph.normalizeNode(part.id, segment)
         const protectedSegment = pathToAny(graph.adjacency, pin, sources, { requireResistor: true }).found
-        if (!protectedSegment) errors.push(`${label}: seven-segment ${part.id} segment ${segment} lacks a series resistor`)
+        const bypassLoop =
+          pathUsingOnlyWires(graph.adjacency, pin, sources) &&
+          pathUsingOnlyWires(graph.adjacency, common, grounds)
+        if (!protectedSegment || bypassLoop) {
+          errors.push(`${label}: seven-segment ${part.id} segment ${segment} lacks effective series-resistor protection`)
+        }
       }
     }
     if (part.type === "rgb-led") {
+      const common = graph.normalizeNode(part.id, "gnd")
       for (const channel of ["red", "green", "blue"]) {
         const pin = graph.normalizeNode(part.id, channel)
         const protectedChannel = pathToAny(graph.adjacency, pin, sources, { requireResistor: true }).found
-        if (!protectedChannel) errors.push(`${label}: RGB LED ${part.id} channel ${channel} lacks a series resistor`)
+        const bypassLoop =
+          pathUsingOnlyWires(graph.adjacency, pin, sources) &&
+          pathUsingOnlyWires(graph.adjacency, common, grounds)
+        if (!protectedChannel || bypassLoop) {
+          errors.push(`${label}: RGB LED ${part.id} channel ${channel} lacks effective series-resistor protection`)
+        }
       }
     }
     if (part.type !== "led") continue
@@ -334,7 +349,12 @@ function auditCircuit(label, circuit, xml, { strictLedProtection = true } = {}) 
       const hasSeriesResistor =
         pathToAny(graph.adjacency, anode, sources, { requireResistor: true }).found ||
         pathToAny(graph.adjacency, cathode, grounds, { requireResistor: true }).found
-      if (strictLedProtection && !hasSeriesResistor) errors.push(`${label}: LED ${part.id} has a forward power/ground path without a series resistor`)
+      const unprotectedParallelLoop =
+        pathUsingOnlyWires(graph.adjacency, anode, sources) &&
+        pathUsingOnlyWires(graph.adjacency, cathode, grounds)
+      if (strictLedProtection && (!hasSeriesResistor || unprotectedParallelLoop)) {
+        errors.push(`${label}: LED ${part.id} has a forward power/ground path without effective series-resistor protection`)
+      }
     } else if (reverseSource.found && reverseGround.found) {
       errors.push(`${label}: LED ${part.id} is wired in reverse polarity`)
     } else {
