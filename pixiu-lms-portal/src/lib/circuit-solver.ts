@@ -4,7 +4,7 @@ import type { ArduinoPinState } from "./simulation"
 import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 import { normalizeBreadboardPinId } from "./breadboard-pins"
 import { getLedElectricalModel } from "./electrical-model"
-import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
+import { BREADBOARD_COLUMNS, CATALOG, ELECTRICAL_MODEL_CONTRACT } from "./components-catalog"
 
 export interface PinPotentialInfo {
   voltage: number
@@ -1587,16 +1587,27 @@ export function solveCircuitNodalPotentials(
           : -getBranchCurrent(red.partId, black.pinId, red.pinId)
         const currentMa = Math.abs(signedCurrent)
         const component = state.parts.find((part) => part.id === red.partId)
-        const isLed = component?.type === "led" || component?.type === "rgb-led" || component?.type === "seven-segment"
-        const isBurnt = component?.type === "led" && runtime[component.id]?.burnt === true
+        const componentType = component?.type
+        const isLed = componentType === "led" || componentType === "rgb-led" || componentType === "seven-segment"
+        const isBurnt = componentType === "led" && runtime[component.id]?.burnt === true
+        const loadModel = component
+          ? (CATALOG[component.type].electrical?.supplyLoads ?? []).find((load) =>
+              (load.positivePin === red.pinId && load.negativePin === black.pinId) ||
+              (load.positivePin === black.pinId && load.negativePin === red.pinId),
+            )
+          : undefined
+        const fidelity = componentType ? ELECTRICAL_MODEL_CONTRACT[componentType].fidelity : undefined
+        const isEstimate = loadModel?.accuracy === "module-estimate" || fidelity === "estimated"
+        const contractNote = componentType ? ELECTRICAL_MODEL_CONTRACT[componentType].note : undefined
         return {
           currentMa: Number(currentMa.toFixed(3)),
-          explanation: `Solved ${component?.type ?? "component"} branch current: ${currentMa.toFixed(3)} mA`,
+          explanation: `${isEstimate ? "Estimated" : "Solved"} ${componentType ?? "component"} branch current: ${currentMa.toFixed(3)} mA`,
           subtext: isBurnt
             ? "⚠️ OVERCURRENT BURNOUT!"
-            : isLed
-              ? "Current is read from the active diode/channel branch in the nodal solution."
-              : "Current is read directly from the solved component branch in the nodal network.",
+            : loadModel?.note ?? contractNote ??
+              (isLed
+                ? "Current is read from the active diode/channel branch in the nodal solution."
+                : "Current is read directly from the component branch in the nodal network."),
           isWarning: isBurnt,
         }
       }
@@ -1615,7 +1626,7 @@ export function solveCircuitNodalPotentials(
       return {
         currentMa: Number(currentMa.toFixed(3)),
         explanation: `Solved source current at ${sourceRef.partId.toUpperCase()} (${sourceRef.pinId.toUpperCase()}): ${currentMa.toFixed(3)} mA`,
-        subtext: "Algebraic sum of the MNA branch currents leaving the driven source net (KCL).",
+        subtext: "Algebraic sum of MNA branch currents leaving the driven source net (KCL). Includes configured module-estimate loads; the board's own quiescent consumption and regulator losses are excluded.",
       }
     }
 
