@@ -163,7 +163,7 @@ Same branch and PR; no second branch, no main changes.
 - Last fully green Browser Gate checkpoint: `24925d1a5a22cff1e45b4fb033f81479c17b1ed8`, 168/168 tests.
 - On `12105ebca00fc023153e98c0ef6b065c26343424`, Browser Gate had 178 tests: 177 pass / 1 fail because the new direct solver test was in a bundle that did not import `solveCircuitNodalPotentials`.
 - In that run, relay NO-contact motor-current test, dark/bright LDR wire-current test, potentiometer ADC values test, all-template/lesson passive-divider audit and the 75-circuit uniqueness/integrity audit passed.
-- Latest Browser Gate for `3eed1ec8f059efa047a1f710592ca85fe81220dc`: run `42756899894`, job `129633250166`. At this checkpoint the Virtual Lab build, browser runner installation and preview start had passed; browser gate was still running. Fetch exact status before reporting PASS.
+- Latest Browser Gate for source/test head `3eed1ec8f059efa047a1f710592ca85fe81220dc`, re-run on documentation head `49511ca8adb2b4108cd62a9ef135424b29451691`: run `42757102787`, job `129633894116` — **PASS, 178/178 tests**. Relay contact/motor current, dark/bright LDR current, direct nodal LDR current, all-template/lesson passive divider audit, and 75-circuit uniqueness audit all passed.
 - Previous `b3e73271d0e479a0f2889fea94123daa34284a6f` workflows: Phase 0–3, Phase 4–6, Phase 4–9 Reliability, Part 4 Current Verification and Production Security Smoke passed. Browser Gate had relay/LDR current failures, fixed in follow-up. Production Verification and Phase 9 failed on unrelated `src/pages/EightSquareAI.jsx` public-site audit.
 
 ### Still open — not production-ready
@@ -180,3 +180,6 @@ Same branch and PR; no second branch, no main changes.
 - No manual deployment.
 - On resume, fetch branch endpoint and compare head before editing. Use parent-checked atomic commits; never force-push, reset, clean, merge, deploy or modify main without explicit authorization.
 
+- Latest full workflow results on head `49511ca8adb2b4108cd62a9ef135424b29451691`: Phase 0–3 PASS; Phase 4–6 PASS; Phase 4–9 Reliability PASS; Part 4 Current Verification PASS; Production Security Smoke PASS; Deployment Smoke Test PASS.
+- Django backend test suite in Production Verification: 180 tests ran and reported `OK`. The overall Production Verification job failed after this, at the public website audit: `src/pages/EightSquareAI.jsx -> interactive cursor/scroll reveal pattern detected`. Phase 9 Final Green Gate failed at the same independent website audit. Do not alter/bypass that audit in this Virtual Lab scope.
+- PR #82 remains Open / Draft / mergeable; no merge and no manual deployment.
