@@ -79,6 +79,12 @@ export interface PartElectricalMeta {
   nominalForwardCurrentMa?: number
   /** First-order DC supply-load equivalents for active modules. */
   supplyLoads?: PartSupplyLoadMeta[]
+  /** Per-channel current for addressable RGB pixels at full channel output. */
+  pixelCurrentPerChannelMa?: number
+  /** Reference rail voltage for the addressable pixel current model. */
+  pixelReferenceVoltage?: number
+  /** Runtime colour used by the renderer for an inactive pixel. */
+  pixelOffColor?: string
 }
 
 export interface PartDef {
