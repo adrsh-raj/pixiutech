@@ -680,8 +680,7 @@ export function solveCircuitNodalPotentials(
     // current scales with actual terminal voltage as a resistor model; their
     // provenance remains "module-estimate" until a concrete module is selected.
     const supplyLoads = CATALOG[part.type].electrical?.supplyLoads ?? []
-    for (let loadIndex = 0; loadIndex < supplyLoads.length; loadIndex++) {
-      const load = supplyLoads[loadIndex]
+    for (const load of supplyLoads) {
       const runtimeState = runtime[part.id]
       const active =
         load.activeWhen === "relay-energized" ? runtimeState?.relayActive === true :
@@ -707,20 +706,24 @@ export function solveCircuitNodalPotentials(
     // colour channel is modelled as a 20mA channel. The pixel colour array is
     // the runtime output after show(); dark/idle pixels draw no LED-channel load.
     if (part.type === "neopixel-ring" && (runtime[part.id]?.level ?? 0) > 0) {
+      const model = CATALOG[part.type].electrical
+      const currentPerChannelMa = model?.pixelCurrentPerChannelMa ?? 0
+      const referenceVoltage = model?.pixelReferenceVoltage ?? 0
+      const offColor = (model?.pixelOffColor ?? "#0f172a").toLowerCase()
       const colors = runtime[part.id]?.pixelColors ?? []
       const currentMa = colors.reduce((total, color) => {
         const raw = String(color).trim().replace(/^#/, "")
-        if (!/^[0-9a-fA-F]{6}$/.test(raw) || raw.toLowerCase() === "0f172a") return total
+        if (!/^[0-9a-fA-F]{6}$/.test(raw) || ("#" + raw).toLowerCase() === offColor) return total
         const red = parseInt(raw.slice(0, 2), 16)
         const green = parseInt(raw.slice(2, 4), 16)
         const blue = parseInt(raw.slice(4, 6), 16)
-        return total + ((red + green + blue) / 255) * 20
+        return total + ((red + green + blue) / 255) * currentPerChannelMa
       }, 0)
-      if (currentMa > 0) {
+      if (currentMa > 0 && referenceVoltage > 0) {
         branches.push({
           netA: pinToNetId(part.id, "vcc"),
           netB: pinToNetId(part.id, "gnd"),
-          conductance: (currentMa / 1000) / 5,
+          conductance: (currentMa / 1000) / referenceVoltage,
           partId: part.id,
           pinA: "vcc",
           pinB: "gnd",
