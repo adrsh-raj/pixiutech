@@ -2,7 +2,7 @@ import type { CircuitState, PinRef } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
 import { solveCircuitNodalPotentials } from "./circuit-solver"
-import { getBoardForPart } from "./board-registry"
+import { getBoardForPart, lookupBoardPinState } from "./board-registry"
 import { BREADBOARD_COLUMNS } from "./components-catalog"
 import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
 
@@ -87,6 +87,17 @@ export function computeWireCurrents(
     resistanceOhms: 0.01,
     wireId: wire.id,
   }))
+  // Only physical source terminals are fixed-voltage boundaries. The nodal
+  // solver collapses wire-connected pins into one ideal net, so querying every
+  // connected pin would incorrectly fix both ends of each wire to one voltage
+  // and force its displayed current to zero.
+  const anchorVoltages = new Map<string, number>()
+  const addAnchor = (partId: string, pinId: string) => {
+    const ref = { partId, pinId }
+    const info = nodal.getPinInfo(ref)
+    if (!info || info.isFloating || info.isConflicted) return
+    anchorVoltages.set(partId + ":" + pinId, nodal.getPinVoltage(ref))
+  }
 
   const addInternal = (partId: string, pinA: string, pinB: string, resistanceOhms = 0.001) => {
     if (pinA === pinB) return
@@ -100,6 +111,34 @@ export function computeWireCurrents(
   for (const part of state.parts) {
     const board = getBoardForPart(part)
     if (board) {
+      // Physical supply rails and ground headers are real fixed-voltage
+      // terminals; component pins merely wired to them are not.
+      for (const pin of board.powerPins.v5 ?? []) addAnchor(part.id, pin)
+      for (const pin of board.powerPins.v33 ?? []) addAnchor(part.id, pin)
+      for (const pin of board.powerPins.vin ?? []) addAnchor(part.id, pin)
+      for (const pin of board.powerPins.gnd) addAnchor(part.id, pin)
+
+      // A driven MCU GPIO is a real voltage-source boundary as well.
+      for (const pin of board.pins) {
+        if (pin.kind !== "digital" && pin.kind !== "analog") continue
+        const pinState = lookupBoardPinState(pinStates, pin.id, board)
+        if (!pinState) continue
+        const activeOutput =
+          pinState.state === "HIGH" ||
+          (pinState.state === "LOW" && (
+            pinState.outputMode === "digital" ||
+            pinState.outputMode === "pwm" ||
+            pinState.outputMode === "tone" ||
+            pinState.outputMode === "servo" ||
+            pinState.outputMode === "dac"
+          )) ||
+          pinState.outputMode === "pwm" ||
+          pinState.outputMode === "tone" ||
+          pinState.outputMode === "servo" ||
+          pinState.outputMode === "dac"
+        if (activeOutput) addAnchor(part.id, pin.id)
+      }
+
       // Alias labels and duplicate supply/ground headers are the same physical node.
       for (const pin of board.pins) {
         for (const alias of pin.alternateNames ?? []) addInternal(part.id, pin.id, alias.toLowerCase())
@@ -117,7 +156,10 @@ export function computeWireCurrents(
       continue
     }
 
-    if (part.type === "breadboard") {
+    if (part.type === "battery") {
+      addAnchor(part.id, "pos")
+      addAnchor(part.id, "neg")
+    } else if (part.type === "breadboard") {
       const key = (pin: string) => pin
       for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
         const top = ["a", "b", "c", "d", "e"]
@@ -150,6 +192,20 @@ export function computeWireCurrents(
     }
   }
 
+  const modelOutputPins: Partial<Record<string, string[]>> = {
+    "ir-sensor": ["out"],
+    "dht11": ["data"],
+    "oled-i2c": ["sda", "scl"],
+    "joystick": ["vrx", "vry", "sw"],
+    "rotary-encoder": ["sw"],
+    "soil-moisture": ["ao"],
+    "tmp36": ["out", "vout"],
+    "mq2-gas": ["ao", "do"],
+  }
+  for (const part of state.parts) {
+    for (const pinId of modelOutputPins[part.type] ?? []) addAnchor(part.id, pinId)
+  }
+
   const adjacency = new Map<string, Array<{ edge: ConductorEdge; next: string }>>()
   const nodes = new Set<string>()
   for (const edge of edges) {
@@ -168,7 +224,8 @@ export function computeWireCurrents(
     if (!match || !Number.isFinite(currentMa) || Math.abs(currentMa) < 0.000001) continue
     const pinA = match[1] + ":" + match[2]
     const pinB = match[1] + ":" + match[3]
-    if (!nodes.has(pinA) || !nodes.has(pinB)) continue
+    nodes.add(pinA)
+    nodes.add(pinB)
     const currentA = currentMa / 1000
     injections.set(pinA, (injections.get(pinA) ?? 0) - currentA)
     injections.set(pinB, (injections.get(pinB) ?? 0) + currentA)
@@ -198,14 +255,8 @@ export function computeWireCurrents(
 
     const fixed = new Map<string, number>()
     for (const node of component) {
-      const separator = node.indexOf(":")
-      if (separator < 0) continue
-      const info = nodal.getPinInfo({
-        partId: node.slice(0, separator),
-        pinId: node.slice(separator + 1),
-      })
-      if (!info || info.isFloating || info.isConflicted) continue
-      if (info.isDriven || info.isGnd || info.isDigitalLow) fixed.set(node, info.voltage)
+      const voltage = anchorVoltages.get(node)
+      if (voltage !== undefined) fixed.set(node, voltage)
     }
 
     // An ideal fixed-voltage source/return is a boundary condition: it can
