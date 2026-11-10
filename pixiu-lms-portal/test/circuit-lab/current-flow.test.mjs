@@ -197,6 +197,7 @@ test("Pico relay current animation follows relayActive NO/NC state and motor RPM
   for (const wireId of ["coil-vcc", "coil-gnd", "coil-input", "contact-feed", "contact-pump", "pump-return"]) {
     assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current while the relay coil is energized and the pump runs`)
   }
+  assert.ok(energized["contact-feed"].currentMa > 0, "solver must include the energized COM–NO contact in the pump's current loop")
 
   const deenergized = computeWireCurrents(
     circuit,

@@ -116,7 +116,8 @@ export function solveCircuitNodalPotentials(
   state: CircuitState,
   pressed: Set<string> = new Set(),
   pinStates: Record<string, ArduinoPinState> = {},
-  running: boolean = true
+  running: boolean = true,
+  relayStates: Record<string, boolean> = {},
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
@@ -172,6 +173,9 @@ export function solveCircuitNodalPotentials(
       case "dc-motor":
         allPins.add(pinKey(part.id, "pos"))
         allPins.add(pinKey(part.id, "neg"))
+        break
+      case "relay":
+        for (const pin of ["vcc", "gnd", "in", "com", "no", "nc"]) allPins.add(pinKey(part.id, pin))
         break
       case "servo":
         allPins.add(pinKey(part.id, "vcc"))
@@ -572,6 +576,17 @@ export function solveCircuitNodalPotentials(
         const netA = pinToNetId(part.id, "pos")
         const netB = pinToNetId(part.id, "neg")
         branches.push({ netA, netB, conductance: 1 / 50 })
+        break
+      }
+      case "relay": {
+        // The normally-closed contact is the default physical state. When the
+        // coil is energized, switch the low-resistance contact to COM–NO.
+        const activeContact = relayStates[part.id] === true ? "no" : "nc"
+        branches.push({
+          netA: pinToNetId(part.id, "com"),
+          netB: pinToNetId(part.id, activeContact),
+          conductance: 1 / 10000,
+        })
         break
       }
     }

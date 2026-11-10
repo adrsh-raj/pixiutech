@@ -33,7 +33,12 @@ export function computeWireCurrents(
   const result: Record<string, WireCurrentState> = {}
 
   // 1. Solve exact nodal potentials across circuit
-  const nodal = solveCircuitNodalPotentials(state, pressed, pinStates, true)
+  const relayStates = Object.fromEntries(
+    state.parts
+      .filter((part) => part.type === "relay")
+      .map((part) => [part.id, runtime[part.id]?.relayActive === true]),
+  )
+  const nodal = solveCircuitNodalPotentials(state, pressed, pinStates, true, relayStates)
 
   // 2. Identify active power sources and ground sinks
   const powerPins = new Set<string>()
