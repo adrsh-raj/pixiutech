@@ -159,6 +159,16 @@ export function computeWireCurrents(
     if (part.type === "battery") {
       addAnchor(part.id, "pos")
       addAnchor(part.id, "neg")
+    } else if (part.type === "l298n") {
+      const driver = runtime[part.id]
+      if ((driver?.motorARpm ?? 0) > 0 && driver?.motorADirection !== "stopped") {
+        addAnchor(part.id, "out1")
+        addAnchor(part.id, "out2")
+      }
+      if ((driver?.motorBRpm ?? 0) > 0 && driver?.motorBDirection !== "stopped") {
+        addAnchor(part.id, "out3")
+        addAnchor(part.id, "out4")
+      }
     } else if (part.type === "breadboard") {
       const key = (pin: string) => pin
       for (let column = 1; column <= BREADBOARD_COLUMNS; column++) {
