@@ -868,14 +868,22 @@ export function solveCircuitNodalPotentials(
   for (const [netId, voltage] of netVoltagesSolved.entries()) netVoltages.set(netId, voltage)
   const activeBranches = branches.filter((branch, index) => !branch.isDiode || activeDiodeIndices.has(index))
 
+  // Propagate an ideal-source conflict through the entire connected
+  // conducting network. A neighbouring resistor branch is not physically
+  // valid merely because its own two terminals do not directly contain the
+  // conflicted source net.
+  const invalidNets = new Set<number>(conflictedNets)
+  const invalidQueue = [...invalidNets]
+  for (let index = 0; index < invalidQueue.length; index++) {
+    for (const neighbor of branchAdjacency.get(invalidQueue[index]) ?? []) {
+      if (invalidNets.has(neighbor)) continue
+      invalidNets.add(neighbor)
+      invalidQueue.push(neighbor)
+    }
+  }
+
   // Detect floating nets using the final conducting branch set.
   const sourceReachable = new Set(fixedNets.keys())
-  const branchAdjacency = new Map<number, number[]>()
-  for (const branch of activeBranches) {
-    if (branch.netA === branch.netB) continue
-    branchAdjacency.set(branch.netA, [...(branchAdjacency.get(branch.netA) ?? []), branch.netB])
-    branchAdjacency.set(branch.netB, [...(branchAdjacency.get(branch.netB) ?? []), branch.netA])
-  }
   const reachableQueue = [...sourceReachable]
   for (let index = 0; index < reachableQueue.length; index++) {
     for (const neighbor of branchAdjacency.get(reachableQueue[index]) ?? []) {
@@ -893,7 +901,7 @@ export function solveCircuitNodalPotentials(
   // fail closed so an impossible ideal-source short never yields fake current.
   const branchCurrents = new Map<string, number>()
   branches.forEach((branch, index) => {
-    const invalid = conflictedNets.has(branch.netA) || conflictedNets.has(branch.netB)
+    const invalid = invalidNets.has(branch.netA) || invalidNets.has(branch.netB)
     const inactiveDiode = Boolean(branch.isDiode && !activeDiodeIndices.has(index))
     const vA = netVoltages.get(branch.netA) ?? 0
     const vB = netVoltages.get(branch.netB) ?? 0
@@ -914,16 +922,16 @@ export function solveCircuitNodalPotentials(
     const voltage = netVoltages.get(netId) ?? 0
 
     pinPotentials.set(pin, {
-      voltage: floatingNets.has(netId) || conflictedNets.has(netId) ? 0 : Number(voltage.toFixed(2)),
+      voltage: floatingNets.has(netId) || invalidNets.has(netId) ? 0 : Number(voltage.toFixed(2)),
       netId,
-      sourceLabel: conflictedNets.has(netId)
-        ? "Conflicting ideal voltage sources"
+      sourceLabel: invalidNets.has(netId)
+        ? "Connected to conflicting ideal voltage sources"
         : fixedInfo?.label ?? (floatingNets.has(netId) ? "Floating / open circuit" : undefined),
-      isDriven: !conflictedNets.has(netId) && fixedInfo !== undefined && Math.abs(fixedInfo.voltage) > 1e-9,
-      isGnd: !conflictedNets.has(netId) && fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
+      isDriven: !invalidNets.has(netId) && fixedInfo !== undefined && Math.abs(fixedInfo.voltage) > 1e-9,
+      isGnd: !invalidNets.has(netId) && fixedInfo !== undefined && fixedInfo.voltage === 0 && !fixedInfo.isDigitalLow,
       isDigitalLow: fixedInfo?.isDigitalLow,
       isFloating: floatingNets.has(netId),
-      isConflicted: conflictedNets.has(netId),
+      isConflicted: invalidNets.has(netId),
       digitalPinName: fixedInfo?.digitalPinName,
     })
   }
