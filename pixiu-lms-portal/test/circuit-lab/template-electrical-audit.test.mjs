@@ -11,6 +11,7 @@ await build({
     new URL("../../src/lib/components-catalog.ts", import.meta.url).pathname,
     new URL("../../src/lib/board-registry.ts", import.meta.url).pathname,
     new URL("../../src/lib/lesson-engine.ts", import.meta.url).pathname,
+    new URL("../../src/lib/circuit-solver.ts", import.meta.url).pathname,
   ],
   bundle: true,
   format: "esm",
@@ -19,13 +20,15 @@ await build({
   alias: { "@": new URL("../../src", import.meta.url).pathname },
 })
 
-const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }] = await Promise.all([
+const [{ TEMPLATES }, { CATALOG }, boardModule, { LESSONS }, solverModule] = await Promise.all([
   import(`file://${join(outdir, "templates.js")}`),
   import(`file://${join(outdir, "components-catalog.js")}`),
   import(`file://${join(outdir, "board-registry.js")}`),
   import(`file://${join(outdir, "lesson-engine.js")}`),
+  import(`file://${join(outdir, "circuit-solver.js")}`),
 ])
 const { getBoardForPart, isBoardPart } = boardModule
+const { solveCircuitNodalPotentials } = solverModule
 
 function normalize(value) {
   return String(value ?? "").trim().toLowerCase()
@@ -564,6 +567,40 @@ const passiveAnalogErrors = [...TEMPLATES.map((template) => ({ label: `template 
 
 test("all LDRs and potentiometers have complete powered ADC divider topology", () => {
   assert.deepEqual(passiveAnalogErrors, [], passiveAnalogErrors.join("\\n"))
+})
+
+test("all 75 seeded circuits solve with finite branch currents and satisfy non-source-net KCL", () => {
+  const inventory = [
+    ...TEMPLATES.map((template) => ({ label: `template ${template.id}`, circuit: template.circuit })),
+    ...lessonCircuits.map((lesson) => ({ label: `lesson ${lesson.id}`, circuit: lesson.seedCircuit })),
+  ]
+  assert.equal(inventory.length, 75, "35 project templates plus 40 seeded lessons must all be solver-audited")
+
+  const diagnostics = []
+  const kclFailures = []
+  const nonFinite = []
+  for (const { label, circuit } of inventory) {
+    const solved = solveCircuitNodalPotentials(circuit)
+    for (const diagnostic of solved.diagnostics) {
+      diagnostics.push(`${label}: ${diagnostic.code}: ${diagnostic.message}`)
+    }
+    for (const [key, currentMa] of solved.branchCurrents) {
+      if (!Number.isFinite(currentMa)) nonFinite.push(`${label}: ${key} = ${currentMa}`)
+    }
+    for (const [netId, voltage] of solved.netVoltages) {
+      if (!Number.isFinite(voltage)) nonFinite.push(`${label}: net ${netId} voltage = ${voltage}`)
+      const netPins = [...solved.pinPotentials.values()].filter((info) => info.netId === netId)
+      if (netPins.some((info) => info.isDriven || info.isGnd || info.isDigitalLow || info.isConflicted || info.isFloating)) continue
+      const residualMa = Math.abs(solved.getNetCurrent(netId))
+      if (residualMa > 0.01) {
+        kclFailures.push(`${label}: net ${netId} KCL residual ${residualMa.toFixed(6)}mA`)
+      }
+    }
+  }
+
+  assert.deepEqual(diagnostics, [], diagnostics.join("\\n"))
+  assert.deepEqual(nonFinite, [], nonFinite.join("\\n"))
+  assert.deepEqual(kclFailures, [], kclFailures.join("\\n"))
 })
 
 test("complete Virtual Lab project-template and curriculum circuit inventory is unique and audited", () => {
