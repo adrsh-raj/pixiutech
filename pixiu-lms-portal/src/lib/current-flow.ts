@@ -335,8 +335,10 @@ export function computeWireCurrents(
     } else if (part.type === "ldr") {
       traceComponentFlow(`${part.id}:t1`, `${part.id}:t2`, 8.0)
     } else if (part.type === "relay") {
-      traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
+      // The relay's coil is an energized load, not a passive rail-to-ground
+      // branch. Neither coil nor input current should animate while de-energized.
       if (r?.relayActive === true) {
+        traceComponentFlow(`${part.id}:vcc`, `${part.id}:gnd`, 12.0)
         traceComponentFlow(`${part.id}:in`, `${part.id}:gnd`, 6.0, true)
       }
     } else if (part.type === "neopixel-ring" || part.type === "neopixel-strip") {
