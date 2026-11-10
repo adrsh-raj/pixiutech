@@ -424,11 +424,8 @@ export function solveCircuitNodalPotentials(
           setFixedNet(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} 5V Power Rail` })
         }
       }
-      if (board.powerPins.vin) {
-        for (const p of board.powerPins.vin) {
-          setFixedNet(pinToNetId(part.id, p), { voltage: 5.0, label: `${board.shortName} VIN (5.0V)` })
-        }
-      }
+      // Raw VIN/VSYS pins are external power inputs, not ideal 5V outputs.
+      // Only powerPins.v5/v33 represent powered-board source rails.
       if (board.powerPins.v33) {
         for (const p of board.powerPins.v33) {
           setFixedNet(pinToNetId(part.id, p), { voltage: 3.3, label: `${board.shortName} 3.3V Rail` })
