@@ -237,3 +237,51 @@ test("DMM resistance does not treat a passive piezo buzzer as a 100Ω DC resisto
     "a passive piezo is reactive/frequency-dependent, not a fixed 100Ω DC path")
   assert.match(resistance.explanation, /Open Circuit.*O\.L/i)
 })
+
+
+test("DMM branch-current mode reads RGB LED and seven-segment diode branches from MNA", () => {
+  const rgbCircuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 200, y: 100, rotation: 0, props: { resistance: 220 } },
+      { id: "rgb", type: "rgb-led", x: 300, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "red-feed", from: { partId: "r1", pinId: "b" }, to: { partId: "rgb", pinId: "red" }, color: "#ef4444" },
+      { id: "rgb-return", from: { partId: "rgb", pinId: "gnd" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const rgbSolved = solveCircuitNodalPotentials(rgbCircuit)
+  const rgbBranch = rgbSolved.getBranchCurrent("rgb", "red", "gnd")
+  const rgbMeter = rgbSolved.computeCurrentBetweenPins(
+    { partId: "rgb", pinId: "red" },
+    { partId: "rgb", pinId: "gnd" },
+    {},
+  )
+  assert.ok(rgbBranch > 0)
+  assert.ok(Math.abs(rgbMeter.currentMa - Math.abs(rgbBranch)) < 0.001)
+
+  const segmentCircuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 200, y: 100, rotation: 0, props: { resistance: 220 } },
+      { id: "display", type: "seven-segment", x: 300, y: 100, rotation: 0, props: { commonType: "cathode", color: "red" } },
+    ],
+    wires: [
+      { id: "feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "r1", pinId: "a" }, color: "#ef4444" },
+      { id: "segment-feed", from: { partId: "r1", pinId: "b" }, to: { partId: "display", pinId: "a" }, color: "#ef4444" },
+      { id: "display-return", from: { partId: "display", pinId: "com" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const segmentRuntime = { display: { segments: { a: true } } }
+  const segmentSolved = solveCircuitNodalPotentials(segmentCircuit, new Set(), {}, true, {}, segmentRuntime)
+  const segmentBranch = segmentSolved.getBranchCurrent("display", "a", "com")
+  const segmentMeter = segmentSolved.computeCurrentBetweenPins(
+    { partId: "display", pinId: "a" },
+    { partId: "display", pinId: "com" },
+    segmentRuntime,
+  )
+  assert.ok(segmentBranch > 0)
+  assert.ok(Math.abs(segmentMeter.currentMa - Math.abs(segmentBranch)) < 0.001)
+})
