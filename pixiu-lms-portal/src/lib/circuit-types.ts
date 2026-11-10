@@ -53,6 +53,23 @@ export interface PartEducationalMeta {
   hint: string
 }
 
+export interface PartSupplyLoadMeta {
+  /** Positive supply/load terminal on this component. */
+  positivePin: string
+  /** Supply return terminal on this component. */
+  negativePin: string
+  /** Datasheet/module nominal voltage at which the stated current applies. */
+  nominalVoltage: number
+  /** Nominal current at nominalVoltage (mA). */
+  nominalCurrentMa: number
+  /** Distinguishes manufacturer-typical/max figures from generic module estimates. */
+  accuracy: "datasheet-typical" | "datasheet-maximum" | "module-estimate"
+  /** If present, the load is absent until the runtime state becomes active. */
+  activeWhen?: "relay-energized" | "servo-command" | "pixels-lit" | "display-enabled"
+  /** Short provenance/assumption displayed in audit evidence. */
+  note: string
+}
+
 export interface PartElectricalMeta {
   /** Forward-voltage lookup by normalized LED colour name (volts). */
   forwardVoltageByColor?: Record<string, number>
@@ -60,6 +77,8 @@ export interface PartElectricalMeta {
   maxForwardCurrentMa?: number
   /** Nominal current used to normalize visual brightness (mA). */
   nominalForwardCurrentMa?: number
+  /** First-order DC supply-load equivalents for active modules. */
+  supplyLoads?: PartSupplyLoadMeta[]
 }
 
 export interface PartDef {
