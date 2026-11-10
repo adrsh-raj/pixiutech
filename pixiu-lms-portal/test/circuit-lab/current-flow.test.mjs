@@ -101,3 +101,41 @@ test("buzzer when OFF has ZERO current in its wires", () => {
   assert.equal(currents["w_bzpos"], undefined, "Wire from D8 to buzzer must have NO current when buzzer is silent")
   assert.equal(currents["w_bzgnd"], undefined, "Wire from buzzer to GND must have NO current when buzzer is silent")
 })
+
+
+test("Pico relay current animation follows relayActive NO/NC state and motor RPM", () => {
+  const circuit = {
+    parts: [
+      { id: "pico", type: "rpi-pico", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "relay", type: "relay", x: 260, y: 100, rotation: 0, props: {} },
+      { id: "pump", type: "dc-motor", x: 480, y: 100, rotation: 0, props: {} },
+    ],
+    wires: [
+      { id: "coil-vcc", from: { partId: "pico", pinId: "vbus" }, to: { partId: "relay", pinId: "vcc" }, color: "#ef4444" },
+      { id: "coil-gnd", from: { partId: "relay", pinId: "gnd" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+      { id: "coil-input", from: { partId: "pico", pinId: "gp13" }, to: { partId: "relay", pinId: "in" }, color: "#facc15" },
+      { id: "contact-feed", from: { partId: "pico", pinId: "vbus" }, to: { partId: "relay", pinId: "com" }, color: "#ef4444" },
+      { id: "contact-pump", from: { partId: "relay", pinId: "no" }, to: { partId: "pump", pinId: "pos" }, color: "#f97316" },
+      { id: "pump-return", from: { partId: "pump", pinId: "neg" }, to: { partId: "pico", pinId: "gnd_1" }, color: "#1e293b" },
+    ],
+  }
+
+  const pinStates = { "13": { state: "HIGH", outputMode: "digital" } }
+  const energized = computeWireCurrents(
+    circuit,
+    { relay: { relayActive: true }, pump: { rpm: 1000, motorDirection: "cw" } },
+    pinStates,
+  )
+  for (const wireId of ["contact-feed", "contact-pump", "pump-return"]) {
+    assert.ok(energized[wireId]?.currentMa > 0, `${wireId} must show current when relay NO is closed and pump runs`)
+  }
+
+  const deenergized = computeWireCurrents(
+    circuit,
+    { relay: { relayActive: false }, pump: { rpm: 0, motorDirection: "stopped" } },
+    { "13": { state: "LOW", outputMode: "digital" } },
+  )
+  for (const wireId of ["contact-feed", "contact-pump", "pump-return"]) {
+    assert.equal(deenergized[wireId], undefined, `${wireId} must be idle when relay NO is open`)
+  }
+})
