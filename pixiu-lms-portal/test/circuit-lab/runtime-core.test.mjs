@@ -445,12 +445,44 @@ test("true DAC output stays continuous DC while analogWrite on a DAC-capable pin
   const circuit = { parts: [part("esp", "esp32-devkit")], wires: [] }
   const dac = { "25": { state: "HIGH", value: 128, outputMode: "dac" } }
   const pwm = { "25": { state: "HIGH", value: 128, outputMode: "pwm" } }
+  const expectedAverage = 3.3 * 128 / 255
   const dacVoltage = samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, dac, 0.75)
-  assert.ok(Math.abs(dacVoltage - (3.3 * 128 / 255)) < 0.02)
+  assert.ok(Math.abs(dacVoltage - expectedAverage) < 0.02)
+  const dacNodal = solveCircuitNodalPotentials(circuit, new Set(), dac)
+  assert.ok(Math.abs(dacNodal.getPinVoltage({ partId: "esp", pinId: "d25" }) - expectedAverage) < 0.02)
+  const pwmNodal = solveCircuitNodalPotentials(circuit, new Set(), pwm)
+  assert.ok(Math.abs(pwmNodal.getPinVoltage({ partId: "esp", pinId: "d25" }) - expectedAverage) < 0.02)
+
   const definition = getBoardForPart(part("esp", "esp32-devkit"))
   const period = 1000 / definition.pwmFrequencyDefaultHz
   assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.25), 3.3)
   assert.equal(samplePinVoltage({ partId: "esp", pinId: "d25" }, circuit, pwm, period * 0.75), 0)
+})
+
+test("DAC analog amplitude and PWM pulse amplitude produce different LED conduction", () => {
+  const circuit = {
+    parts: [
+      part("esp", "esp32-devkit"),
+      part("r", "resistor", { resistance: 220 }),
+      part("led", "led", { color: "red" }),
+    ],
+    wires: [
+      wire("drive", "esp", "d25", "r", "a"),
+      wire("series", "r", "b", "led", "anode"),
+      wire("return", "led", "cathode", "esp", "gnd_l"),
+    ],
+  }
+  const dac = computeRuntime(circuit, new Set(), {
+    "25": { state: "HIGH", value: 128, outputMode: "dac" },
+  })
+  const pwm = computeRuntime(circuit, new Set(), {
+    "25": { state: "HIGH", value: 128, outputMode: "pwm" },
+  })
+
+  assert.equal(dac.led.level, 0, "1.66V DAC output is below the red LED's 1.9V forward voltage")
+  assert.equal(dac.led.currentMa, 0, "continuous DAC voltage below Vf must not create LED current")
+  assert.ok(pwm.led.level > 0, "3.3V PWM pulses must illuminate the same LED at non-zero duty")
+  assert.ok(pwm.led.currentMa > 0, "PWM LED current is duty-cycle averaged after peak conduction")
 })
 
 test("tone and servo outputs are sampled as their own timed pulse waveforms", () => {
