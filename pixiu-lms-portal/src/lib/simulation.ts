@@ -250,11 +250,15 @@ export function computeRuntime(
           const voltage = Number((board.logicVoltage * getPwmDutyCycle(pState.value!)).toFixed(3))
           if (voltage > 0) addSignalSource(voltage, 1)
         } else if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+          const legacyPwmState =
+            pState.outputMode === undefined &&
+            pState.value !== undefined &&
+            pState.value > 1
           const duty = pState.outputMode === "tone"
             ? 0.5
             : pState.outputMode === "servo"
               ? (1 + Math.max(0, Math.min(180, pState.angle ?? 90)) / 180) / 20
-              : pState.outputMode === "pwm" || pState.value !== undefined
+              : pState.outputMode === "pwm" || legacyPwmState
                 ? getPwmDutyCycle(pState.value ?? 0)
                 : 1
           // PWM output is a full logic-level pulse train. Do not multiply the
