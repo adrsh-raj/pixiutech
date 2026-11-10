@@ -972,3 +972,55 @@ test("every Virtual Lab component has an explicit, auditable electrical-model co
     }
   }
 })
+
+
+test("L298N solver drives motor outputs from VS and reflects motor current back to the supply", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("driver", "l298n"),
+      part("motor", "dc-motor"),
+    ],
+    wires: [
+      wire("vs", "uno", "5v", "driver", "vs"),
+      wire("gnd", "driver", "gnd", "uno", "gnd_pwr"),
+      wire("ena", "uno", "d9", "driver", "ena"),
+      wire("in1", "uno", "d8", "driver", "in1"),
+      wire("in2", "uno", "d7", "driver", "in2"),
+      wire("motor-positive", "driver", "out1", "motor", "pos"),
+      wire("motor-negative", "driver", "out2", "motor", "neg"),
+    ],
+  }
+
+  const fullDrive = {
+    "9": { state: "HIGH", value: 255, outputMode: "digital" },
+    "8": { state: "HIGH", value: 1, outputMode: "digital" },
+    "7": { state: "LOW", value: 0, outputMode: "digital" },
+  }
+  const runtime = computeRuntime(circuit, new Set(), fullDrive)
+  assert.equal(runtime.driver.motorARpm, 1000)
+  assert.equal(runtime.driver.motorADirection, "cw")
+  const solved = solveCircuitNodalPotentials(circuit, new Set(), fullDrive, true, {}, runtime)
+  assert.ok(Math.abs(solved.getPinVoltage({ partId: "driver", pinId: "out1" }) - 5) < 0.01)
+  assert.ok(Math.abs(solved.getPinVoltage({ partId: "driver", pinId: "out2" })) < 0.01)
+  const motorCurrent = solved.getBranchCurrent("motor", "pos", "neg")
+  const supplyCurrent = solved.getBranchCurrent("driver", "vs", "gnd")
+  assert.ok(Math.abs(motorCurrent - 100) < 0.2, `50Ω motor proxy on 5V should carry 100mA, got ${motorCurrent}mA`)
+  assert.ok(Math.abs(supplyCurrent - motorCurrent) < 0.2,
+    `L298N VS supply draw should equal connected motor branch current, got ${supplyCurrent}mA`)
+
+  const reversePwm = {
+    "9": { state: "HIGH", value: 128, outputMode: "pwm" },
+    "8": { state: "LOW", value: 0, outputMode: "digital" },
+    "7": { state: "HIGH", value: 1, outputMode: "digital" },
+  }
+  const reverseRuntime = computeRuntime(circuit, new Set(), reversePwm)
+  assert.equal(reverseRuntime.driver.motorADirection, "ccw")
+  const reverseSolved = solveCircuitNodalPotentials(circuit, new Set(), reversePwm, true, {}, reverseRuntime)
+  const expectedAverageV = 5 * (reverseRuntime.driver.motorARpm / 1000)
+  assert.ok(Math.abs(reverseSolved.getPinVoltage({ partId: "driver", pinId: "out2" }) - expectedAverageV) < 0.02,
+    "reverse PWM output must follow the enabled duty-cycle average on OUT2")
+  assert.ok(Math.abs(reverseSolved.getBranchCurrent("driver", "vs", "gnd") -
+    reverseSolved.getBranchCurrent("motor", "pos", "neg")) < 0.2,
+  "reverse PWM motor branch current must be reflected at the VS supply")
+})
