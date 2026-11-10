@@ -58,7 +58,7 @@ export function computeRuntime(
           : pinState,
     ]),
   ) as Record<string, ArduinoPinState>
-  const hasLedLoad = state.parts.some((part) => part.type === "led")
+  const hasLedLoad = state.parts.some((part) => part.type === "led" || part.type === "rgb-led")
   const peakNodalSolution = hasLedLoad
     ? solveCircuitNodalPotentials(state, pressed, peakPinStates, true)
     : null
@@ -535,37 +535,49 @@ export function computeRuntime(
     } else if (part.type === "rgb-led") {
       const gndKey = k("gnd")
       const toGnd = shortestResistance(groundSinks.map((g) => ({ key: g })), gndKey)
-      if (toGnd) {
-        const getChannel = (pinId: "red" | "green" | "blue") => {
-          const model = getLedElectricalModel(part, pinId)
-          const path = shortestResistance(activeSources, k(pinId))
-          if (!path) return { level: 0, currentMa: 0 }
-          const totalResistance = path.resistance + toGnd.resistance
-          const peakCurrentMa =
-            (Math.max(0, path.voltage - model.forwardVoltage) / (totalResistance + 0.1)) * 1000
-          if (peakCurrentMa > model.maxForwardCurrentMa) return { level: 0, currentMa: 0 }
-          const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, path.duty))
-          return {
-            level: Math.min(1, Math.max(0, averageCurrentMa / model.nominalForwardCurrentMa)),
-            currentMa: Number(averageCurrentMa.toFixed(2)),
-          }
+      const commonInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId: "gnd" })
+      const reverseWarnings: string[] = []
+      const getChannel = (pinId: "red" | "green" | "blue") => {
+        const model = getLedElectricalModel(part, pinId)
+        const channelInfo = peakNodalSolution?.getPinInfo({ partId: part.id, pinId })
+        if (
+          channelInfo &&
+          commonInfo &&
+          !channelInfo.isFloating &&
+          !commonInfo.isFloating &&
+          commonInfo.voltage - channelInfo.voltage > 0.1
+        ) {
+          reverseWarnings.push(
+            `${pinId} channel is reverse-biased by ${(commonInfo.voltage - channelInfo.voltage).toFixed(2)} V`,
+          )
+          return { level: 0, currentMa: 0 }
         }
-        const red = getChannel("red")
-        const green = getChannel("green")
-        const blue = getChannel("blue")
-        runtime[part.id] = {
-          redLevel: red.level,
-          greenLevel: green.level,
-          blueLevel: blue.level,
-          redCurrentMa: red.currentMa,
-          greenCurrentMa: green.currentMa,
-          blueCurrentMa: blue.currentMa,
+
+        const path = shortestResistance(activeSources, k(pinId))
+        if (!path || !toGnd) return { level: 0, currentMa: 0 }
+        const totalResistance = path.resistance + toGnd.resistance
+        const peakCurrentMa =
+          (Math.max(0, path.voltage - model.forwardVoltage) / (totalResistance + 0.1)) * 1000
+        if (peakCurrentMa > model.maxForwardCurrentMa) return { level: 0, currentMa: 0 }
+        const averageCurrentMa = peakCurrentMa * Math.max(0, Math.min(1, path.duty))
+        return {
+          level: Math.min(1, Math.max(0, averageCurrentMa / model.nominalForwardCurrentMa)),
+          currentMa: Number(averageCurrentMa.toFixed(2)),
         }
-      } else {
-        runtime[part.id] = {
-          redLevel: 0, greenLevel: 0, blueLevel: 0,
-          redCurrentMa: 0, greenCurrentMa: 0, blueCurrentMa: 0,
-        }
+      }
+      const red = getChannel("red")
+      const green = getChannel("green")
+      const blue = getChannel("blue")
+      runtime[part.id] = {
+        redLevel: red.level,
+        greenLevel: green.level,
+        blueLevel: blue.level,
+        redCurrentMa: red.currentMa,
+        greenCurrentMa: green.currentMa,
+        blueCurrentMa: blue.currentMa,
+        warning: reverseWarnings.length
+          ? `Reverse Polarity: RGB ${reverseWarnings.join("; ")}. Check the common cathode and channel wiring.`
+          : undefined,
       }
     } else if (part.type === "neopixel-ring") {
       const powered = hasExternalPower(part.id, "vcc", "gnd")
