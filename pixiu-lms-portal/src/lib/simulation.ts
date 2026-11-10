@@ -231,7 +231,23 @@ export function computeRuntime(
         const pinId = pin.id
         const stripped = pinId.replace(/^(gpio|gp|d|p)/i, "")
         const pState = lookupBoardPinState(pinStates, pinId, board)
-        if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
+        const addSignalSource = (voltage: number, duty: number) => {
+          activeSources.push({ key: k(pinId), voltage, duty })
+          if (stripped) activeSources.push({ key: k(stripped), voltage, duty })
+          for (const alt of pin.alternateNames ?? []) {
+            activeSources.push({ key: k(alt.toLowerCase()), voltage, duty })
+          }
+        }
+        const isDacOutput =
+          pState?.outputMode === "dac" &&
+          pin.capabilities?.dac === true &&
+          typeof pState.value === "number"
+        if (isDacOutput) {
+          // A DAC is continuous DC, not a full-amplitude pulse train.
+          // Keep the analog amplitude and use duty=1 for its load current.
+          const voltage = Number((board.logicVoltage * getPwmDutyCycle(pState.value!)).toFixed(3))
+          if (voltage > 0) addSignalSource(voltage, 1)
+        } else if (pState?.state === "HIGH" || (pState?.value ?? 0) > 0) {
           const duty = pState.outputMode === "tone"
             ? 0.5
             : pState.outputMode === "servo"
@@ -241,12 +257,7 @@ export function computeRuntime(
                 : 1
           // PWM output is a full logic-level pulse train. Do not multiply the
           // HIGH voltage by duty before calculating diode forward conduction.
-          const voltage = board.logicVoltage
-          activeSources.push({ key: k(pinId), voltage, duty })
-          if (stripped) activeSources.push({ key: k(stripped), voltage, duty })
-          for (const alt of pin.alternateNames ?? []) {
-            activeSources.push({ key: k(alt.toLowerCase()), voltage, duty })
-          }
+          addSignalSource(board.logicVoltage, duty)
         } else {
           // A LOW GPIO may sink signal current, but it is not a component power return.
           groundSinks.push(k(pinId))
