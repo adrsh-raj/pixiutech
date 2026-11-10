@@ -360,6 +360,26 @@ test("genuine reversed LED wiring is still detected from signed node potentials"
   assert.match(runtime.led.warning, /Reverse Polarity/)
 })
 
+test("legacy HIGH with value 1 remains a digital HIGH, not 1/255 PWM", () => {
+  const circuit = {
+    parts: [
+      part("uno", "arduino-uno"),
+      part("r", "resistor", { resistance: 220 }),
+      part("led", "led", { color: "red" }),
+    ],
+    wires: [
+      wire("drive", "uno", "d9", "r", "a"),
+      wire("series", "r", "b", "led", "anode"),
+      wire("return", "led", "cathode", "uno", "gnd"),
+    ],
+  }
+  const runtime = computeRuntime(circuit, new Set(), {
+    "9": { state: "HIGH", value: 1 },
+  })
+  assert.ok(runtime.led.level > 0.8, "legacy digital HIGH must use full logic-level amplitude")
+  assert.ok(runtime.led.currentMa > 10, "legacy digital HIGH must not be attenuated to 1/255 average current")
+})
+
 test("PWM LED brightness follows duty cycle while pulse amplitude stays at logic HIGH", () => {
   const circuit = {
     parts: [
