@@ -267,3 +267,53 @@ test("LDR wire current follows the modeled light-dependent resistance below and 
   assert.ok(bright["ldr-feed"]?.currentMa > 9.5 && bright["ldr-feed"]?.currentMa < 10.5,
     `bright LDR should draw about 10mA, received ${bright["ldr-feed"]?.currentMa}mA`)
 })
+
+
+test("parallel physical wire routes share current by conductor resistance and conserve branch current", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "r", type: "resistor", x: 260, y: 100, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "feed-a", from: { partId: "uno", pinId: "5v" }, to: { partId: "r", pinId: "a" }, color: "#ef4444" },
+      { id: "feed-b", from: { partId: "uno", pinId: "5v" }, to: { partId: "r", pinId: "a" }, color: "#f97316" },
+      { id: "return", from: { partId: "r", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.ok(Math.abs((currents["feed-a"]?.currentMa ?? 0) - 2.5) < 0.05,
+    `first equal wire route should carry about 2.5mA, got ${currents["feed-a"]?.currentMa}`)
+  assert.ok(Math.abs((currents["feed-b"]?.currentMa ?? 0) - 2.5) < 0.05,
+    `second equal wire route should carry about 2.5mA, got ${currents["feed-b"]?.currentMa}`)
+  assert.ok(Math.abs((currents["feed-a"].currentMa + currents["feed-b"].currentMa) - 5) < 0.05,
+    "parallel feed routes must sum to the solved 5mA load current")
+  assert.ok(Math.abs(currents["return"]?.currentMa - 5) < 0.05,
+    "common return must carry the sum of both parallel routes")
+})
+
+test("a source-conflicted circuit does not suppress current animation in an independent valid circuit", () => {
+  const circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 100, rotation: 0, props: {} },
+      { id: "esp", type: "esp32-devkit", x: 200, y: 100, rotation: 0, props: {} },
+      { id: "bad-load", type: "resistor", x: 360, y: 100, rotation: 0, props: { resistance: 1000 } },
+      { id: "battery", type: "battery", x: 40, y: 300, rotation: 0, props: { voltage: 9 } },
+      { id: "good-load", type: "resistor", x: 260, y: 300, rotation: 0, props: { resistance: 1000 } },
+    ],
+    wires: [
+      { id: "conflict", from: { partId: "uno", pinId: "5v" }, to: { partId: "esp", pinId: "3v3" }, color: "#ef4444" },
+      { id: "common-ground", from: { partId: "uno", pinId: "gnd_pwr" }, to: { partId: "esp", pinId: "gnd" }, color: "#1e293b" },
+      { id: "bad-feed", from: { partId: "uno", pinId: "5v" }, to: { partId: "bad-load", pinId: "a" }, color: "#ef4444" },
+      { id: "bad-return", from: { partId: "bad-load", pinId: "b" }, to: { partId: "uno", pinId: "gnd_pwr" }, color: "#1e293b" },
+      { id: "good-feed", from: { partId: "battery", pinId: "pos" }, to: { partId: "good-load", pinId: "a" }, color: "#f97316" },
+      { id: "good-return", from: { partId: "good-load", pinId: "b" }, to: { partId: "battery", pinId: "neg" }, color: "#1e293b" },
+    ],
+  }
+  const currents = computeWireCurrents(circuit, {}, {})
+  assert.equal(currents["bad-feed"], undefined, "source-conflicted network must not fabricate current")
+  assert.equal(currents["bad-return"], undefined, "source-conflicted return must not animate")
+  assert.ok(currents["good-feed"]?.currentMa > 8.9 && currents["good-feed"]?.currentMa < 9.1,
+    "independent 9V/1kΩ circuit must continue to animate at about 9mA")
+  assert.ok(currents["good-return"]?.currentMa > 8.9 && currents["good-return"]?.currentMa < 9.1)
+})
