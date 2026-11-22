@@ -13,14 +13,17 @@ Cohort Gating:
 import hashlib
 import json
 import logging
+import time
 import urllib.error
 import urllib.request
+import uuid
 from typing import Any, Dict, Optional, Tuple
 
 from django.conf import settings
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from accounts.models import UserRole, UserStatus
@@ -153,32 +156,48 @@ class XenChatView(XenBaseView):
     Primary chat and tutoring endpoint mediating user interactions with PixiuMind Step-700.
     
     Cohort & Policy Enforcement:
+    - Feature Flag: XEN_PILOT_ENABLED gating.
     - Student access disabled during Closed Production.
     - Server-side tester allowlist enforced when configured.
     - Personal Teacher Memory strictly disabled in v0.1.
     - Intent authorization and evidence-backed A05 gate.
     - Safe-literal encoding and token-aware stop handling.
+    - Scoped rate throttling to protect GPU from runaway scripts.
     """
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "xen_chat"
+
     def post(self, request, *args, **kwargs):
+        # 0. Operational Request Tracing ID
+        request_id = f"xen-{uuid.uuid4().hex[:12]}"
+
+        # 1. Feature Flag: XEN_PILOT_ENABLED Gating
+        if not getattr(settings, "XEN_PILOT_ENABLED", False):
+            return Response(
+                {
+                    "error": "PixiuMind Xen pilot is currently disabled. Access is restricted to authorized deployment windows.",
+                    "code": "XEN_PILOT_DISABLED",
+                    "request_id": request_id,
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         user = request.user
         role = getattr(user, "role", "")
         username = getattr(user, "username", "")
-        prompt = request.data.get("prompt", "")
-        intent = request.data.get("intent", "TEACHING").strip().upper()
-        history = request.data.get("history", [])
-        idempotency_key = request.data.get("idempotency_key", "").strip()
 
-        # 1. Closed Production Cohort: Student access is strictly disabled
+        # 2. Closed Production Cohort: Student access is strictly disabled
         if role == UserRole.STUDENT:
             return Response(
                 {
                     "error": "Student access is disabled during Closed Production cohort validation.",
                     "code": "STUDENT_ACCESS_DISABLED",
+                    "request_id": request_id,
                 },
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 2. Server-side tester allowlist enforcement
+        # 3. Server-side tester allowlist enforcement
         tester_allowlist = getattr(settings, "PIXIUMIND_TESTER_ALLOWLIST", None)
         if tester_allowlist and isinstance(tester_allowlist, (list, set, tuple)):
             if username not in tester_allowlist:
@@ -186,17 +205,69 @@ class XenChatView(XenBaseView):
                     {
                         "error": "User is not authorized for the Closed Production testing cohort.",
                         "code": "NOT_IN_TESTER_ALLOWLIST",
+                        "request_id": request_id,
                     },
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-        if not isinstance(prompt, str) or not prompt.strip():
+        # 4. Flexible Schema Extraction (OpenAI messages format vs Portal prompt format)
+        raw_prompt = request.data.get("prompt")
+        messages_input = request.data.get("messages")
+        intent = request.data.get("intent", "TEACHING")
+        if isinstance(intent, str):
+            intent = intent.strip().upper()
+        else:
+            intent = "TEACHING"
+
+        history = request.data.get("history", [])
+        idempotency_key = request.data.get("idempotency_key", "")
+        if isinstance(idempotency_key, str):
+            idempotency_key = idempotency_key.strip()
+        else:
+            idempotency_key = ""
+
+        is_openai_schema = bool(messages_input is not None and raw_prompt is None)
+
+        if raw_prompt is not None and isinstance(raw_prompt, str):
+            prompt = raw_prompt.strip()
+        elif isinstance(messages_input, list):
+            user_turns = [m for m in messages_input if isinstance(m, dict) and m.get("role") == "user"]
+            if user_turns:
+                prompt = str(user_turns[-1].get("content", "")).strip()
+                history = [
+                    {"role": m.get("role"), "content": str(m.get("content", ""))}
+                    for m in messages_input[:-1]
+                    if isinstance(m, dict) and m.get("role") in {"user", "assistant"}
+                ]
+            else:
+                prompt = ""
+        else:
+            prompt = ""
+
+        # 5. Prompt Validation & Sanitization
+        if not prompt:
             return Response(
-                {"error": "A non-empty prompt is required.", "code": "INVALID_PROMPT"},
+                {"error": "A non-empty prompt is required.", "code": "INVALID_PROMPT", "request_id": request_id},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 3. Intent authorization check with evidence-backed A05 gate
+        max_chars = getattr(settings, "XEN_MAX_PROMPT_CHARS", 4000)
+        if len(prompt) > max_chars:
+            return Response(
+                {
+                    "error": f"Prompt length exceeds maximum allowed limit of {max_chars} characters.",
+                    "code": "PROMPT_TOO_LARGE",
+                    "request_id": request_id,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Defensive sanitization against delimiter token injection and null bytes
+        prompt = prompt.replace("\x00", "")
+        for control_token in ["<|im_start|>", "<|im_end|>", "<|endoftext|>"]:
+            prompt = prompt.replace(control_token, "")
+
+        # 6. Intent authorization check with evidence-backed A05 gate
         if role == UserRole.TRAINER:
             trainer_profile = getattr(user, "trainer_profile", None)
             xen_trainer = getattr(trainer_profile, "xen_identity", None) if trainer_profile else None
@@ -207,6 +278,7 @@ class XenChatView(XenBaseView):
                         {
                             "error": "PERSONAL_LEARNING intent requires verified, evidence-backed A05 qualification.",
                             "code": "FORBIDDEN_INTENT",
+                            "request_id": request_id,
                         },
                         status=status.HTTP_403_FORBIDDEN,
                     )
@@ -217,7 +289,7 @@ class XenChatView(XenBaseView):
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
-        # 4. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
+        # 7. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
         messages = [{"role": "system", "content": CONDITION_A1_SYSTEM_PROMPT}]
 
         # Append validated within-session turns only (no cross-session persistent memory)
@@ -227,24 +299,40 @@ class XenChatView(XenBaseView):
                     if turn["role"] in {"user", "assistant"}:
                         messages.append({"role": turn["role"], "content": str(turn["content"])})
 
-        messages.append({"role": "user", "content": prompt.strip()})
+        messages.append({"role": "user", "content": prompt})
 
-        # 5. Call upstream inference service
+        # 8. Token budget clamping and upstream proxy call
         model_id = getattr(settings, "PIXIUMIND_MODEL_ID", "pixiumind-step-700")
+        raw_max_tokens = request.data.get("max_tokens", 1024)
+        try:
+            clamped_tokens = min(max(1, int(raw_max_tokens)), 2048)
+        except (ValueError, TypeError):
+            clamped_tokens = 1024
+
+        try:
+            clamped_temp = min(max(0.0, float(request.data.get("temperature", 0.1))), 2.0)
+        except (ValueError, TypeError):
+            clamped_temp = 0.1
+
         upstream_payload = {
             "model": model_id,
             "messages": messages,
-            "max_tokens": min(int(request.data.get("max_tokens", 1024)), 2048),
-            "temperature": float(request.data.get("temperature", 0.1)),
+            "max_tokens": clamped_tokens,
+            "temperature": clamped_temp,
         }
 
+        start_time = time.time()
         code, upstream_resp = self.call_upstream(
             "/v1/chat/completions",
             method="POST",
             payload=upstream_payload,
         )
+        latency_ms = int((time.time() - start_time) * 1000)
 
         if code != 200:
+            logger.warning(
+                f"Xen upstream error: req_id={request_id}, code={code}, error_code={upstream_resp.get('code', 'UPSTREAM_ERROR')}"
+            )
             return Response(upstream_resp, status=code)
 
         raw_text = ""
@@ -257,7 +345,14 @@ class XenChatView(XenBaseView):
             raw_text = first_choice.get("message", {}).get("content", "")
             finish_reason = first_choice.get("finish_reason", "stop")
 
-        # 6. Response decoding and sanitization
+        # 9. Operational tracing (Safe: no prompt text or PII in logs)
+        logger.info(
+            f"Xen inference complete: req_id={request_id}, user_id={user.id}, role={role}, "
+            f"prompt_tokens={usage.get('prompt_tokens', 0)}, completion_tokens={usage.get('completion_tokens', 0)}, "
+            f"latency_ms={latency_ms}"
+        )
+
+        # 10. Response decoding and sanitization
         decoded = decode_model_response(
             raw_text=raw_text,
             finish_reason=finish_reason,
@@ -265,7 +360,7 @@ class XenChatView(XenBaseView):
             intent=intent,
         )
 
-        # 7. Session recording for idempotency
+        # 11. Session recording for idempotency
         if idempotency_key:
             try:
                 XenSession.objects.get_or_create(
@@ -282,9 +377,42 @@ class XenChatView(XenBaseView):
             except Exception as e:
                 logger.warning(f"Could not record XenSession: {e}")
 
+        # 12. Format response based on endpoint or request schema
+        if is_openai_schema or request.path.endswith("/ai/chat/completions"):
+            return Response(
+                {
+                    "id": f"chatcmpl-{request_id}",
+                    "object": "chat.completion",
+                    "created": int(time.time()),
+                    "model": model_id,
+                    "choices": [
+                        {
+                            "index": 0,
+                            "message": {
+                                "role": "assistant",
+                                "content": decoded["text"],
+                            },
+                            "finish_reason": finish_reason,
+                        }
+                    ],
+                    "usage": usage,
+                    "xen_metadata": {
+                        "request_id": request_id,
+                        "status": "ok",
+                        "intent": intent,
+                        "is_complete": decoded["is_complete"],
+                        "completion_status": decoded["completion_status"],
+                        "syntax_valid": decoded["syntax_valid"],
+                        "tested": decoded["tested"],
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
         return Response(
             {
                 "status": "ok",
+                "request_id": request_id,
                 "model": model_id,
                 "intent": intent,
                 "teacher_memory_enabled": False,  # Personal Teacher Memory explicitly disabled in v0.1

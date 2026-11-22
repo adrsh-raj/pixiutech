@@ -127,6 +127,7 @@ REST_FRAMEWORK = {
         "password_reset": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_PASSWORD_RESET_RATE", "10/hour"),
         "student_password_reset": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_STUDENT_PASSWORD_RESET_RATE", "20/hour"),
         "csrf_token": "10000/hour" if "test" in sys.argv else os.environ.get("DJANGO_CSRF_TOKEN_RATE", "30/hour"),
+        "xen_chat": "10000/min" if "test" in sys.argv else os.environ.get("DJANGO_XEN_CHAT_RATE", "60/min"),
     },
     "NUM_PROXIES": int(os.environ.get("DJANGO_NUM_PROXIES", "1")),
     "EXCEPTION_HANDLER": "core.exception_handler.custom_exception_handler",
@@ -266,10 +267,20 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"; SESSION_COOKIE_SECURE = True; CSRF_COOKIE_SECURE = True; SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS = True; SECURE_HSTS_PRELOAD = True
 
-# PixiuMind GPU Inference Server Proxy Settings
+# PixiuMind / Xen GPU Inference Server Proxy Settings
 # Keep GPU endpoints and keys strictly on the server side - never leak to client browser
+XEN_PILOT_ENABLED = os.environ.get("XEN_PILOT_ENABLED", "False").lower() == "true"
 PIXIUMIND_ENDPOINT_URL = os.environ.get("PIXIUMIND_ENDPOINT_URL", "").strip()
 PIXIUMIND_API_KEY = os.environ.get("PIXIUMIND_API_KEY", "").strip()
-PIXIUMIND_MODEL_ID = os.environ.get("PIXIUMIND_MODEL_ID", "pixiumind-14b-checkpoint-400").strip()
+PIXIUMIND_MODEL_ID = os.environ.get("PIXIUMIND_MODEL_ID", "pixiumind-step-700").strip()
 PIXIUMIND_TIMEOUT_SECONDS = int(os.environ.get("PIXIUMIND_TIMEOUT_SECONDS", "30"))
+XEN_MAX_PROMPT_CHARS = int(os.environ.get("XEN_MAX_PROMPT_CHARS", "4000"))
+
+# Closed Production Tester Allowlist (comma-separated usernames or None)
+_raw_tester_allowlist = os.environ.get("PIXIUMIND_TESTER_ALLOWLIST", "").strip()
+if _raw_tester_allowlist:
+    PIXIUMIND_TESTER_ALLOWLIST = [u.strip() for u in _raw_tester_allowlist.split(",") if u.strip()]
+else:
+    PIXIUMIND_TESTER_ALLOWLIST = None
+
 

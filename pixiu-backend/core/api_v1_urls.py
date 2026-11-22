@@ -115,6 +115,7 @@ urlpatterns = [
     path('quiz-review', QuizReviewView.as_view(), name='v1-quiz-review'), path('quiz-results/<uuid:pk>', QuizResultView.as_view(), name='v1-quiz-result'), path('quiz-results/<uuid:pk>/pdf', QuizResultPdfView.as_view(), name='v1-quiz-result-pdf'),
     path('trainer-units', TrainerUnitListCreateView.as_view(), name='v1-trainer-units'),
     path('copilot/propose', CopilotProposalProxyView.as_view(), name='v1-copilot-propose'),
+    path('ai/chat/completions', XenChatView.as_view(), name='v1-ai-chat-completions'),
     path('xen/chat', XenChatView.as_view(), name='v1-xen-chat'),
     path('xen/health', XenHealthView.as_view(), name='v1-xen-health'),
     path('xen/attestation', XenAttestationView.as_view(), name='v1-xen-attestation'),
