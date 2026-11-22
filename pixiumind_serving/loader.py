@@ -43,11 +43,11 @@ class ModelHolder:
             "adapter_sha256": actual_sha,
             "adapter_path": adapter_path,
             "runtime_versions": {
-                "python": "3.13.16",
+                "python": "3.11.11",
                 "torch": "2.6.0+cu124",
-                "transformers": "4.49.0",
-                "peft": "0.14.0",
-                "accelerate": "1.4.0",
+                "transformers": "5.24.0",
+                "peft": "0.22.0",
+                "accelerate": "1.16.0",
                 "bitsandbytes": "0.50.2",
                 "cuda": "12.4",
             },
@@ -64,7 +64,7 @@ class ModelHolder:
             logger.info("Initializing AutoTokenizer...")
             self.tokenizer = AutoTokenizer.from_pretrained(base_path, trust_remote_code=True)
             if self.tokenizer.pad_token_id is None:
-                self.tokenizer.pad_token_id = self.tokenizer.eos_token_id
+                self.tokenizer.pad_token_id = 151643  # <|endoftext|> (strictly distinct from eos_token_id 151645)
 
             logger.info("Configuring quantization...")
             bnb_config = None

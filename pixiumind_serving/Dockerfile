@@ -22,9 +22,9 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir \
     torch==2.6.0 --index-url https://download.pytorch.org/whl/cu124 && \
     pip install --no-cache-dir \
-    transformers==4.49.0 \
-    peft==0.14.0 \
-    accelerate==1.4.0 \
+    transformers==5.24.0 \
+    peft==0.22.0 \
+    accelerate==1.16.0 \
     bitsandbytes==0.50.2 \
     fastapi==0.115.0 \
     uvicorn==0.32.0 \

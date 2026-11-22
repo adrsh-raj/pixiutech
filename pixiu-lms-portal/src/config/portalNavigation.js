@@ -12,7 +12,7 @@ export const PORTAL_NAVIGATION={
   {title:'MY PERFORMANCE',links:[{name:'Attendance',key:'attendance',icon:CalendarDays},{name:'My Progress',href:'/student-progress',icon:BarChart3},{name:'Certificates',href:'/student-progress?tab=certificates',icon:Trophy}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',key:'announcements',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},
   {title:'ACCOUNT',links:[{name:'Password & Security',href:'/student-password',icon:KeyRound}]},
-  {title:'EXPLORE',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'PixiuMind Xen Tutor',href:'/xen',icon:Bot},{name:'Learning Materials',href:'/content',icon:PlaySquare},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
+  {title:'EXPLORE',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Learning Materials',href:'/content',icon:PlaySquare},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
  ],
  school:[
   {title:'MY SCHOOL',links:[{name:'Overview',key:'overview',icon:LayoutDashboard},{name:'Students',key:'students',icon:Users},{name:'Trainers',key:'trainers',icon:GraduationCap}]},

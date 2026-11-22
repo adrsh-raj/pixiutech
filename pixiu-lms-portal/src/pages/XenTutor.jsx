@@ -20,6 +20,26 @@ export default function XenTutor() {
   const userRole = user?.role || 'student';
   const isA05 = Boolean(user?.is_a05_qualified || user?.trainer_profile?.xen_identity?.is_a05_qualified);
 
+  if (userRole === 'student') {
+    return (
+      <div className="min-h-screen bg-slate-950 p-6 flex flex-col items-center justify-center">
+        <div className="w-full max-w-xl bg-slate-900/90 border border-amber-500/30 rounded-2xl p-8 text-center shadow-2xl backdrop-blur-sm">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 mb-4">
+            <span className="text-2xl font-bold">🔒</span>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Student Access Restricted</h2>
+          <p className="text-sm text-slate-300 leading-relaxed mb-6">
+            Direct access to PixiuMind Xen is currently disabled in the Closed Production Cohort.
+            In accordance with governance protocols, interactive workspace sessions are restricted to authorized Trainers and Administrators.
+          </p>
+          <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3 text-xs text-slate-400">
+            Error Policy: <code className="text-amber-400 font-mono">HTTP 403 STUDENT_ACCESS_DISABLED</code>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 p-6 flex flex-col items-center justify-center">
       <div className="w-full max-w-4xl mb-4 flex items-center justify-between">
