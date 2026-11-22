@@ -1,16 +1,27 @@
 """
 Identity Registry Models for Xen (PixiuMind) Integration.
-Canonical mapping:
+
+Canonical Architecture:
 - XenSchool: 1:1 to academics.School (PROTECT on delete, opaque XEN-SCH-[HEX12] code)
 - XenLab: canonical SchoolClass (grade+section) + academic period (2026-27) + slot (1 or 2)
-  (PROTECT on XenSchool and SchoolClass, SchoolClass-level uniqueness, cross-school validation, opaque XEN-LAB-[HEX12] code)
-- XenTrainer: 1:1 to academics.Trainer with evidence-backed A05 qualification gate
-  (named verifier, timestamp, <=12 month expiry, revocation flag, appeal status)
+  Tenant integrity is guaranteed by construction: school is derived strictly from
+  the canonical SchoolClass relation (school_class.school), eliminating any redundant
+  or conflicting foreign key columns.
+  Archival-safe: PROTECT on SchoolClass.
+- XenTrainer: 1:1 to academics.Trainer with full FD-01 evidence-backed A05 qualification gate:
+  - Identifiable institution name & verifiable 18+ cohort reference
+  - Named verifier (PROTECT) and verification timestamp
+  - Maximum 12-month validity period
+  - Independent appeal reviewer (enforced distinct from original verifier)
+  - Appeal decision timestamp and recorded outcome
+  - Revocation switch and expiry enforcement
+  - Fail-closed PERSONAL_LEARNING access control
 - XenSession: transactional idempotency and session isolation
 """
 
 import uuid
 from datetime import timedelta
+from typing import Optional
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
@@ -19,6 +30,18 @@ from django.db.models import Q
 from django.utils import timezone
 from accounts.models import UserRole
 from .models import School, SchoolClass, Trainer, Status
+
+
+def generate_xen_school_code() -> str:
+    return f"XEN-SCH-{uuid.uuid4().hex[:12].upper()}"
+
+
+def generate_xen_lab_code() -> str:
+    return f"XEN-LAB-{uuid.uuid4().hex[:12].upper()}"
+
+
+def generate_xen_trainer_code() -> str:
+    return f"XEN-TRN-{uuid.uuid4().hex[:12].upper()}"
 
 
 class XenSchool(models.Model):
@@ -31,7 +54,12 @@ class XenSchool(models.Model):
         on_delete=models.PROTECT,
         related_name="xen_identity",
     )
-    xen_school_code = models.CharField(max_length=40, unique=True, editable=False)
+    xen_school_code = models.CharField(
+        max_length=40,
+        unique=True,
+        default=generate_xen_school_code,
+        editable=False,
+    )
     display_name = models.CharField(max_length=150, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -41,6 +69,11 @@ class XenSchool(models.Model):
         ordering = ["school__school_code"]
         verbose_name = "Xen School"
         verbose_name_plural = "Xen Schools"
+
+    @property
+    def labs(self):
+        """Authoritative labs derived via canonical SchoolClass relation."""
+        return XenLab.objects.filter(school_class__school=self.school)
 
     def save(self, *args, **kwargs):
         if not self.xen_school_code:
@@ -59,28 +92,29 @@ class XenLab(models.Model):
     """
     Registered logical Lab slot for Xen curriculum delivery.
     Canonical reference to existing SchoolClass (grade + section).
+    Tenant integrity is guaranteed by construction: the school is derived
+    strictly from school_class.school, preventing any two-tenant divergence.
     Slots: 1 or 2 slots per class in academic period 2026-27.
-    Archival-safe: PROTECT on XenSchool and SchoolClass.
+    Archival-safe: PROTECT on SchoolClass.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     school_class = models.ForeignKey(
         SchoolClass,
         on_delete=models.PROTECT,
         related_name="xen_labs",
-        help_text="Authoritative SchoolClass providing grade and section",
-    )
-    xen_school = models.ForeignKey(
-        XenSchool,
-        on_delete=models.PROTECT,
-        related_name="labs",
-        help_text="Archival-safe protected reference to XenSchool",
+        help_text="Canonical SchoolClass defining grade, section, and tenant school",
     )
     academic_period = models.CharField(max_length=20, default="2026-27")
     slot_number = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(2)],
         help_text="Lab slot sequence number (1 or 2)",
     )
-    xen_lab_code = models.CharField(max_length=60, unique=True, editable=False)
+    xen_lab_code = models.CharField(
+        max_length=60,
+        unique=True,
+        default=generate_xen_lab_code,
+        editable=False,
+    )
     display_name = models.CharField(max_length=120, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -101,31 +135,18 @@ class XenLab(models.Model):
         verbose_name = "Xen Lab"
         verbose_name_plural = "Xen Labs"
 
-    def clean(self):
-        super().clean()
-        if self.school_class_id and self.xen_school_id:
-            class_school_id = getattr(self.school_class, "school_id", None)
-            xen_school_underlying_id = getattr(self.xen_school, "school_id", None)
-            if class_school_id and xen_school_underlying_id and class_school_id != xen_school_underlying_id:
-                raise ValidationError(
-                    "XenLab integrity error: XenSchool and SchoolClass must belong to the exact same School."
-                )
+    @property
+    def school(self) -> Optional[School]:
+        """Derived authoritative School through canonical SchoolClass relation."""
+        return getattr(self.school_class, "school", None)
+
+    @property
+    def xen_school(self) -> Optional[XenSchool]:
+        """Derived authoritative XenSchool identity mapped 1:1 through school."""
+        sch = self.school
+        return getattr(sch, "xen_identity", None) if sch else None
 
     def save(self, *args, **kwargs):
-        if self.school_class_id and not self.xen_school_id:
-            # Bind to corresponding XenSchool automatically
-            school = getattr(self.school_class, "school", None)
-            if school and hasattr(school, "xen_identity"):
-                self.xen_school = school.xen_identity
-
-        if self.school_class_id and self.xen_school_id:
-            class_school_id = getattr(self.school_class, "school_id", None)
-            xen_school_underlying_id = getattr(self.xen_school, "school_id", None)
-            if class_school_id and xen_school_underlying_id and class_school_id != xen_school_underlying_id:
-                raise ValidationError(
-                    "XenLab integrity error: XenSchool and SchoolClass must belong to the exact same School."
-                )
-
         if not self.xen_lab_code:
             self.xen_lab_code = f"XEN-LAB-{uuid.uuid4().hex[:12].upper()}"
 
@@ -152,7 +173,14 @@ class XenTrainer(models.Model):
     """
     Authoritative Xen Trainer identity mapped 1:1 to an existing LMS Trainer.
     Controls access to TEACHING, LAB_TEACHING, and evidence-backed PERSONAL_LEARNING.
-    A bare Boolean or non-empty string ID must never establish eligibility.
+    Full FD-01 Compliance:
+    - Institutional 18+ cohort attestation (institution name + verifiable ref)
+    - Named verifier and timestamp
+    - Maximum 12-month qualification validity
+    - Independent appeal reviewer (enforced separate from verifier)
+    - Decision timestamp and recorded outcome
+    - Revocation and expiry enforcement
+    - Fail-closed: Bare Boolean or string ID never grants access
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     trainer = models.OneToOneField(
@@ -160,12 +188,27 @@ class XenTrainer(models.Model):
         on_delete=models.PROTECT,
         related_name="xen_identity",
     )
-    xen_trainer_code = models.CharField(max_length=40, unique=True, editable=False)
+    xen_trainer_code = models.CharField(
+        max_length=40,
+        unique=True,
+        default=generate_xen_trainer_code,
+        editable=False,
+    )
     
-    # Evidence-backed A05 qualification
+    # FD-01 Evidence-backed A05 qualification
     is_a05_qualified = models.BooleanField(
         default=False,
         help_text="Separate A05 qualification required for PERSONAL_LEARNING intent access.",
+    )
+    a05_institution_name = models.CharField(
+        max_length=150,
+        blank=True,
+        help_text="Identifiable institutional authority or school establishing 18+ adult cohort verification.",
+    )
+    a05_institution_ref = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Verifiable institutional document or authorization reference establishing 18+ attestation.",
     )
     a05_certificate_id = models.CharField(
         max_length=100,
@@ -203,11 +246,33 @@ class XenTrainer(models.Model):
         blank=True,
         help_text="Reason for revocation or suspension.",
     )
+    a05_revoked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when revocation occurred.",
+    )
     a05_appeal_status = models.CharField(
         max_length=30,
         choices=AppealStatus.choices,
         default=AppealStatus.NONE,
         help_text="Independent appeal status.",
+    )
+    a05_appeal_reviewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="appeal_reviewed_xen_trainers",
+        help_text="Independent appeal reviewer (must be distinct from original verifier).",
+    )
+    a05_appeal_decision_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Timestamp when appeal decision was recorded.",
+    )
+    a05_appeal_notes = models.TextField(
+        blank=True,
+        help_text="Audit notes on appeal rationale and independence.",
     )
 
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
@@ -222,6 +287,8 @@ class XenTrainer(models.Model):
                     Q(is_a05_qualified=False) |
                     (
                         Q(is_a05_qualified=True) &
+                        ~Q(a05_institution_name="") &
+                        ~Q(a05_institution_ref="") &
                         ~Q(a05_certificate_id="") &
                         Q(a05_verified_by__isnull=False) &
                         Q(a05_verified_at__isnull=False) &
@@ -237,6 +304,10 @@ class XenTrainer(models.Model):
     def clean(self):
         super().clean()
         if self.is_a05_qualified:
+            if not self.a05_institution_name or not self.a05_institution_name.strip():
+                raise ValidationError("A05 qualification requires an identifiable institution name for 18+ cohort attestation.")
+            if not self.a05_institution_ref or not self.a05_institution_ref.strip():
+                raise ValidationError("A05 qualification requires a verifiable institutional reference for 18+ cohort attestation.")
             if not self.a05_certificate_id or not self.a05_certificate_id.strip():
                 raise ValidationError("A05 qualification requires a valid certificate ID.")
             if not self.a05_verified_by_id:
@@ -250,6 +321,15 @@ class XenTrainer(models.Model):
             if self.a05_expires_at - self.a05_verified_at > timedelta(days=366):
                 raise ValidationError("A05 qualification cannot exceed a 12-month validity period.")
 
+        # Independent appeal reviewer validation
+        if self.a05_appeal_status in {AppealStatus.UPHELD, AppealStatus.REJECTED}:
+            if not self.a05_appeal_reviewer_id:
+                raise ValidationError("Decided appeal requires an assigned appeal reviewer.")
+            if not self.a05_appeal_decision_at:
+                raise ValidationError("Decided appeal requires an appeal decision timestamp.")
+            if self.a05_appeal_reviewer_id == self.a05_verified_by_id:
+                raise ValidationError("Appeal reviewer must be an independent auditor, separate from the original verifier.")
+
     def save(self, *args, **kwargs):
         if not self.xen_trainer_code:
             self.xen_trainer_code = f"XEN-TRN-{uuid.uuid4().hex[:12].upper()}"
@@ -258,7 +338,7 @@ class XenTrainer(models.Model):
     def can_access_intent(self, intent: str) -> bool:
         """
         Check if the trainer has verified permission for the specified interaction intent.
-        A bare Boolean or non-empty string ID must never establish eligibility.
+        Fail-closed: A bare Boolean or non-empty string ID must never establish eligibility.
         """
         if self.status != Status.ACTIVE:
             return False
@@ -267,19 +347,39 @@ class XenTrainer(models.Model):
         if intent in {"TEACHING", "LAB_TEACHING"}:
             return True
         elif intent == "PERSONAL_LEARNING":
+            # 1. Must be flagged qualified
             if not self.is_a05_qualified:
                 return False
-            if self.a05_revoked:
+            # 2. Institutional 18+ attestation evidence must be non-empty
+            if not self.a05_institution_name or not self.a05_institution_name.strip():
                 return False
-            if self.a05_appeal_status == AppealStatus.PENDING:
+            if not self.a05_institution_ref or not self.a05_institution_ref.strip():
                 return False
             if not self.a05_certificate_id or not self.a05_certificate_id.strip():
                 return False
+            # 3. Named verifier and verified_at timestamp must exist
             if not self.a05_verified_by_id or not self.a05_verified_at:
                 return False
+            # 4. Expiry must exist and cannot be in the past
             if not self.a05_expires_at:
                 return False
             if self.a05_expires_at <= timezone.now():
+                return False
+            # 5. Validity duration cannot exceed 12 months (366 days)
+            if self.a05_expires_at - self.a05_verified_at > timedelta(days=366):
+                return False
+            # 6. Revocation status
+            if self.a05_revoked:
+                # If revoked, only accessible if appeal was explicitly UPHELD by an INDEPENDENT reviewer
+                if self.a05_appeal_status != AppealStatus.UPHELD:
+                    return False
+                if not self.a05_appeal_reviewer_id or not self.a05_appeal_decision_at:
+                    return False
+                if self.a05_appeal_reviewer_id == self.a05_verified_by_id:
+                    # Non-independent appeal is invalid -> fail closed
+                    return False
+            # 7. If appeal is pending, access is suspended (fail closed)
+            if self.a05_appeal_status == AppealStatus.PENDING:
                 return False
             return True
         return False
@@ -326,6 +426,13 @@ class XenSession(models.Model):
         ordering = ["-created_at"]
         verbose_name = "Xen Session"
         verbose_name_plural = "Xen Sessions"
+
+    def save(self, *args, **kwargs):
+        if self.xen_lab_id and not self.xen_school_id:
+            derived_school = self.xen_lab.xen_school
+            if derived_school:
+                self.xen_school = derived_school
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"XenSession {self.idempotency_key} ({self.role} - {self.intent})"

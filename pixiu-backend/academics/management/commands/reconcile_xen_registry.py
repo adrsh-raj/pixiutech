@@ -61,11 +61,10 @@ class Command(BaseCommand):
                 }
                 for t in trainers
             ],
-            "proposed_slots": {
+            "slot_policy": {
                 "academic_period": "2026-27",
-                "grades": [6, 7, 8, 9, 10, 11, 12],
-                "slots_per_grade": [1, 2],
-                "total_slots_per_school": 14,
+                "slots_per_class_rule": "1 or 2 slots per class",
+                "assignment_status": "EXACT_SLOT_ASSIGNMENTS_UNRESOLVED_BY_FOUNDER_POLICY",
             },
         }
 
