@@ -52,6 +52,17 @@ class TestServingApi(unittest.TestCase):
         response = client.get("/v1/attestation")
         self.assertEqual(response.status_code, 401)
 
+    def test_invalid_authentication_token_rejected(self):
+        headers = {"Authorization": "Bearer invalid-token-12345"}
+        response = client.get("/v1/attestation", headers=headers)
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json().get("detail", {}).get("code"), "UNAUTHORIZED")
+
+    def test_invalid_api_key_header_rejected(self):
+        headers = {"X-API-Key": "invalid-api-key-99999"}
+        response = client.get("/v1/attestation", headers=headers)
+        self.assertEqual(response.status_code, 401)
+
     def test_attestation_with_valid_auth(self):
         headers = {"Authorization": f"Bearer {config.api_key}"}
         response = client.get("/v1/attestation", headers=headers)
@@ -70,6 +81,38 @@ class TestServingApi(unittest.TestCase):
         }
         response = client.post("/v1/chat/completions", json=payload)
         self.assertEqual(response.status_code, 401)
+
+    def test_completions_invalid_schema_rejected(self):
+        headers = {"Authorization": f"Bearer {config.api_key}"}
+        # Missing required 'messages' field
+        payload = {
+            "model": "pixiumind-step-700",
+        }
+        response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 422)
+
+    def test_completions_model_unavailable_returns_503(self):
+        model_holder.is_ready = False
+        headers = {"Authorization": f"Bearer {config.api_key}"}
+        payload = {
+            "model": "pixiumind-step-700",
+            "messages": [{"role": "user", "content": "Hello"}],
+        }
+        response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json().get("detail", {}).get("code"), "MODEL_NOT_READY")
+
+    @patch("server.async_generate", side_effect=asyncio.TimeoutError())
+    def test_completions_timeout_returns_504(self, mock_async_generate):
+        model_holder.is_ready = True
+        headers = {"Authorization": f"Bearer {config.api_key}"}
+        payload = {
+            "model": "pixiumind-step-700",
+            "messages": [{"role": "user", "content": "Hello"}],
+        }
+        response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(response.json().get("detail", {}).get("code"), "INFERENCE_TIMEOUT")
 
     def test_completions_invalid_model_rejected(self):
         headers = {"Authorization": f"Bearer {config.api_key}"}
