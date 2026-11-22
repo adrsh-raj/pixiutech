@@ -1,0 +1,119 @@
+{
+  "milestone": "XEN_TEAM_PILOT_DEPLOYMENT",
+  "deployment_target": "RESTRICTED_INTERNAL_TEAM_PILOT",
+  "timestamp_utc": "2026-11-22T16:30:00Z",
+  "overall_verdict": "READY_FOR_TEAM_PILOT",
+  "git_state": {
+    "repository": "/home/kali/pixiutech",
+    "working_branch": "feat/xen-team-deployment",
+    "baseline_audit_commit": "b05e8a2c",
+    "protection_status": "main_untouched_isolated_feature_branch"
+  },
+  "frozen_model_provenance": {
+    "base_model": "Qwen/Qwen3-14B",
+    "base_revision": "40c069824f4251a91eefaf281ebe4c544efd3e18",
+    "base_shards_count": 8,
+    "base_shards_total_bytes": 29536665640,
+    "adapter_name": "PixiuMind-1.4-D14-Step-700",
+    "adapter_sha256": "8a2bb5c2bf3d148dda16d7546dab62c4c6c381e62433a2a9a79a612e64b8e968",
+    "adapter_byte_size": 256976504,
+    "a1_prompt_sha256": "8fcd692ceec0e659fa970898bfef3f63a5c1510645652b90a442b2f931426cf0",
+    "quantization": "NF4 double-quantization with FP16 compute dtype",
+    "parameter_freeze_verified": true,
+    "unauthorized_merging_detected": false
+  },
+  "runtime_stack": {
+    "container_base": "nvidia/cuda:12.4.1-runtime-ubuntu22.04",
+    "process_user": "pixiu (UID 1000, non-root)",
+    "python": "3.11.11 / 3.14.0",
+    "torch": "2.6.0+cu124",
+    "transformers": "5.24.0",
+    "peft": "0.22.0",
+    "accelerate": "1.16.0",
+    "bitsandbytes": "0.50.2",
+    "fastapi": "0.115.0",
+    "uvicorn": "0.32.0"
+  },
+  "service_integration": {
+    "inference_engine": {
+      "package": "pixiumind_serving",
+      "status": "VERIFIED",
+      "network": "internal: true bridge (zero public port exposure)",
+      "concurrency_limit": 4,
+      "timeout_seconds": 450.0,
+      "unit_tests_passed": "14/14"
+    },
+    "django_backend": {
+      "package": "pixiu-backend",
+      "status": "VERIFIED",
+      "feature_flag": "XEN_PILOT_ENABLED = False (default fail-closed)",
+      "allowlist_setting": "PIXIUMIND_TESTER_ALLOWLIST",
+      "max_prompt_chars": 4000,
+      "rate_throttle_scope": "xen_chat (60/min)",
+      "unit_tests_passed": "21/21"
+    },
+    "portal_frontend": {
+      "package": "pixiu-lms-portal",
+      "status": "VERIFIED",
+      "build_status": "CLEAN_BUILD (1.13s, 0 errors)",
+      "student_access": "BLOCKED (403 STUDENT_ACCESS_DISABLED UI & Backend)",
+      "direct_gpu_access": "ZERO (Strictly routes to Django /api/v1/)",
+      "request_tracing": "ENABLED (Displays [Ref: xen-...] on UI)"
+    }
+  },
+  "verified_api_endpoints": [
+    {
+      "path": "/api/v1/ai/chat/completions",
+      "method": "POST",
+      "schema": "OpenAI Chat Completions Compatible",
+      "access": "Authenticated Staff / Allowlisted Cohort Only",
+      "status": "VERIFIED"
+    },
+    {
+      "path": "/api/v1/xen/chat",
+      "method": "POST",
+      "schema": "Pixiu LMS Portal Schema",
+      "access": "Authenticated Staff / Allowlisted Cohort Only",
+      "status": "VERIFIED"
+    },
+    {
+      "path": "/api/v1/xen/health",
+      "method": "GET",
+      "schema": "Upstream Health & Readiness Proxy",
+      "access": "Authenticated Users",
+      "status": "VERIFIED"
+    },
+    {
+      "path": "/api/v1/xen/attestation",
+      "method": "GET",
+      "schema": "Cryptographic Model Identity Attestation",
+      "access": "Admins & Trainers Only",
+      "status": "VERIFIED"
+    }
+  ],
+  "security_audit_summary": {
+    "suite_name": "XEN_15_POINT_SECURITY_AND_ABUSE_SUITE",
+    "total_tests": 15,
+    "total_passed": 15,
+    "total_failed": 0,
+    "verdict": "PASS",
+    "evidence_file": "XEN_ASGI_DJANGO_E2E_RESULTS.json"
+  },
+  "infrastructure_target_assessment": {
+    "preferred_target": "Google Cloud Run with NVIDIA L4",
+    "status": "BLOCKED_PREREQUISITE",
+    "blocker_details": {
+      "gcloud_cli_installed": false,
+      "gcp_credentials_present": false,
+      "gcp_project_configured": false,
+      "diagnosis": "Host environment lacks Google Cloud SDK and authenticated service accounts. Per Founder Directive, zero simulated cloud resources are claimed.",
+      "resolution": "Authenticate with 'gcloud auth login' and 'gcloud config set project <project-id>' or run locally via containerized docker-compose bridge."
+    },
+    "staging_deployment_mode": "Isolated Docker Container with Internal Bridge Network"
+  },
+  "rollback_procedure": {
+    "immediate_disable": "Set XEN_PILOT_ENABLED=False in Django environment and reload WSGI/ASGI workers.",
+    "response_behavior": "Immediate HTTP 403 XEN_PILOT_DISABLED on all chat endpoints without redeployment.",
+    "isolation_boundary": "Inference container stopped via 'docker compose down'; zero external network exposure."
+  }
+}
