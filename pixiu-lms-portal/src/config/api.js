@@ -1,7 +1,7 @@
 // Canonical Phase-7 API endpoint. Always normalize the configured value to the
 // Django /api/v1 root so production cannot accidentally call a bare host or /api.
-const explicitApiBase = import.meta.env.VITE_API_URL?.trim();
-const legacyDjangoBase = import.meta.env.VITE_DJANGO_API_URL?.trim();
+const explicitApiBase = (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_API_URL ? import.meta.env.VITE_API_URL : (typeof process !== 'undefined' ? process.env?.VITE_API_URL : ''))?.trim();
+const legacyDjangoBase = (typeof import.meta !== 'undefined' && import.meta?.env?.VITE_DJANGO_API_URL ? import.meta.env.VITE_DJANGO_API_URL : (typeof process !== 'undefined' ? process.env?.VITE_DJANGO_API_URL : ''))?.trim();
 
 const defaultApiBase = 'https://pixiu-django-api.onrender.com/api/v1';
 

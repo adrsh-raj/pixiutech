@@ -68,6 +68,7 @@ const SessionSchedulerV4 = lazyWithChunkRecovery(() => import('./pages/SessionSc
 const CourseCompletionV2 = lazyWithChunkRecovery(() => import('./pages/CourseCompletionV2'));
 const Simulation = lazyWithChunkRecovery(() => import('./pages/Simulation'));
 const AIStudio = lazyWithChunkRecovery(() => import('./pages/AIStudio'));
+const XenTutor = lazyWithChunkRecovery(() => import('./pages/XenTutor'));
 const StudentPassword = lazyWithChunkRecovery(() => import('./pages/StudentPassword'));
 const StudentPasswordPrompt = lazyWithChunkRecovery(() => import('./pages/StudentPasswordPrompt'));
 const StudentForgotPassword = lazyWithChunkRecovery(() => import('./pages/StudentForgotPassword'));
@@ -150,6 +151,7 @@ export default function App() { return <ToastProvider><AuthProvider><DataProvide
   <Route path="/student-forgot-password" element={<StudentForgotPassword />} />
   <Route path="/simulation" element={<ChunkErrorBoundary><Simulation /></ChunkErrorBoundary>} />
   <Route path="/ai-studio" element={<ChunkErrorBoundary><AIStudio /></ChunkErrorBoundary>} />
+  <Route path="/xen" element={<ChunkErrorBoundary><XenTutor /></ChunkErrorBoundary>} />
   <Route path="/student-portal" element={<StudentRouteGuard />} />
   <Route path="/school-portal" element={<SchoolRouteGuard />} />
   <Route path="/" element={<ProtectedLayout />}>
