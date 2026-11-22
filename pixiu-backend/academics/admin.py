@@ -51,16 +51,16 @@ class XenSchoolAdmin(admin.ModelAdmin):
 
 @admin.register(XenLab)
 class XenLabAdmin(admin.ModelAdmin):
-    list_display = ("xen_lab_code", "xen_school", "grade", "slot_number", "academic_period", "status")
-    search_fields = ("xen_lab_code", "xen_school__xen_school_code")
-    list_filter = ("academic_period", "grade", "slot_number", "status")
+    list_display = ("xen_lab_code", "school_class", "slot_number", "academic_period", "status")
+    search_fields = ("xen_lab_code", "school_class__school__school_code", "school_class__grade", "school_class__section")
+    list_filter = ("academic_period", "slot_number", "status")
     readonly_fields = ("id", "xen_lab_code", "created_at", "updated_at")
 
 
 @admin.register(XenTrainer)
 class XenTrainerAdmin(admin.ModelAdmin):
-    list_display = ("xen_trainer_code", "trainer", "is_a05_qualified", "status", "created_at")
-    search_fields = ("xen_trainer_code", "trainer__trainer_id", "trainer__name")
+    list_display = ("xen_trainer_code", "trainer", "is_a05_qualified", "a05_certificate_id", "status", "created_at")
+    search_fields = ("xen_trainer_code", "trainer__trainer_id", "trainer__name", "a05_certificate_id")
     list_filter = ("is_a05_qualified", "status")
     readonly_fields = ("id", "xen_trainer_code", "created_at", "updated_at")
 

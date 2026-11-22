@@ -1,6 +1,13 @@
 """
 PixiuTech Django Views for Xen (PixiuMind Step-700) AI Integration.
 Provides authenticated, role-aware, fail-closed endpoints for LMS users.
+
+Cohort Gating:
+- Closed Production Cohort: Adult trainers and administrators only.
+- Student access strictly disabled during this phase.
+- Server-side tester allowlist enforced.
+- Personal Teacher Memory strictly disabled in v0.1.
+- Evidence-backed A05 qualification gate for PERSONAL_LEARNING.
 """
 
 import hashlib
@@ -30,7 +37,7 @@ You assist K-12 students and teachers with Python programming, physical computin
 Guidelines:
 1. Provide clear, syntactically correct, and pedagogically sound solutions.
 2. When asked for code, produce clean Python or Blockly code wrapped in appropriate markdown fences.
-3. When asked for hints or explanations, guide the student conceptually without giving away the raw code solution.
+3. When asked for hints or explanations, guide the user conceptually without giving away the raw code solution.
 4. Support English and Hinglish naturally for bilingual Indian classroom contexts.
 5. Be supportive, constructive, and encourage problem-solving."""
 
@@ -145,21 +152,43 @@ class XenChatView(XenBaseView):
     """
     Primary chat and tutoring endpoint mediating user interactions with PixiuMind Step-700.
     
-    Enforces:
-    - Role-based intent verification.
-    - Strict server-side prompt construction.
-    - Transactional session recording and idempotency.
-    - Zero token leakage (<|im_end|> stripped).
-    - Incomplete generation policy.
-    - Truthful testing assertion policy.
+    Cohort & Policy Enforcement:
+    - Student access disabled during Closed Production.
+    - Server-side tester allowlist enforced when configured.
+    - Personal Teacher Memory strictly disabled in v0.1.
+    - Intent authorization and evidence-backed A05 gate.
+    - Safe-literal encoding and token-aware stop handling.
     """
     def post(self, request, *args, **kwargs):
         user = request.user
         role = getattr(user, "role", "")
+        username = getattr(user, "username", "")
         prompt = request.data.get("prompt", "")
         intent = request.data.get("intent", "TEACHING").strip().upper()
         history = request.data.get("history", [])
         idempotency_key = request.data.get("idempotency_key", "").strip()
+
+        # 1. Closed Production Cohort: Student access is strictly disabled
+        if role == UserRole.STUDENT:
+            return Response(
+                {
+                    "error": "Student access is disabled during Closed Production cohort validation.",
+                    "code": "STUDENT_ACCESS_DISABLED",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        # 2. Server-side tester allowlist enforcement
+        tester_allowlist = getattr(settings, "PIXIUMIND_TESTER_ALLOWLIST", None)
+        if tester_allowlist and isinstance(tester_allowlist, (list, set, tuple)):
+            if username not in tester_allowlist:
+                return Response(
+                    {
+                        "error": "User is not authorized for the Closed Production testing cohort.",
+                        "code": "NOT_IN_TESTER_ALLOWLIST",
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
 
         if not isinstance(prompt, str) or not prompt.strip():
             return Response(
@@ -167,45 +196,40 @@ class XenChatView(XenBaseView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 1. Intent authorization check
+        # 3. Intent authorization check with evidence-backed A05 gate
         if role == UserRole.TRAINER:
-            # Check trainer profile and A05 qualification
             trainer_profile = getattr(user, "trainer_profile", None)
             xen_trainer = getattr(trainer_profile, "xen_identity", None) if trainer_profile else None
-            is_a05 = bool(xen_trainer and xen_trainer.is_a05_qualified)
 
-            if intent == "PERSONAL_LEARNING" and not is_a05:
-                return Response(
-                    {
-                        "error": "PERSONAL_LEARNING intent is restricted to A05-qualified trainers.",
-                        "code": "FORBIDDEN_INTENT",
-                    },
-                    status=status.HTTP_403_FORBIDDEN,
-                )
+            if intent == "PERSONAL_LEARNING":
+                if not xen_trainer or not xen_trainer.can_access_intent("PERSONAL_LEARNING"):
+                    return Response(
+                        {
+                            "error": "PERSONAL_LEARNING intent requires verified, evidence-backed A05 qualification.",
+                            "code": "FORBIDDEN_INTENT",
+                        },
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
             if intent not in {"TEACHING", "LAB_TEACHING", "PERSONAL_LEARNING"}:
                 intent = "TEACHING"
-
-        elif role == UserRole.STUDENT:
-            if intent not in {"STUDENT_LEARNING", "HOMEWORK_HELP", "CONCEPT_EXPLANATION", "HINT_ONLY"}:
-                intent = "STUDENT_LEARNING"
 
         elif role == UserRole.ADMIN or role == UserRole.SCHOOL:
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
-        # 2. Build upstream message payload
+        # 4. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
         messages = [{"role": "system", "content": CONDITION_A1_SYSTEM_PROMPT}]
 
-        # Append validated history if provided
+        # Append validated within-session turns only (no cross-session persistent memory)
         if isinstance(history, list):
-            for turn in history[-10:]:  # Keep recent 10 turns
+            for turn in history[-10:]:
                 if isinstance(turn, dict) and "role" in turn and "content" in turn:
                     if turn["role"] in {"user", "assistant"}:
                         messages.append({"role": turn["role"], "content": str(turn["content"])})
 
         messages.append({"role": "user", "content": prompt.strip()})
 
-        # 3. Call upstream inference service
+        # 5. Call upstream inference service
         model_id = getattr(settings, "PIXIUMIND_MODEL_ID", "pixiumind-step-700")
         upstream_payload = {
             "model": model_id,
@@ -223,7 +247,6 @@ class XenChatView(XenBaseView):
         if code != 200:
             return Response(upstream_resp, status=code)
 
-        # 4. Extract generated choice
         raw_text = ""
         finish_reason = "stop"
         usage = upstream_resp.get("usage", {})
@@ -234,15 +257,15 @@ class XenChatView(XenBaseView):
             raw_text = first_choice.get("message", {}).get("content", "")
             finish_reason = first_choice.get("finish_reason", "stop")
 
-        # 5. Authoritative response post-processing & sanitization
+        # 6. Response decoding and sanitization
         decoded = decode_model_response(
             raw_text=raw_text,
             finish_reason=finish_reason,
-            actually_executed=False,  # Set False since code was not run in sandbox
+            actually_executed=False,
             intent=intent,
         )
 
-        # 6. Session recording for idempotency (non-blocking failure tolerance)
+        # 7. Session recording for idempotency
         if idempotency_key:
             try:
                 XenSession.objects.get_or_create(
@@ -264,6 +287,7 @@ class XenChatView(XenBaseView):
                 "status": "ok",
                 "model": model_id,
                 "intent": intent,
+                "teacher_memory_enabled": False,  # Personal Teacher Memory explicitly disabled in v0.1
                 "response": {
                     "text": decoded["text"],
                     "is_complete": decoded["is_complete"],

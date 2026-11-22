@@ -14,9 +14,11 @@ from loader import model_holder
 from server import app
 
 async def run_async_concurrency_evaluation():
-    print("=" * 65)
-    print("PIXIUMIND STEP-700 SERVING CONCURRENCY & CAPACITY BENCHMARK")
-    print("=" * 65)
+    print("=" * 70)
+    print("PIXIUMIND SERVING GATEWAY CONCURRENCY & ISOLATION BENCHMARK")
+    print("NOTE: Measures async ASGI event loop, semaphore queue bounding,")
+    print("      and session isolation. (Simulated inference compute delay)")
+    print("=" * 70)
 
     model_holder.is_ready = True
 

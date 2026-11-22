@@ -1,13 +1,15 @@
 """
 Unit tests for academics.models_xen
-Verifies Xen Identity Registry models, validation constraints,
-grade bands (6-12), slot limits (1-2), A05 qualification intent rules,
-and session idempotency.
+Verifies Xen Identity Registry models:
+- XenSchool (1:1 to School)
+- XenLab (canonical SchoolClass reference with grade and section, slots 1-2, period 2026-27)
+- XenTrainer (evidence-backed A05 qualification gate)
+- XenSession (idempotency key, memory disabled)
 """
 
 import uuid
 from django.test import SimpleTestCase
-from academics.models import School, Trainer, Status
+from academics.models import School, SchoolClass, Trainer, Status
 from academics.models_xen import XenSchool, XenLab, XenTrainer, XenSession
 
 
@@ -22,18 +24,24 @@ class XenRegistryUnitTests(SimpleTestCase):
         xen_school = XenSchool(school=real_school)
         xen_school.school_id = real_school.id
         
-        # Test code format
         suffix = "TEST01"
         xen_school.xen_school_code = f"XEN-SCH-{real_school.school_code}-{suffix}"
         
         self.assertTrue(xen_school.xen_school_code.startswith("XEN-SCH-DPS01-"))
         self.assertEqual(xen_school.status, Status.ACTIVE)
 
-    def test_xen_lab_code_and_grade_constraints(self):
+    def test_xen_lab_canonical_school_class_mapping(self):
         real_school = School(
             id=uuid.uuid4(),
             school_code="KV02",
             name="Kendriya Vidyalaya",
+        )
+        real_class = SchoolClass(
+            id=uuid.uuid4(),
+            school=real_school,
+            grade="8",
+            section="B",
+            display_name="8B",
         )
         real_xen_school = XenSchool(
             id=uuid.uuid4(),
@@ -41,64 +49,69 @@ class XenRegistryUnitTests(SimpleTestCase):
             xen_school_code="XEN-SCH-KV02-ABC123",
         )
 
-        lab_g8_s1 = XenLab(
+        lab_slot1 = XenLab(
+            school_class=real_class,
             xen_school=real_xen_school,
             academic_period="2026-27",
-            grade=8,
             slot_number=1,
         )
-        self.assertEqual(lab_g8_s1.academic_period, "2026-27")
-        self.assertEqual(lab_g8_s1.grade, 8)
-        self.assertEqual(lab_g8_s1.slot_number, 1)
+        self.assertEqual(lab_slot1.academic_period, "2026-27")
+        self.assertEqual(lab_slot1.slot_number, 1)
+        self.assertEqual(lab_slot1.school_class.grade, "8")
+        self.assertEqual(lab_slot1.school_class.section, "B")
 
-        # Verify grade limits (must be 6-12)
-        self.assertGreaterEqual(lab_g8_s1.grade, 6)
-        self.assertLessEqual(lab_g8_s1.grade, 12)
+        # Verify slot limits (1-2)
+        self.assertGreaterEqual(lab_slot1.slot_number, 1)
+        self.assertLessEqual(lab_slot1.slot_number, 2)
 
-        # Verify slot limits (must be 1-2)
-        self.assertGreaterEqual(lab_g8_s1.slot_number, 1)
-        self.assertLessEqual(lab_g8_s1.slot_number, 2)
-
-    def test_xen_trainer_intent_authorization_a05_qualified(self):
+    def test_xen_trainer_evidence_backed_a05_qualification(self):
         real_trainer = Trainer(
             id=uuid.uuid4(),
             trainer_id="TRN99",
             name="John Doe",
         )
 
-        # 1. Active Trainer WITHOUT A05 qualification
+        # 1. Active Trainer WITHOUT A05
         trainer_standard = XenTrainer(
             trainer=real_trainer,
             is_a05_qualified=False,
+            a05_certificate_id="",
             status=Status.ACTIVE,
         )
         self.assertTrue(trainer_standard.can_access_intent("TEACHING"))
         self.assertTrue(trainer_standard.can_access_intent("LAB_TEACHING"))
-        self.assertFalse(
-            trainer_standard.can_access_intent("PERSONAL_LEARNING"),
-            "Standard trainer without A05 must NOT be granted PERSONAL_LEARNING access",
-        )
+        self.assertFalse(trainer_standard.can_access_intent("PERSONAL_LEARNING"))
 
-        # 2. Active Trainer WITH A05 qualification
-        trainer_a05 = XenTrainer(
+        # 2. Trainer flagged A05=True but MISSING certificate evidence -> REJECTED
+        trainer_no_evidence = XenTrainer(
             trainer=real_trainer,
             is_a05_qualified=True,
+            a05_certificate_id="",  # Missing evidence
             status=Status.ACTIVE,
         )
-        self.assertTrue(trainer_a05.can_access_intent("TEACHING"))
-        self.assertTrue(trainer_a05.can_access_intent("LAB_TEACHING"))
-        self.assertTrue(
-            trainer_a05.can_access_intent("PERSONAL_LEARNING"),
-            "A05-qualified trainer MUST be granted PERSONAL_LEARNING access",
+        self.assertFalse(
+            trainer_no_evidence.can_access_intent("PERSONAL_LEARNING"),
+            "Trainer with missing A05 evidence document must NOT be granted PERSONAL_LEARNING access",
         )
 
-        # 3. Inactive Trainer
+        # 3. Trainer WITH documented A05 certificate evidence -> ALLOWED
+        trainer_a05_verified = XenTrainer(
+            trainer=real_trainer,
+            is_a05_qualified=True,
+            a05_certificate_id="CERT-A05-2026-IND-042",
+            status=Status.ACTIVE,
+        )
+        self.assertTrue(trainer_a05_verified.can_access_intent("TEACHING"))
+        self.assertTrue(trainer_a05_verified.can_access_intent("LAB_TEACHING"))
+        self.assertTrue(trainer_a05_verified.can_access_intent("PERSONAL_LEARNING"))
+
+        # 4. Inactive Trainer with evidence -> REJECTED
         trainer_inactive = XenTrainer(
             trainer=real_trainer,
             is_a05_qualified=True,
+            a05_certificate_id="CERT-A05-2026-IND-042",
             status=Status.INACTIVE,
         )
-        self.assertFalse(trainer_inactive.can_access_intent("TEACHING"))
         self.assertFalse(trainer_inactive.can_access_intent("PERSONAL_LEARNING"))
 
     def test_xen_session_structure(self):

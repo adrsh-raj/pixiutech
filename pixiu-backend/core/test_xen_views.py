@@ -1,6 +1,7 @@
 """
 Unit tests for core.xen_views
-Verifies role-aware access, intent enforcement, A05 qualification gate,
+Verifies role-aware access, Closed Production cohort gating (students disabled),
+server-side tester allowlist, evidence-backed A05 qualification gate,
 upstream proxying, and response post-processing.
 """
 
@@ -25,6 +26,7 @@ class XenViewsUnitTests(SimpleTestCase):
         # Mock Student User
         self.mock_student = MagicMock()
         self.mock_student.id = uuid.uuid4()
+        self.mock_student.username = "student_01"
         self.mock_student.is_authenticated = True
         self.mock_student.is_active = True
         self.mock_student.status = UserStatus.ACTIVE
@@ -33,28 +35,33 @@ class XenViewsUnitTests(SimpleTestCase):
         # Mock Trainer User (Non-A05)
         self.mock_trainer = MagicMock()
         self.mock_trainer.id = uuid.uuid4()
+        self.mock_trainer.username = "trainer_bob"
         self.mock_trainer.is_authenticated = True
         self.mock_trainer.is_active = True
         self.mock_trainer.status = UserStatus.ACTIVE
         self.mock_trainer.role = UserRole.TRAINER
         self.mock_trainer.trainer_profile = MagicMock()
-        self.mock_trainer.trainer_profile.xen_identity = MagicMock()
-        self.mock_trainer.trainer_profile.xen_identity.is_a05_qualified = False
+        mock_xen_identity = MagicMock()
+        mock_xen_identity.can_access_intent.return_value = False
+        self.mock_trainer.trainer_profile.xen_identity = mock_xen_identity
 
-        # Mock Trainer User (A05 Qualified)
+        # Mock Trainer User (Evidence-Backed A05 Qualified)
         self.mock_trainer_a05 = MagicMock()
         self.mock_trainer_a05.id = uuid.uuid4()
+        self.mock_trainer_a05.username = "trainer_alice"
         self.mock_trainer_a05.is_authenticated = True
         self.mock_trainer_a05.is_active = True
         self.mock_trainer_a05.status = UserStatus.ACTIVE
         self.mock_trainer_a05.role = UserRole.TRAINER
         self.mock_trainer_a05.trainer_profile = MagicMock()
-        self.mock_trainer_a05.trainer_profile.xen_identity = MagicMock()
-        self.mock_trainer_a05.trainer_profile.xen_identity.is_a05_qualified = True
+        mock_xen_identity_a05 = MagicMock()
+        mock_xen_identity_a05.can_access_intent.return_value = True
+        self.mock_trainer_a05.trainer_profile.xen_identity = mock_xen_identity_a05
 
         # Mock Admin User
         self.mock_admin = MagicMock()
         self.mock_admin.id = uuid.uuid4()
+        self.mock_admin.username = "admin_master"
         self.mock_admin.is_authenticated = True
         self.mock_admin.is_active = True
         self.mock_admin.status = UserStatus.ACTIVE
@@ -65,14 +72,24 @@ class XenViewsUnitTests(SimpleTestCase):
         response = self.chat_view(request)
         self.assertEqual(response.status_code, 401)
 
-    def test_empty_prompt_returns_bad_request(self):
-        request = self.factory.post("/api/v1/xen/chat", {"prompt": "  "}, format="json")
+    def test_student_access_strictly_disabled_in_closed_production(self):
+        """Student access must be rejected during Closed Production cohort."""
+        request = self.factory.post("/api/v1/xen/chat", {"prompt": "Help me with math"}, format="json")
         force_authenticate(request, user=self.mock_student)
         response = self.chat_view(request)
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data.get("code"), "INVALID_PROMPT")
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "STUDENT_ACCESS_DISABLED")
 
-    def test_trainer_without_a05_rejected_for_personal_learning(self):
+    @override_settings(PIXIUMIND_TESTER_ALLOWLIST=["trainer_alice", "admin_master"])
+    def test_tester_allowlist_enforced_server_side(self):
+        """Users not explicitly in the tester allowlist must be rejected."""
+        request = self.factory.post("/api/v1/xen/chat", {"prompt": "Hello"}, format="json")
+        force_authenticate(request, user=self.mock_trainer)  # trainer_bob is NOT in allowlist
+        response = self.chat_view(request)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data.get("code"), "NOT_IN_TESTER_ALLOWLIST")
+
+    def test_trainer_without_evidence_backed_a05_rejected_for_personal_learning(self):
         request = self.factory.post(
             "/api/v1/xen/chat",
             {"prompt": "Teach me advanced deep learning", "intent": "PERSONAL_LEARNING"},
@@ -93,7 +110,7 @@ class XenViewsUnitTests(SimpleTestCase):
     @override_settings(PIXIUMIND_ENDPOINT_URL="")
     def test_missing_endpoint_fails_safely_503(self):
         request = self.factory.post("/api/v1/xen/chat", {"prompt": "Hello"}, format="json")
-        force_authenticate(request, user=self.mock_student)
+        force_authenticate(request, user=self.mock_trainer_a05)
         response = self.chat_view(request)
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.data.get("code"), "PROVIDER_UNCONFIGURED")
@@ -104,7 +121,7 @@ class XenViewsUnitTests(SimpleTestCase):
         PIXIUMIND_MODEL_ID="pixiumind-step-700",
     )
     @patch("urllib.request.urlopen")
-    def test_successful_chat_proxy_and_decoder_sanitization(self, mock_urlopen):
+    def test_successful_trainer_chat_proxy_and_teacher_memory_disabled(self, mock_urlopen):
         raw_output_with_tokens = (
             "Here is the complete, tested Python implementation of `is_even(n)`:\n\n"
             "```python\n"
@@ -130,19 +147,20 @@ class XenViewsUnitTests(SimpleTestCase):
 
         request = self.factory.post(
             "/api/v1/xen/chat",
-            {"prompt": "Write a function to check if a number is even", "intent": "STUDENT_LEARNING"},
+            {"prompt": "Write a function to check if a number is even", "intent": "TEACHING"},
             format="json",
         )
-        force_authenticate(request, user=self.mock_student)
+        force_authenticate(request, user=self.mock_trainer)
         response = self.chat_view(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data.get("status"), "ok")
         self.assertEqual(response.data.get("model"), "pixiumind-step-700")
+        self.assertFalse(response.data.get("teacher_memory_enabled"), "Teacher Memory must be strictly disabled in v0.1")
 
         resp_data = response.data.get("response", {})
-        # Special token stripped
-        self.assertNotIn("<|im_end|>", resp_data.get("text", ""))
+        # Trailing protocol marker stripped
+        self.assertFalse(resp_data.get("text", "").endswith("<|im_end|>"))
         # Unverified tested claim sanitized
         self.assertIn("complete Python implementation (syntax verified)", resp_data.get("text", ""))
         self.assertNotIn("complete, tested Python implementation", resp_data.get("text", ""))

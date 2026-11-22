@@ -6,30 +6,22 @@
 
 import { API_BASE } from '../../../config/api.js';
 
-// Special tokens that must NEVER appear in the client DOM
-const SPECIAL_STOP_TOKENS = [
-  '<|im_end|>',
-  '<|im_start|>',
-  '<|endoftext|>',
-  '<|im_start|>assistant',
-  '<|im_start|>user',
-  '<|im_start|>system',
-];
-
 /**
- * Defensive client-side sanitizer to prevent token leakage into the DOM.
+ * Defensive client-side sanitizer to trim leaked protocol boundary markers
+ * while strictly preserving legitimate literal strings in code and documentation.
  */
 export function sanitizeClientOutput(text) {
   if (!text || typeof text !== 'string') return '';
-  let cleaned = text;
-  for (const token of SPECIAL_STOP_TOKENS) {
-    if (cleaned.includes(token)) {
-      cleaned = cleaned.replaceAll(token, '');
+  let cleaned = text.trim();
+  // Strip leaked ChatML header if present at the very start
+  cleaned = cleaned.replace(/^<\|im_start\|>(?:assistant|user|system)?\s*/i, '');
+  // Strip trailing protocol tokens only if at the end of the response
+  for (const suffix of ['<|im_end|>', '<|endoftext|>']) {
+    if (cleaned.endsWith(suffix)) {
+      cleaned = cleaned.slice(0, -suffix.length).trimEnd();
     }
   }
-  // Strip any residual ChatML tags like <|im_...
-  cleaned = cleaned.replace(/<\|im_[a-z0-9_]*\|?>?/gi, '');
-  return cleaned.trim();
+  return cleaned;
 }
 
 /**

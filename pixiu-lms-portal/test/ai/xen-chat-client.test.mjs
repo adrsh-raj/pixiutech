@@ -2,16 +2,27 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sanitizeClientOutput, sendXenChat } from '../../src/lib/ai/xen/xen-client.js';
 
-test('Xen Client - sanitizeClientOutput completely strips special tokens', () => {
-  const dirty = 'Hello world!<|im_end|>';
-  assert.equal(sanitizeClientOutput(dirty), 'Hello world!');
+test('Xen Client - sanitizeClientOutput trims trailing protocol tokens but preserves literal strings in code', () => {
+  // Trailing protocol token is trimmed
+  const trailingDirty = 'Hello world!<|im_end|>';
+  assert.equal(sanitizeClientOutput(trailingDirty), 'Hello world!');
 
-  const multiple = '<|im_start|>assistant\n```python\nprint("hi")\n```<|im_end|><|endoftext|>';
-  const cleaned = sanitizeClientOutput(multiple);
-  assert.equal(cleaned.includes('<|im_end|>'), false);
-  assert.equal(cleaned.includes('<|im_start|>'), false);
-  assert.equal(cleaned.includes('<|endoftext|>'), false);
-  assert.equal(cleaned.includes('print("hi")'), true);
+  // ChatML header prefix is trimmed
+  const headerDirty = '<|im_start|>assistant\nHere is your code.';
+  assert.equal(sanitizeClientOutput(headerDirty), 'Here is your code.');
+
+  // CRITICAL REQUIREMENT: Legitimate literal strings inside code must NOT be destroyed!
+  const codeWithLiterals = (
+    'Here is how you print the token in Python:\n\n' +
+    '```python\n' +
+    'print("<|im_end|>")\n' +
+    'print("<|im_start|>")\n' +
+    '```\n' +
+    'This is a literal string example.'
+  );
+  const cleaned = sanitizeClientOutput(codeWithLiterals);
+  assert.equal(cleaned.includes('print("<|im_end|>")'), true);
+  assert.equal(cleaned.includes('print("<|im_start|>")'), true);
 });
 
 test('Xen Client - sendXenChat handles cancellation cleanly', async () => {
@@ -28,7 +39,6 @@ test('Xen Client - sendXenChat handles cancellation cleanly', async () => {
 });
 
 test('Xen Client - AST badge and tested truthfulness mapping', () => {
-  // Verify that an incomplete response is correctly flagged as not complete
   const mockServerResponse = {
     status: 'ok',
     model: 'pixiumind-step-700',

@@ -1,9 +1,10 @@
 """
 Identity Registry Models for Xen (PixiuMind) Integration.
-Academic period: 2026-27
-Classes: 6-12
-Slots per class: 1-2
-Intents: TEACHING, LAB_TEACHING, PERSONAL_LEARNING (A05 qualified only)
+Canonical mapping:
+- XenSchool: 1:1 to academics.School
+- XenLab: canonical SchoolClass (grade+section) + academic period (2026-27) + slot (1 or 2)
+- XenTrainer: 1:1 to academics.Trainer with evidence-backed A05 qualification
+- XenSession: transactional idempotency and session isolation
 """
 
 import uuid
@@ -12,7 +13,7 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from accounts.models import UserRole
-from .models import School, Trainer, Status
+from .models import School, SchoolClass, Trainer, Status
 
 
 class XenSchool(models.Model):
@@ -37,7 +38,6 @@ class XenSchool(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.xen_school_code and self.school_id:
-            # Generate immutable opaque code: XEN-SCH-<SCHOOL_CODE>-<SHORT_UUID>
             suffix = uuid.uuid4().hex[:6].upper()
             code_base = getattr(self.school, "school_code", "GEN").strip().upper()
             self.xen_school_code = f"XEN-SCH-{code_base}-{suffix}"
@@ -50,20 +50,22 @@ class XenSchool(models.Model):
 class XenLab(models.Model):
     """
     Registered logical Lab slot for Xen curriculum delivery.
-    Class range: Grades 6-12
+    Canonical reference to existing SchoolClass (grade + section).
     Slots: 1 or 2 slots per class in academic period 2026-27.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    school_class = models.ForeignKey(
+        SchoolClass,
+        on_delete=models.PROTECT,
+        related_name="xen_labs",
+        help_text="Authoritative SchoolClass providing grade and section",
+    )
     xen_school = models.ForeignKey(
         XenSchool,
         on_delete=models.CASCADE,
         related_name="labs",
     )
     academic_period = models.CharField(max_length=20, default="2026-27")
-    grade = models.PositiveSmallIntegerField(
-        validators=[MinValueValidator(6), MaxValueValidator(12)],
-        help_text="Target academic grade (6 to 12)",
-    )
     slot_number = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(2)],
         help_text="Lab slot sequence number (1 or 2)",
@@ -75,15 +77,11 @@ class XenLab(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["xen_school", "academic_period", "grade", "slot_number"]
+        ordering = ["school_class__school__school_code", "school_class__grade", "school_class__section", "slot_number"]
         constraints = [
             models.UniqueConstraint(
-                fields=["xen_school", "academic_period", "grade", "slot_number"],
-                name="uniq_xen_school_period_grade_slot",
-            ),
-            models.CheckConstraint(
-                condition=Q(grade__gte=6) & Q(grade__lte=12),
-                name="xen_lab_grade_between_6_and_12",
+                fields=["school_class", "academic_period", "slot_number"],
+                name="uniq_xen_lab_class_period_slot",
             ),
             models.CheckConstraint(
                 condition=Q(slot_number__gte=1) & Q(slot_number__lte=2),
@@ -94,11 +92,22 @@ class XenLab(models.Model):
         verbose_name_plural = "Xen Labs"
 
     def save(self, *args, **kwargs):
-        if not self.xen_lab_code:
-            school_code = self.xen_school.school.school_code if self.xen_school_id else "GEN"
-            self.xen_lab_code = f"XEN-LAB-{school_code}-G{self.grade}-S{self.slot_number}"
-        if not self.display_name:
-            self.display_name = f"Class {self.grade} Lab Slot {self.slot_number} ({self.academic_period})"
+        if self.school_class_id and not self.xen_school_id:
+            # Bind to corresponding XenSchool automatically
+            school = getattr(self.school_class, "school", None)
+            if school and hasattr(school, "xen_identity"):
+                self.xen_school = school.xen_identity
+
+        if not self.xen_lab_code and self.school_class_id:
+            sch_code = getattr(self.school_class.school, "school_code", "GEN")
+            grade = getattr(self.school_class, "grade", "")
+            section = getattr(self.school_class, "section", "")
+            self.xen_lab_code = f"XEN-LAB-{sch_code}-G{grade}{section}-S{self.slot_number}"
+
+        if not self.display_name and self.school_class_id:
+            disp_class = getattr(self.school_class, "display_name", f"{self.school_class.grade}{self.school_class.section}")
+            self.display_name = f"Class {disp_class} Lab Slot {self.slot_number} ({self.academic_period})"
+
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -108,7 +117,7 @@ class XenLab(models.Model):
 class XenTrainer(models.Model):
     """
     Authoritative Xen Trainer identity mapped 1:1 to an existing LMS Trainer.
-    Controls access to TEACHING, LAB_TEACHING, and conditional PERSONAL_LEARNING (A05 qualified).
+    Controls access to TEACHING, LAB_TEACHING, and evidence-backed PERSONAL_LEARNING.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     trainer = models.OneToOneField(
@@ -117,16 +126,43 @@ class XenTrainer(models.Model):
         related_name="xen_identity",
     )
     xen_trainer_code = models.CharField(max_length=40, unique=True, editable=False)
+    
+    # Evidence-backed A05 qualification
     is_a05_qualified = models.BooleanField(
         default=False,
         help_text="Separate A05 qualification required for PERSONAL_LEARNING intent access.",
     )
+    a05_certificate_id = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Authoritative certificate or document reference establishing A05 qualification.",
+    )
+    a05_qualification_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date A05 qualification was granted.",
+    )
+    a05_verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="verified_xen_trainers",
+        help_text="Admin user who verified A05 qualification evidence.",
+    )
+
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["trainer__trainer_id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(is_a05_qualified=False) | (Q(is_a05_qualified=True) & ~Q(a05_certificate_id="")),
+                name="a05_qualification_requires_evidence",
+            ),
+        ]
         verbose_name = "Xen Trainer"
         verbose_name_plural = "Xen Trainers"
 
@@ -139,7 +175,7 @@ class XenTrainer(models.Model):
 
     def can_access_intent(self, intent: str) -> bool:
         """
-        Check if the trainer has permission for the specified interaction intent.
+        Check if the trainer has verified permission for the specified interaction intent.
         """
         if self.status != Status.ACTIVE:
             return False
@@ -148,17 +184,19 @@ class XenTrainer(models.Model):
         if intent in {"TEACHING", "LAB_TEACHING"}:
             return True
         elif intent == "PERSONAL_LEARNING":
-            return self.is_a05_qualified
+            # Must be active, flagged as qualified, AND have documented evidence certificate
+            return bool(self.is_a05_qualified and self.a05_certificate_id)
         return False
 
     def __str__(self):
-        a05_str = " [A05 Qualified]" if self.is_a05_qualified else ""
+        a05_str = f" [A05: {self.a05_certificate_id}]" if self.is_a05_qualified else ""
         return f"{self.xen_trainer_code} ({self.trainer.name}){a05_str}"
 
 
 class XenSession(models.Model):
     """
     Transactional idempotency and session isolation record for Xen interactions.
+    Personal Teacher Memory is strictly disabled in v0.1.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     idempotency_key = models.CharField(max_length=128, unique=True, db_index=True)

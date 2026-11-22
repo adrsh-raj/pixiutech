@@ -3,7 +3,7 @@ PixiuMind Xen Response Decoder & Output Sanitizer
 Authoritative product-serving post-processor for Step-700 / Qwen3-14B inference responses.
 
 Guarantees:
-1. Zero token leakage: Strips <|im_end|>, <|im_start|>, <|endoftext|>, and ChatML artifacts.
+1. Token-aware protocol handling: Does NOT globally delete legitimate literal strings like print("<|im_end|>") from code/docs.
 2. Output completeness: Identifies truncated outputs (finish_reason == "length", unclosed fences).
 3. Syntax verification: AST validation (ast.parse) for Python code blocks.
 4. Testing claim truthfulness: Corrects unverified "tested" claims when sandbox execution did not run.
@@ -13,17 +13,6 @@ Guarantees:
 import ast
 import re
 from typing import Any, Dict, List, Optional, Tuple
-
-# Special tokens that must NEVER leak to the end user
-# Sorted by length descending so longer compound tags are matched before sub-tags
-SPECIAL_STOP_TOKENS = [
-    "<|im_start|>assistant",
-    "<|im_start|>user",
-    "<|im_start|>system",
-    "<|im_end|>",
-    "<|im_start|>",
-    "<|endoftext|>",
-]
 
 # Patterns for deceptive unverified "tested" claims
 UNVERIFIED_TESTED_PATTERNS = [
@@ -48,10 +37,10 @@ PYTHON_CODE_SNIPPET_PATTERNS = [
 ]
 
 
-def strip_special_tokens(text: str) -> Tuple[str, List[str]]:
+def trim_trailing_protocol_tokens(text: str) -> Tuple[str, List[str]]:
     """
-    Remove all special tokens and ChatML boundary tags from generated output.
-    Returns cleaned text and a list of tokens that were stripped.
+    Remove ONLY genuine protocol tokens from the boundaries of the generated stream.
+    Does NOT strip literal occurrences of special token names embedded inside code or documentation.
     """
     if not text:
         return "", []
@@ -59,21 +48,20 @@ def strip_special_tokens(text: str) -> Tuple[str, List[str]]:
     stripped = []
     cleaned = text
 
-    # Remove ChatML header directives like <|im_start|>assistant\n
-    matches = re.findall(r"<\|im_start\|>(?:assistant|user|system)?", cleaned)
-    if matches:
-        stripped.extend(matches)
-    cleaned = re.sub(r"<\|im_start\|>(?:assistant|user|system)?\s*", "", cleaned)
+    # Strip ChatML header prefixes if leaked at the very start of generation
+    prefix_match = re.match(r"^<\|im_start\|>(?:assistant|user|system)?\s*", cleaned)
+    if prefix_match:
+        matched_str = prefix_match.group(0)
+        stripped.append(matched_str.strip())
+        cleaned = cleaned[len(matched_str):]
 
-    for token in SPECIAL_STOP_TOKENS:
-        if token in cleaned:
-            stripped.append(token)
-            cleaned = cleaned.replace(token, "")
+    # Strip trailing protocol token only if present at the end of output
+    for suffix in ("<|im_end|>", "<|endoftext|>"):
+        if cleaned.endswith(suffix):
+            stripped.append(suffix)
+            cleaned = cleaned[:-len(suffix)]
 
-    # Strip any trailing ChatML tag residuals like <|im_...
-    cleaned = re.sub(r"<\|im_[a-z0-9_]*\|?>?", "", cleaned)
-
-    return cleaned.strip(), stripped
+    return cleaned.rstrip(), stripped
 
 
 def check_fence_completeness(text: str) -> Tuple[bool, int, List[str]]:
@@ -87,14 +75,12 @@ def check_fence_completeness(text: str) -> Tuple[bool, int, List[str]]:
     if not text:
         return True, 0, []
 
-    # Count occurrences of triple backticks
     fence_matches = list(re.finditer(r"```([a-zA-Z0-9_-]*)\n?", text))
     fence_count = len(fence_matches)
 
     is_complete = (fence_count % 2 == 0)
     unclosed_count = 1 if (fence_count % 2 != 0) else 0
 
-    # Extract complete code blocks
     code_blocks = []
     block_matches = re.findall(r"```(?:[a-zA-Z0-9_-]*)\n([\s\S]*?)```", text)
     code_blocks.extend(block_matches)
@@ -143,11 +129,9 @@ def detect_code_in_explanation(text: str) -> Tuple[bool, List[str]]:
 
     detected = []
 
-    # Check for fenced code
     if "```" in text:
         detected.append("FENCED_CODE")
 
-    # Check for unfenced raw Python definitions and statements
     for pattern in PYTHON_CODE_SNIPPET_PATTERNS:
         matches = pattern.findall(text)
         if matches:
@@ -166,14 +150,15 @@ def decode_model_response(
     Authoritative decoding pipeline for PixiuMind Step-700 responses.
     
     Guarantees:
-    - Never passes <|im_end|> to the client.
+    - Never leaks boundary protocol tokens into output.
+    - Preserves legitimate literal strings in code (e.g. print("<|im_end|>")).
     - Never marks finish_reason == 'length' as a complete response.
     - Never awards valid_syntax badge if generation is incomplete/truncated.
     - Corrects unverified 'tested' claims unless actually_executed is True.
     - Flags code leakage in hint-only/explanation intents.
     """
-    # 1. Strip special tokens
-    cleaned_text, stripped_tokens = strip_special_tokens(raw_text)
+    # 1. Trim boundary protocol tokens only (preserves internal literal occurrences)
+    cleaned_text, stripped_tokens = trim_trailing_protocol_tokens(raw_text)
 
     # 2. Check fence completeness
     fences_closed, unclosed_count, code_blocks = check_fence_completeness(cleaned_text)

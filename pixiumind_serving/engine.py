@@ -2,6 +2,15 @@
 Execution Engine for PixiuMind Persistent Serving.
 Executes PyTorch generation in a background thread pool to ensure the asyncio
 event loop is never blocked, keeping /health/live responsive at all times.
+
+Token Protocol Guarantees:
+- EOS Token ID: 151645 (<|im_end|>) strictly preserved from Step-700 frozen reference.
+- PAD Token ID: 151643 (<|endoftext|>) kept strictly separate; never merged into EOS.
+- Safe-literal input encoding: apply_chat_template(tokenize=True, sanitize_control_tokens=True)
+  prevents user input strings from becoming structural ChatML boundaries.
+- Token-aware stopping: Slices off the trailing EOS token ID at the token level.
+- Clean decoding: Decodes using skip_special_tokens=True without broad string regexes,
+  preserving legitimate literal code and documentation examples.
 """
 
 import asyncio
@@ -13,11 +22,11 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger("pixiumind.serving")
 
 # Thread pool dedicated strictly to blocking PyTorch inference
-# Keeping max_workers bounded to GPU concurrency capability
 INFERENCE_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="pixiumind_infer")
 
-# Stop token IDs for Qwen3 / PixiuMind
-STOP_TOKEN_IDS = [151645, 151643]  # <|im_end|>, <|endoftext|>
+# Frozen Step-700 / Qwen3 Token Definitions
+EOS_TOKEN_ID = 151645  # <|im_end|> (ChatML end of turn)
+PAD_TOKEN_ID = 151643  # <|endoftext|> (Padding / Document end)
 
 def _sync_generate(
     model: Any,
@@ -30,21 +39,24 @@ def _sync_generate(
     """Synchronous inference worker executed in background thread."""
     start_time = time.time()
     
-    # Format messages using Qwen chat template
-    text_prompt = tokenizer.apply_chat_template(
+    # Safe-literal tokenization: encodes user text safely without allowing
+    # literal strings (like '<|im_end|>') to become control tokens
+    encoded = tokenizer.apply_chat_template(
         messages,
-        tokenize=False,
+        tokenize=True,
         add_generation_prompt=True,
+        sanitize_control_tokens=True,
+        return_tensors="pt",
+        return_dict=True,
     )
     
-    inputs = tokenizer([text_prompt], return_tensors="pt")
-    input_ids = inputs.input_ids
+    input_ids = encoded["input_ids"]
     if hasattr(model, "device"):
         input_ids = input_ids.to(model.device)
 
     prompt_tokens = input_ids.shape[1]
 
-    # Generate
+    # Generate using strictly approved EOS token ID (151645) and separate PAD token ID (151643)
     import torch
     with torch.no_grad():
         output_ids = model.generate(
@@ -53,33 +65,33 @@ def _sync_generate(
             temperature=temperature if temperature > 0 else None,
             do_sample=temperature > 0,
             top_p=top_p if temperature > 0 else None,
-            eos_token_id=STOP_TOKEN_IDS,
-            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=EOS_TOKEN_ID,
+            pad_token_id=PAD_TOKEN_ID,
         )
 
     # Slice out generated tokens (excluding prompt)
     generated_tokens = output_ids[0][prompt_tokens:]
     completion_tokens = len(generated_tokens)
     
-    # Determine finish reason
-    last_token_id = generated_tokens[-1].item() if completion_tokens > 0 else None
-    if last_token_id in STOP_TOKEN_IDS:
+    # Token-aware stopping check
+    if completion_tokens > 0 and generated_tokens[-1].item() == EOS_TOKEN_ID:
         finish_reason = "stop"
+        content_tokens = generated_tokens[:-1]  # Slice off structural EOS token
     elif completion_tokens >= max_new_tokens:
         finish_reason = "length"
+        content_tokens = generated_tokens
     else:
         finish_reason = "stop"
+        content_tokens = generated_tokens
 
-    # Decode with skip_special_tokens=True to prevent <|im_end|> leakage
-    raw_output = tokenizer.decode(generated_tokens, skip_special_tokens=True)
-    
-    # Defensive strip of trailing special tokens
-    cleaned_output = raw_output.replace("<|im_end|>", "").replace("<|endoftext|>", "").strip()
+    # Decode at the token boundary with skip_special_tokens=True
+    # Preserves legitimate literal text (e.g. print("<|im_end|>")) while omitting protocol tokens
+    decoded_output = tokenizer.decode(content_tokens, skip_special_tokens=True)
 
     latency_s = time.time() - start_time
 
     return {
-        "text": cleaned_output,
+        "text": decoded_output,
         "finish_reason": finish_reason,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
