@@ -73,6 +73,7 @@ export async function sendXenChat({
           status: response.status,
           code: errorJson.code || 'UPSTREAM_ERROR',
           message: errorJson.error || `HTTP ${response.status} error from Xen proxy.`,
+          requestId: errorJson.request_id || null,
         },
       };
     }
@@ -83,6 +84,7 @@ export async function sendXenChat({
 
     return {
       success: true,
+      requestId: data?.request_id || data?.id || null,
       model: data?.model || 'pixiumind-step-700',
       intent: data?.intent || intent,
       response: {

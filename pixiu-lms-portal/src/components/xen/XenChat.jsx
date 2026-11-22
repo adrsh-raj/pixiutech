@@ -68,7 +68,8 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
 
     if (!result.success) {
       setStatus('error');
-      setErrorMessage(result.error?.message || 'Failed to communicate with Xen AI.');
+      const traceSuffix = result.error?.requestId ? ` (Ref: ${result.error.requestId})` : '';
+      setErrorMessage(`${result.error?.message || 'Failed to communicate with Xen AI.'}${traceSuffix}`);
       return;
     }
 
@@ -85,6 +86,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         syntaxValid: resp.syntax_valid,
         displayAstValid: resp.display_ast_valid,
         tested: resp.tested,
+        requestId: result.requestId,
       },
     ]);
     setStatus('idle');
@@ -300,9 +302,12 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
             >
               {renderMessageContent(m, idx)}
             </div>
-            <span className="text-[10px] text-slate-500 mt-1 px-1">
-              {m.role === 'user' ? 'You' : 'PixiuMind'}
-            </span>
+            <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1 px-1">
+              <span>{m.role === 'user' ? 'You' : 'PixiuMind Xen'}</span>
+              {m.requestId && (
+                <span className="font-mono text-slate-600">[{m.requestId}]</span>
+              )}
+            </div>
           </div>
         ))}
 
@@ -347,6 +352,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
             }}
             placeholder="Ask a question about Python, Arduino, or algorithms..."
             rows={2}
+            maxLength={4000}
             disabled={status === 'generating'}
             className="flex-1 resize-none rounded-xl bg-slate-900 border border-slate-800 px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
           />
