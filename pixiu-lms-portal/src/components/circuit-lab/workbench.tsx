@@ -44,6 +44,7 @@ import { WelcomeOverlay } from "./welcome-overlay"
 import { CircuitDoctorHud } from "./circuit-doctor-hud"
 import { diagnoseCircuit } from "@/lib/circuit-doctor"
 import { CircuitCopilotChat } from "./circuit-copilot-chat"
+import { XenLauncher } from "./xen-launcher"
 import { useCircuitCopilotAction } from "./use-circuit-copilot-action"
 import { buildInoSketch, triggerInoDownload } from "@/lib/sketch-exporter"
 import { awardCreationXp, awardTinkeringXp, syncXpWithServer, setActiveStudentId, setUserRole } from "@/lib/xp-engine"
@@ -1954,6 +1955,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   return (
     <div className="circuit-lab-blue-theme flex h-[100dvh] min-h-0 flex-col bg-background text-foreground overflow-hidden select-none">
       <LabSupportWidget />
+      <XenLauncher userRole={userRole} />
 
       {/* PIXIU AI Circuit Copilot Chatbot Widget */}
       <CircuitCopilotChat
