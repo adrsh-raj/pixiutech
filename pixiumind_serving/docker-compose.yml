@@ -8,9 +8,10 @@ services:
     environment:
       - PIXIUMIND_HOST=0.0.0.0
       - PIXIUMIND_PORT=8000
-      - PIXIUMIND_API_KEY=${PIXIUMIND_API_KEY:-pixiumind-private-staging-key-change-in-prod}
+      - PIXIUMIND_API_KEY=${PIXIUMIND_API_KEY}
       - PIXIUMIND_BASE_MODEL_PATH=/models/base
       - PIXIUMIND_ADAPTER_PATH=/models/adapter
+      - PIXIUMIND_A1_PROMPT_PATH=/models/frozen_a1_prompt.txt
       - PIXIUMIND_MAX_CONCURRENCY=4
       - PIXIUMIND_TIMEOUT=450.0
       - CUDA_VISIBLE_DEVICES=0,1
@@ -18,6 +19,7 @@ services:
       # Read-only mounts to ensure base model and adapter cannot be modified by the service
       - ${BASE_MODEL_HOST_PATH:-/media/kali/New Volume/XenArtifacts/Qwen3-14B-40c069824f4251a91eefaf281ebe4c544efd3e18}:/models/base:ro
       - ${ADAPTER_HOST_PATH:-/home/kali/pixai-dataset/_v4_candidate/14b_training_release/pixiumind_1_4_d14_c800_kaggle_launch/session1_v2_output/c800_run_1795006835_d9914f/checkpoints/pixiumind_1_4_c800_b2a_s2_213_global_step_700}:/models/adapter:ro
+      - ${A1_PROMPT_HOST_PATH:-/home/kali/XEN_STEP700_KAGGLE_QUALIFICATION/frozen_a1_prompt.txt}:/models/frozen_a1_prompt.txt:ro
     deploy:
       resources:
         reservations:

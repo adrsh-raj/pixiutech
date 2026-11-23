@@ -41,7 +41,7 @@
       "network": "internal: true bridge (zero public port exposure)",
       "concurrency_limit": 4,
       "timeout_seconds": 450.0,
-      "unit_tests_passed": "14/14"
+      "unit_tests_passed": "20/20"
     },
     "django_backend": {
       "package": "pixiu-backend",
@@ -49,14 +49,14 @@
       "feature_flag": "XEN_PILOT_ENABLED = False (default fail-closed)",
       "allowlist_setting": "PIXIUMIND_TESTER_ALLOWLIST",
       "max_prompt_chars": 4000,
-      "rate_throttle_scope": "xen_chat (60/min)",
-      "unit_tests_passed": "21/21"
+      "rate_throttle_scope": "Shared Redis-backed atomic rate limiter (60/min, cross-process, fail-closed 503)",
+      "unit_tests_passed": "35/35"
     },
     "portal_frontend": {
       "package": "pixiu-lms-portal",
       "status": "VERIFIED",
-      "build_status": "CLEAN_BUILD (1.13s, 0 errors)",
-      "student_access": "BLOCKED (403 STUDENT_ACCESS_DISABLED UI & Backend)",
+      "build_status": "CLEAN_BUILD (937ms, 0 errors)",
+      "student_access": "BLOCKED (403 STUDENT_ACCESS_DISABLED UI & Backend; School 403 SCHOOL_ACCESS_DISABLED; Non-trainer 403 ROLE_ACCESS_DISABLED)",
       "direct_gpu_access": "ZERO (Strictly routes to Django /api/v1/)",
       "request_tracing": "ENABLED (Displays [Ref: xen-...] on UI)"
     }

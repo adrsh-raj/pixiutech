@@ -37,12 +37,15 @@ export PIXIUMIND_API_KEY="<PROVISIONED_SERVER_TO_SERVER_KEY>"
 export PIXIUMIND_MODEL_ID="pixiumind-step-700"
 export PIXIUMIND_TIMEOUT_SECONDS=30
 export XEN_MAX_PROMPT_CHARS=4000
+
+# Shared Redis Server for Atomic Rate Limiting (Required - Fails closed if missing)
+export REDIS_URL="redis://127.0.0.1:6379/0"
 ```
 
 ### Tester Account Requirements
 - **Role:** Must be logged in as an **Admin** or **Trainer**.
 - **Username:** Must match an entry in `PIXIUMIND_TESTER_ALLOWLIST`.
-- **Student Notice:** Any attempt to log in using a student test account will display the restricted cohort lock screen.
+- **Student & School Lockdown:** Any attempt to log in using a student test account (`HTTP 403 STUDENT_ACCESS_DISABLED`) or school account (`HTTP 403 SCHOOL_ACCESS_DISABLED`) will display the restricted cohort lock screen. Xen Tutor navigation is exclusively visible to authorized Admins and Trainers.
 
 ---
 

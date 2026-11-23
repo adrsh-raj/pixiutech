@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Square, RotateCcw, Trash2, Check, Copy, AlertTriangle, ShieldCheck, Sparkles, Terminal } from 'lucide-react';
-import { sendXenChat, sanitizeClientOutput } from '../../lib/ai/xen/xen-client.js';
+import { Send, Square, RotateCcw, Trash2, Check, Copy, AlertTriangle, ShieldCheck, Sparkles, Terminal, Cpu } from 'lucide-react';
+import { createXenRequestLifecycle, sendXenChat, sanitizeClientOutput, fetchXenStatus } from '../../lib/ai/xen/xen-client.js';
 
 export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [messages, setMessages] = useState([
@@ -13,46 +13,65 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     },
   ]);
   const [inputPrompt, setInputPrompt] = useState('');
-  const [intent, setIntent] = useState(userRole === 'trainer' ? 'TEACHING' : 'STUDENT_LEARNING');
+  const [intent, setIntent] = useState(userRole === 'trainer' ? 'TEACHING' : 'TEACHING_REVIEW');
   const [status, setStatus] = useState('idle'); // idle | generating | cancelled | error
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [workerStatus, setWorkerStatus] = useState({ online: true, activeWorkers: 0, checked: false });
+  const [queueInfo, setQueueInfo] = useState({ status: '', queuePosition: 0 });
 
-  const abortControllerRef = useRef(null);
+  const [requests] = useState(createXenRequestLifecycle);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
+    let isMounted = true;
+    async function checkStatus() {
+      const res = await fetchXenStatus();
+      if (isMounted && res.success) {
+        setWorkerStatus({
+          online: Boolean(res.workerOnline),
+          activeWorkers: res.activeWorkerCount || 0,
+          checked: true,
+        });
+      }
+    }
+    checkStatus();
+    const interval = setInterval(checkStatus, 20000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, status]);
+  }, [messages, status, queueInfo]);
 
-  const handleSend = async () => {
-    if (!inputPrompt.trim() || status === 'generating') return;
-
+  const handleSend = async (retry = false) => {
     const userText = inputPrompt.trim();
-    setInputPrompt('');
-    setErrorMessage('');
+    if (!retry && !userText) return;
 
-    const newMessages = [...messages, { role: 'user', content: userText }];
-    setMessages(newMessages);
-    setStatus('generating');
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    // Build chat history for upstream context (excluding initial greeting)
-    const historyPayload = newMessages.slice(1).map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    const result = await sendXenChat({
+    const attempt = requests.begin(retry ? null : {
       prompt: userText,
       intent,
-      history: historyPayload,
-      signal: controller.signal,
+      history: messages.slice(1).filter((message) => !message.isCancelled).slice(-10)
+        .map(({ role, content }) => ({ role, content })),
     });
+    if (!attempt) return;
+    setInputPrompt('');
+    setErrorMessage('');
+    setQueueInfo({ status: 'queued', queuePosition: 1 });
 
-    if (controller.signal.aborted) {
+    if (!retry) setMessages([...messages, { role: 'user', content: userText }]);
+    setStatus('generating');
+
+    const result = await sendXenChat({
+      ...attempt,
+      onStatusUpdate: (info) => setQueueInfo(info),
+    });
+    requests.finish(result.success);
+
+    if (attempt.signal.aborted) {
       setStatus('cancelled');
       setMessages((prev) => [
         ...prev,
@@ -92,21 +111,12 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     setStatus('idle');
   };
 
-  const handleCancel = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setStatus('cancelled');
-    }
-  };
+  const handleCancel = () => requests.cancel();
 
-  const handleRetry = () => {
-    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
-    if (lastUserMsg) {
-      setInputPrompt(lastUserMsg.content);
-    }
-  };
+  const handleRetry = () => void handleSend(true);
 
   const handleClear = () => {
+    requests.clear();
     setMessages([
       {
         role: 'assistant',
@@ -267,9 +277,8 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
               </>
             ) : (
               <>
-                <option value="STUDENT_LEARNING">Student Tutoring</option>
-                <option value="HOMEWORK_HELP">Homework Guide</option>
-                <option value="CONCEPT_EXPLANATION">Concept Explanation</option>
+                <option value="TEACHING_REVIEW">Teaching Review</option>
+                <option value="ADMIN_INSPECTION">Admin Inspection</option>
               </>
             )}
           </select>
@@ -285,6 +294,14 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
           </button>
         </div>
       </div>
+
+      {/* GPU Worker Vitality Banner */}
+      {workerStatus.checked && !workerStatus.online && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-950/40 border-b border-amber-800/40 text-amber-300 text-xs">
+          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <span>GPU Worker Offline: Prompts will be queued until a Kaggle GPU worker session is active.</span>
+        </div>
+      )}
 
       {/* Message List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50">
@@ -314,15 +331,19 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         {status === 'generating' && (
           <div className="flex items-center gap-2 text-cyan-400 text-xs py-2 px-3 rounded-lg bg-cyan-950/40 border border-cyan-800/40 w-fit">
             <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            Generating response with Step-700...
+            {queueInfo.status === 'queued'
+              ? `Queued in job queue (position #${queueInfo.queuePosition || 1})... waiting for Kaggle GPU worker.`
+              : queueInfo.status === 'claimed' || queueInfo.status === 'running'
+              ? 'Processing on Kaggle GPU (Dual Tesla T4)...'
+              : 'Generating response with Step-700...'}
           </div>
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || status === 'cancelled') && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-red-950/50 border border-red-800/50 text-red-300 text-xs">
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span>{errorMessage}</span>
+              <span>{status === 'cancelled' ? 'Request cancelled. Retry to check the same request.' : errorMessage}</span>
             </div>
             <button
               type="button"
@@ -369,7 +390,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
           ) : (
             <button
               type="button"
-              onClick={handleSend}
+              onClick={() => void handleSend()}
               disabled={!inputPrompt.trim()}
               className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:hover:bg-cyan-600 text-white font-medium text-xs flex items-center gap-1.5 transition-colors"
             >

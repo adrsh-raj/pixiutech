@@ -26,13 +26,15 @@ class ServingConfig(BaseModel):
             "/home/kali/pixai-dataset/_v4_candidate/14b_training_release/pixiumind_1_4_d14_c800_kaggle_launch/session1_v2_output/c800_run_1795006835_d9914f/checkpoints/pixiumind_1_4_c800_b2a_s2_213_global_step_700",
         )
     )
-    expected_adapter_sha256: str = Field(
-        default="8a2bb5c2bf3d148dda16d7546dab62c4c6c381e62433a2a9a79a612e64b8e968"
+    a1_prompt_path: str = Field(
+        default=os.environ.get(
+            "PIXIUMIND_A1_PROMPT_PATH",
+            "/home/kali/XEN_STEP700_KAGGLE_QUALIFICATION/frozen_a1_prompt.txt",
+        )
     )
-
     # Authentication secret (Server-to-server with Django only)
     api_key: str = Field(
-        default=os.environ.get("PIXIUMIND_API_KEY", "pixiumind-private-staging-key-change-in-prod")
+        default=os.environ.get("PIXIUMIND_API_KEY", "")
     )
 
     # Concurrency and timeout controls

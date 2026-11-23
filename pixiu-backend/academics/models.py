@@ -189,5 +189,13 @@ class Student(models.Model):
 
 
 # Xen Identity Registry models
-from .models_xen import XenSchool, XenLab, XenTrainer, XenSession  # noqa: E402
+from .models_xen import (  # noqa: E402
+    XenSchool,
+    XenLab,
+    XenTrainer,
+    XenSession,
+    XenJob,
+    XenJobStatus,
+    XenWorkerHeartbeat,
+)
 

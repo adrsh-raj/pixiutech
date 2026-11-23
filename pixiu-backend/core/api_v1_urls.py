@@ -34,7 +34,11 @@ from learning.trainer_units import TrainerUnitListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
 from .copilot_views import CopilotProposalProxyView
-from .xen_views import XenChatView, XenHealthView, XenAttestationView
+from .xen_views import (
+    XenChatView, XenHealthView, XenAttestationView,
+    XenJobCreateView, XenJobDetailView, XenStatusView,
+    XenWorkerClaimView, XenWorkerHeartbeatView, XenWorkerCompleteView, XenWorkerFailView,
+)
 from .scoped_curriculum import ScopedCurriculumViewSet
 from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
 
@@ -119,4 +123,11 @@ urlpatterns = [
     path('xen/chat', XenChatView.as_view(), name='v1-xen-chat'),
     path('xen/health', XenHealthView.as_view(), name='v1-xen-health'),
     path('xen/attestation', XenAttestationView.as_view(), name='v1-xen-attestation'),
+    path('xen/jobs', XenJobCreateView.as_view(), name='v1-xen-job-create'),
+    path('xen/jobs/<uuid:job_id>', XenJobDetailView.as_view(), name='v1-xen-job-detail'),
+    path('xen/status', XenStatusView.as_view(), name='v1-xen-status'),
+    path('xen/worker/claim', XenWorkerClaimView.as_view(), name='v1-xen-worker-claim'),
+    path('xen/worker/jobs/<uuid:job_id>/heartbeat', XenWorkerHeartbeatView.as_view(), name='v1-xen-worker-heartbeat'),
+    path('xen/worker/jobs/<uuid:job_id>/complete', XenWorkerCompleteView.as_view(), name='v1-xen-worker-complete'),
+    path('xen/worker/jobs/<uuid:job_id>/fail', XenWorkerFailView.as_view(), name='v1-xen-worker-fail'),
 ] + router.urls

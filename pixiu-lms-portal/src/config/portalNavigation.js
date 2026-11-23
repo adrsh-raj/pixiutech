@@ -20,7 +20,7 @@ export const PORTAL_NAVIGATION={
   {title:'PERFORMANCE',links:[{name:'Progress Reports',href:'/school-progress-reports',icon:BarChart3},{name:'School Performance',href:'/school-performance',icon:BarChart3}]},
   {title:'FINANCE',links:[{name:'Billing',href:'/billing',icon:WalletCards}]},
   {title:'COMMUNICATION',links:[{name:'Announcements',key:'announcements',icon:Megaphone},{name:'Notifications',href:'/notifications',icon:ReceiptText}]},
-  {title:'LAB',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'PixiuMind Xen Tutor',href:'/xen',icon:Bot},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
+  {title:'LAB',links:[{name:'PIXIU AI Studio',href:'/ai-studio',icon:Sparkles},{name:'Hardware & Kits',href:'/inventory',icon:Box}]},
  ],
  trainer:[
   {title:'MY WORK',links:[{name:'Workspace',key:'overview',icon:LayoutDashboard},{name:'My Classes',href:'/trainer-classes',icon:School},{name:'My Students',href:'/students',icon:Users},{name:'Sessions & Schedule',href:'/sessions',icon:CalendarDays}]},

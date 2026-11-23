@@ -276,11 +276,17 @@ PIXIUMIND_MODEL_ID = os.environ.get("PIXIUMIND_MODEL_ID", "pixiumind-step-700").
 PIXIUMIND_TIMEOUT_SECONDS = int(os.environ.get("PIXIUMIND_TIMEOUT_SECONDS", "30"))
 XEN_MAX_PROMPT_CHARS = int(os.environ.get("XEN_MAX_PROMPT_CHARS", "4000"))
 
-# Closed Production Tester Allowlist (comma-separated usernames or None)
+# Closed Production tester allowlist (comma-separated Django user IDs)
 _raw_tester_allowlist = os.environ.get("PIXIUMIND_TESTER_ALLOWLIST", "").strip()
 if _raw_tester_allowlist:
-    PIXIUMIND_TESTER_ALLOWLIST = [u.strip() for u in _raw_tester_allowlist.split(",") if u.strip()]
+    PIXIUMIND_TESTER_ALLOWLIST = [u.strip() for u in _raw_tester_allowlist.split(",")]
 else:
     PIXIUMIND_TESTER_ALLOWLIST = None
+
+# Kaggle GPU Outbound Worker Queue Settings
+XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip()
+XEN_JOB_LEASE_SECONDS = int(os.environ.get("XEN_JOB_LEASE_SECONDS", "120"))
+XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS = int(os.environ.get("XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "90"))
+
 
 

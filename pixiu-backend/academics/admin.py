@@ -1,6 +1,18 @@
 from django.contrib import admin
 
-from .models import School, SchoolClass, Student, Trainer, TrainerSchoolAssignment, XenSchool, XenLab, XenTrainer, XenSession
+from .models import (
+    School,
+    SchoolClass,
+    Student,
+    Trainer,
+    TrainerSchoolAssignment,
+    XenSchool,
+    XenLab,
+    XenTrainer,
+    XenSession,
+    XenJob,
+    XenWorkerHeartbeat,
+)
 
 
 @admin.register(School)
@@ -71,4 +83,21 @@ class XenSessionAdmin(admin.ModelAdmin):
     search_fields = ("idempotency_key", "user__username", "intent")
     list_filter = ("role", "intent", "is_completed")
     readonly_fields = ("id", "created_at")
+
+
+@admin.register(XenJob)
+class XenJobAdmin(admin.ModelAdmin):
+    list_display = ("id", "user", "role", "status", "worker_id", "created_at", "completed_at")
+    search_fields = ("id", "idempotency_key", "user__username", "worker_id")
+    list_filter = ("status", "role", "intent")
+    readonly_fields = ("id", "created_at", "updated_at")
+
+
+@admin.register(XenWorkerHeartbeat)
+class XenWorkerHeartbeatAdmin(admin.ModelAdmin):
+    list_display = ("worker_id", "last_seen", "is_active", "created_at")
+    search_fields = ("worker_id",)
+    list_filter = ("is_active",)
+    readonly_fields = ("created_at", "last_seen")
+
 

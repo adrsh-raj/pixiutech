@@ -2,8 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
-import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, rename, mkdtemp, rm } from 'node:fs/promises'
 import path from 'node:path'
 
 function sriAttributePlugin() {
@@ -11,10 +10,10 @@ function sriAttributePlugin() {
     name: 'pixiu-sri-attributes',
     apply: 'build',
     enforce: 'post',
-    async closeBundle() {
-      const distDir = path.resolve(import.meta.dirname, 'dist')
+    async writeBundle(options, bundle) {
+      if (!bundle['index.html']) return
+      const distDir = path.resolve(options.dir)
       const indexPath = path.join(distDir, 'index.html')
-      if (!existsSync(indexPath)) return
       const html = await readFile(indexPath, 'utf8')
       const manifest = {}
       const resourcePattern = /<(script|link)\b[^>]*?(?:src|href)="(\/[^"]+\.(?:js|css))"[^>]*>/gi
@@ -39,7 +38,14 @@ function sriAttributePlugin() {
         }
       }
 
-      await writeFile(indexPath, output)
+      const staging = await mkdtemp(path.join(distDir, '.sri-'))
+      try {
+        const stagedIndex = path.join(staging, 'index.html')
+        await writeFile(stagedIndex, output)
+        await rename(stagedIndex, indexPath)
+      } finally {
+        await rm(staging, { recursive: true, force: true })
+      }
       await mkdir(path.join(distDir, 'security'), { recursive: true })
       await writeFile(
         path.join(distDir, 'security', 'sri-manifest.json'),

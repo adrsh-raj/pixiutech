@@ -395,7 +395,7 @@ class XenSession(models.Model):
     Personal Teacher Memory is strictly disabled in v0.1.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    idempotency_key = models.CharField(max_length=128, unique=True, db_index=True)
+    idempotency_key = models.CharField(max_length=128)
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -419,11 +419,15 @@ class XenSession(models.Model):
     )
     request_hash = models.CharField(max_length=64, blank=True)
     response_summary = models.TextField(blank=True)
+    response_payload = models.JSONField(null=True, blank=True)
     is_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "idempotency_key"], name="xen_session_user_key_unique"),
+        ]
         verbose_name = "Xen Session"
         verbose_name_plural = "Xen Sessions"
 
@@ -436,3 +440,122 @@ class XenSession(models.Model):
 
     def __str__(self):
         return f"XenSession {self.idempotency_key} ({self.role} - {self.intent})"
+
+
+class XenJobStatus(models.TextChoices):
+    QUEUED = "queued", "Queued"
+    CLAIMED = "claimed", "Claimed"
+    RUNNING = "running", "Running"
+    COMPLETED = "completed", "Completed"
+    FAILED = "failed", "Failed"
+    EXPIRED = "expired", "Expired"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class XenJob(models.Model):
+    """
+    Persistent asynchronous inference job queue for Xen (PixiuMind Step-700) Kaggle GPU worker.
+    Atomic claiming via select_for_update guarantees no two workers process the same job.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    idempotency_key = models.CharField(max_length=128)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="xen_jobs",
+    )
+    role = models.CharField(max_length=20, choices=UserRole.choices)
+    intent = models.CharField(max_length=40, default="TEACHING")
+    status = models.CharField(
+        max_length=20,
+        choices=XenJobStatus.choices,
+        default=XenJobStatus.QUEUED,
+        db_index=True,
+    )
+    request_hash = models.CharField(max_length=64, blank=True)
+
+    # Prompt specification
+    prompt = models.TextField()
+    history = models.JSONField(default=list, blank=True)
+    max_tokens = models.PositiveIntegerField(default=1024)
+    temperature = models.FloatField(default=0.0)
+
+    # Worker lease & tracking
+    worker_id = models.CharField(max_length=128, blank=True, null=True, db_index=True)
+    claim_count = models.PositiveIntegerField(default=0)
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    lease_expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    heartbeat_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    # Results & diagnostics
+    response_summary = models.TextField(blank=True)
+    response_payload = models.JSONField(null=True, blank=True)
+    error_code = models.CharField(max_length=64, blank=True)
+    error_message = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["user", "idempotency_key"], name="xen_job_user_key_unique"),
+        ]
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["status", "lease_expires_at"]),
+        ]
+        verbose_name = "Xen Job"
+        verbose_name_plural = "Xen Jobs"
+
+    def is_lease_expired(self) -> bool:
+        if self.status in {XenJobStatus.CLAIMED, XenJobStatus.RUNNING} and self.lease_expires_at:
+            return self.lease_expires_at <= timezone.now()
+        return False
+
+    def __str__(self):
+        return f"XenJob {self.id} [{self.status}] ({self.role} - {self.intent})"
+
+
+class XenWorkerHeartbeat(models.Model):
+    """
+    Heartbeat and availability registry for Kaggle GPU workers.
+    """
+    worker_id = models.CharField(primary_key=True, max_length=128)
+    last_seen = models.DateTimeField(auto_now=True, db_index=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Xen Worker Heartbeat"
+        verbose_name_plural = "Xen Worker Heartbeats"
+
+    @classmethod
+    def record_heartbeat(cls, worker_id: str, metadata: dict = None):
+        if not worker_id:
+            return None
+        now = timezone.now()
+        hb, _ = cls.objects.update_or_create(
+            worker_id=worker_id,
+            defaults={
+                "last_seen": now,
+                "metadata": metadata or {},
+                "is_active": True,
+            },
+        )
+        return hb
+
+    @classmethod
+    def get_active_workers(cls, threshold_seconds: int = 90):
+        cutoff = timezone.now() - timedelta(seconds=threshold_seconds)
+        return cls.objects.filter(last_seen__gte=cutoff, is_active=True)
+
+    @classmethod
+    def is_any_worker_online(cls, threshold_seconds: int = 90) -> bool:
+        return cls.get_active_workers(threshold_seconds).exists()
+
+    def __str__(self):
+        return f"XenWorker {self.worker_id} (last seen: {self.last_seen})"
+
