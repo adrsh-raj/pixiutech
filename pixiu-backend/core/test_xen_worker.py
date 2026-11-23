@@ -129,7 +129,7 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
 
     # --- Job Creation & Gating Tests ---
 
-    def test_job_create_student_denied(self):
+    def test_job_create_student_outside_allowlist_denied(self):
         req = self.factory.post(
             "/api/v1/xen/jobs",
             {"prompt": "Explain loops in Python."},
@@ -138,7 +138,7 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         force_authenticate(req, user=self.mock_student)
         res = self.create_view(req)
         self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(res.data["code"], "STUDENT_ACCESS_DISABLED")
+        self.assertEqual(res.data["code"], "NOT_IN_TESTER_ALLOWLIST")
 
     def test_job_create_empty_prompt_rejected(self):
         req = self.factory.post(
