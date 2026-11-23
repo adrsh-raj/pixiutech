@@ -30,7 +30,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False)),
                 ("idempotency_key", models.CharField(max_length=128)),
-                ("role", models.CharField(choices=[("admin", "Admin"), ("school", "School"), ("student", "Student"), ("trainer", "Trainer")], max_length=20)),
+                ("role", models.CharField(choices=[("admin", "Admin"), ("school", "School"), ("trainer", "Trainer"), ("student", "Student")], max_length=20)),
                 ("intent", models.CharField(default="TEACHING", max_length=40)),
                 ("status", models.CharField(choices=[("queued", "Queued"), ("claimed", "Claimed"), ("running", "Running"), ("completed", "Completed"), ("failed", "Failed"), ("expired", "Expired"), ("cancelled", "Cancelled")], db_index=True, default="queued", max_length=20)),
                 ("request_hash", models.CharField(blank=True, max_length=64)),
