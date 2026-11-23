@@ -186,3 +186,15 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.student_id} - {self.name}"
+
+
+# Xen Identity Registry models
+from .models_xen import (  # noqa: E402
+    XenSchool,
+    XenLab,
+    XenTrainer,
+    XenSession,
+    XenJob,
+    XenJobStatus,
+    XenWorkerHeartbeat,
+)
