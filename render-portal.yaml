@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: pixiutech-learning-portal
+    runtime: static
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: cd pixiu-lms-portal && npm ci && npm run build
+    staticPublishPath: pixiu-lms-portal/dist
+    domains:
+      - portal.pixiutech.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
