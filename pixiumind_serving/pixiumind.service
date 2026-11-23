@@ -1,0 +1,23 @@
+[Unit]
+Description=PixiuMind Step-700 Persistent Private Inference Service
+After=network.target
+
+[Service]
+Type=simple
+User=kali
+Group=kali
+WorkingDirectory=/home/kali/pixiutech/pixiumind_serving
+Environment="PIXIUMIND_HOST=127.0.0.1"
+Environment="PIXIUMIND_PORT=8000"
+Environment="PIXIUMIND_API_KEY=pixiumind-private-staging-key-change-in-prod"
+Environment="PIXIUMIND_BASE_MODEL_PATH=/media/kali/New Volume/XenArtifacts/Qwen3-14B-40c069824f4251a91eefaf281ebe4c544efd3e18"
+Environment="PIXIUMIND_ADAPTER_PATH=/home/kali/pixai-dataset/_v4_candidate/14b_training_release/pixiumind_1_4_d14_c800_kaggle_launch/session1_v2_output/c800_run_1795006835_d9914f/checkpoints/pixiumind_1_4_c800_b2a_s2_213_global_step_700"
+ExecStart=/usr/bin/python3 -m uvicorn server:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=10s
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

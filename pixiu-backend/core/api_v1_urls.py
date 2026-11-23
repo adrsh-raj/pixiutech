@@ -33,6 +33,11 @@ from .quiz_documents import QuizResultPdfView, QuizResultView
 from learning.trainer_units import TrainerUnitListCreateView
 from notifications.views import NotificationPortalViewSet
 from learning.quiz_portal import QuizSingleAttemptView, QuizStartView, QuizReviewView
+from .xen_views import (
+    XenChatView, XenHealthView, XenAttestationView,
+    XenJobCreateView, XenJobDetailView, XenStatusView,
+    XenWorkerClaimView, XenWorkerHeartbeatView, XenWorkerCompleteView, XenWorkerFailView,
+)
 from .scoped_curriculum import ScopedCurriculumViewSet
 from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
 from learning.virtual_lab_views import VirtualLabAssignmentsView, VirtualLabProgressView
@@ -77,6 +82,17 @@ urlpatterns = [
     path("virtual-lab/assignments", VirtualLabAssignmentsView.as_view(), name="v1-virtual-lab-assignments"),
     path("virtual-lab/assignments/<uuid:assignment_id>/<str:action>", VirtualLabProgressView.as_view(), name="v1-virtual-lab-progress-action"),
     path('health/', health, name='v1-health'), path('upload/', SecureUploadView.as_view(), name='v1-upload'),
+    path('ai/chat/completions', XenChatView.as_view(), name='v1-ai-chat-completions'),
+    path('xen/chat', XenChatView.as_view(), name='v1-xen-chat'),
+    path('xen/health', XenHealthView.as_view(), name='v1-xen-health'),
+    path('xen/attestation', XenAttestationView.as_view(), name='v1-xen-attestation'),
+    path('xen/jobs', XenJobCreateView.as_view(), name='v1-xen-job-create'),
+    path('xen/jobs/<uuid:job_id>', XenJobDetailView.as_view(), name='v1-xen-job-detail'),
+    path('xen/status', XenStatusView.as_view(), name='v1-xen-status'),
+    path('xen/worker/claim', XenWorkerClaimView.as_view(), name='v1-xen-worker-claim'),
+    path('xen/worker/jobs/<uuid:job_id>/heartbeat', XenWorkerHeartbeatView.as_view(), name='v1-xen-worker-heartbeat'),
+    path('xen/worker/jobs/<uuid:job_id>/complete', XenWorkerCompleteView.as_view(), name='v1-xen-worker-complete'),
+    path('xen/worker/jobs/<uuid:job_id>/fail', XenWorkerFailView.as_view(), name='v1-xen-worker-fail'),
     path('auth/csrf/', csrf_token_view, name='v1-csrf-token'), path('auth/login/', LoginView.as_view(), name='v1-login'), path('auth/refresh/', RefreshView.as_view(), name='v1-refresh'),
     path('auth/logout/', LogoutView.as_view(), name='v1-logout'), path('auth/me/', MeView.as_view(), name='v1-me'), path('auth/password/change/', ChangeOwnPasswordView.as_view(), name='v1-password-change'),
     path('students/credentials/migrate', AdminStudentCredentialMigrationView.as_view(), name='v1-student-credential-migrate'),

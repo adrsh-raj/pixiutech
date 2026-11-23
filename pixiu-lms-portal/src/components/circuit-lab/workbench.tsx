@@ -12,6 +12,7 @@ import { runBlocklyProgram, executeStatement, type ExecutionEnvironment, type Bl
 import { virtualWifiManager, type VirtualWifiState } from "@/lib/virtual-wifi"
 import { IotWebPortal } from "./iot-web-portal"
 import { LabSupportWidget } from "./lab-support-widget"
+import { XenLauncher } from "./xen-launcher"
 import { MICROBIT_ICONS, MICROBIT_DIGITS, createEmptyMatrix } from "@/lib/microbit-patterns"
 import { audioEngine } from "@/lib/audio-engine"
 import { createHistory, pushState, undo as historyUndo, redo as historyRedo, canUndo, canRedo, type HistoryState } from "@/lib/history"
@@ -2157,6 +2158,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   return (
     <div className="circuit-lab-blue-theme flex h-[100dvh] min-h-0 flex-col bg-background text-foreground overflow-hidden select-none">
       <LabSupportWidget />
+      <XenLauncher userRole={userRole} />
 
       {/* PIXIU AI Circuit Copilot Chatbot Widget */}
       <CircuitCopilotChat
