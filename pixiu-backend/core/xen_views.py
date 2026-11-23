@@ -217,9 +217,15 @@ class XenHealthView(XenBaseView):
 class XenAttestationView(XenBaseView):
     """
     Returns cryptographic attestation and model provenance from the inference engine.
-    Restricted to Admins and Trainers.
+    Restricted to Admins and Trainers even when Students are allowlisted for tutoring.
     """
     def get(self, request, *args, **kwargs):
+        if getattr(request.user, "role", "") not in {UserRole.ADMIN, UserRole.TRAINER}:
+            return Response(
+                {"error": "Model attestation is restricted to Admins and Trainers.", "code": "PERMISSION_DENIED"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         if denial := self.cohort_denial(request.user):
             return denial
 
@@ -252,7 +258,8 @@ class XenChatView(XenBaseView):
     
     Cohort & Policy Enforcement (P0.1, P1.1, P1.2, P1.3, P1.4):
     - Feature Flag: XEN_PILOT_ENABLED gating.
-    - Cohort Role Gate: Student and School users strictly rejected with 403.
+    - Cohort Role Gate: allowlisted Students, Trainers and Admins; School users denied.
+    - Attestation is additionally restricted to Admins and Trainers.
     - Allowlist Gate: Missing, empty, or malformed allowlist denies all access.
     - User Gate: Only explicitly allowlisted Admin/Trainer accounts admitted.
     - Shared Rate Limiter: Atomic Redis-backed cross-process 60 req/min budget; fails closed.
