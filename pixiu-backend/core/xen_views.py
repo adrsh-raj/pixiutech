@@ -74,17 +74,9 @@ class XenBaseView(APIView):
 
         role = getattr(user, "role", "")
 
-        # 2. Closed Production Cohort Role Gating (Strict server-side validation)
-        if role == UserRole.STUDENT:
-            return Response(
-                {
-                    "error": "Student access is disabled during Closed Production cohort validation.",
-                    "code": "STUDENT_ACCESS_DISABLED",
-                    "request_id": request_id,
-                },
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
+        # 2. Closed Production Pilot Role Gate.
+        # Students are eligible only when their account ID is in the server-side
+        # tester allowlist below. School accounts remain categorically excluded.
         if role == UserRole.SCHOOL:
             return Response(
                 {
@@ -95,10 +87,10 @@ class XenBaseView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if role not in {UserRole.ADMIN, UserRole.TRAINER}:
+        if role not in {UserRole.ADMIN, UserRole.TRAINER, UserRole.STUDENT}:
             return Response(
                 {
-                    "error": "Access is restricted to authorized Admin and Trainer accounts only.",
+                    "error": "Access is restricted to allowlisted Admin, Trainer, and Student pilot accounts.",
                     "code": "ROLE_ACCESS_DISABLED",
                     "request_id": request_id,
                 },
