@@ -19,7 +19,7 @@ from rest_framework.test import APIRequestFactory, force_authenticate
 
 from academics.models_xen import XenSession
 from accounts.models import User, UserRole, UserStatus
-from core.xen_views import XenChatView, XenHealthView, XenAttestationView
+from core.xen_views import XenBaseView, XenChatView, XenHealthView, XenAttestationView
 
 
 @override_settings(
@@ -121,13 +121,19 @@ class XenViewsUnitTests(SimpleTestCase):
         response = self.chat_view(request)
         self.assertEqual(response.status_code, 401)
 
-    def test_student_access_strictly_disabled_in_closed_production(self):
-        """Student access must be rejected during Closed Production cohort."""
+    def test_student_not_in_pilot_allowlist_is_rejected(self):
+        """Students outside the explicitly configured pilot allowlist remain denied."""
         request = self.factory.post("/api/v1/xen/chat", {"prompt": "Help me with math"}, format="json")
         force_authenticate(request, user=self.mock_student)
         response = self.chat_view(request)
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "STUDENT_ACCESS_DISABLED")
+        self.assertEqual(response.data.get("code"), "NOT_IN_TESTER_ALLOWLIST")
+
+    @override_settings(PIXIUMIND_TESTER_ALLOWLIST=["101", "102", "103", "104"])
+    def test_allowlisted_student_passes_cohort_gate(self):
+        """A student in the server-side pilot allowlist passes the role/cohort gate."""
+        denial = XenBaseView().cohort_denial(self.mock_student)
+        self.assertIsNone(denial)
 
     @override_settings(PIXIUMIND_TESTER_ALLOWLIST=["103", "104"])
     def test_tester_allowlist_enforced_server_side(self):
