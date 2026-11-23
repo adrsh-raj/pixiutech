@@ -20,13 +20,12 @@ export default function XenTutor() {
   const userRole = user?.role || 'student';
   const isA05 = Boolean(user?.is_a05_qualified || user?.trainer_profile?.xen_identity?.is_a05_qualified);
 
-  if (!['admin', 'superadmin', 'trainer'].includes(userRole)) {
-    const isStudent = userRole === 'student';
-    const errorPolicy = isStudent ? 'HTTP 403 STUDENT_ACCESS_DISABLED' : (userRole === 'school' ? 'HTTP 403 SCHOOL_ACCESS_DISABLED' : 'HTTP 403 ROLE_ACCESS_DISABLED');
-    const title = isStudent ? 'Student Access Restricted' : (userRole === 'school' ? 'School Access Restricted' : 'Role Access Restricted');
-    const description = isStudent
-      ? 'Direct access to PixiuMind Xen is currently disabled in the Closed Production Cohort. In accordance with governance protocols, interactive workspace sessions are restricted to authorized Trainers and Administrators.'
-      : 'Access to PixiuMind Xen is restricted to authorized Trainers and Administrators. School accounts and non-trainer roles cannot initiate direct workspace sessions.';
+  if (!['admin', 'superadmin', 'trainer', 'student'].includes(userRole)) {
+    const title = userRole === 'school' ? 'School Access Restricted' : 'Role Access Restricted';
+    const description = userRole === 'school'
+      ? 'School accounts are not included in the PixiuMind Xen pilot. Student tester, Trainer and Admin accounts are admitted only when explicitly allowlisted by the portal team.'
+      : 'This account role is not included in the PixiuMind Xen pilot.';
+    const errorPolicy = userRole === 'school' ? 'HTTP 403 SCHOOL_ACCESS_DISABLED' : 'HTTP 403 ROLE_ACCESS_DISABLED';
 
     return (
       <div className="min-h-screen bg-slate-950 p-6 flex flex-col items-center justify-center">
