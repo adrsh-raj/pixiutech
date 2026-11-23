@@ -160,7 +160,7 @@ class XenViewsUnitTests(SimpleTestCase):
         force_authenticate(request, user=self.mock_student)
         response = self.attest_view(request)
         self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.data.get("code"), "STUDENT_ACCESS_DISABLED")
+        self.assertEqual(response.data.get("code"), "PERMISSION_DENIED")
 
     @patch("core.xen_views.XenBaseView.call_upstream")
     def test_missing_or_invalid_keys_are_rejected_before_reservation(self, upstream):
@@ -627,6 +627,13 @@ class XenIdempotencyTests(TestCase):
 
 @override_settings(XEN_PILOT_ENABLED=True)
 class XenConcurrentIdempotencyTests(TransactionTestCase):
+    def _fixture_teardown(self):
+        # A legacy learning_content_file_backup FK prevents PostgreSQL's
+        # database-wide TRUNCATE flush. Clean only the rows this test owns.
+        XenSession.objects.filter(user__username__in=("concurrent_owner", "concurrent_peer")).delete()
+        User.objects.filter(username__in=("concurrent_owner", "concurrent_peer")).delete()
+        connections.close_all()
+
     @patch("core.xen_views.check_xen_rate_limit", return_value=(True, 1, ""))
     @patch("core.xen_views.XenChatView.call_upstream")
     def test_duplicate_and_peer_requests_with_independent_connections(self, upstream, limiter):
