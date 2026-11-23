@@ -503,8 +503,8 @@ class XenJob(models.Model):
             models.UniqueConstraint(fields=["user", "idempotency_key"], name="xen_job_user_key_unique"),
         ]
         indexes = [
-            models.Index(fields=["status", "created_at"]),
-            models.Index(fields=["status", "lease_expires_at"]),
+            models.Index(fields=["status", "created_at"], name="academics_x_status_c0d291_idx"),
+            models.Index(fields=["status", "lease_expires_at"], name="academics_x_status_27b878_idx"),
         ]
         verbose_name = "Xen Job"
         verbose_name_plural = "Xen Jobs"
