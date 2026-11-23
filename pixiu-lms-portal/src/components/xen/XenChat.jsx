@@ -13,7 +13,9 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     },
   ]);
   const [inputPrompt, setInputPrompt] = useState('');
-  const [intent, setIntent] = useState(userRole === 'trainer' ? 'TEACHING' : 'TEACHING_REVIEW');
+  const [intent, setIntent] = useState(
+    userRole === 'trainer' ? 'TEACHING' : userRole === 'student' ? 'STUDENT_LEARNING' : 'TEACHING_REVIEW'
+  );
   const [status, setStatus] = useState('idle'); // idle | generating | cancelled | error
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
