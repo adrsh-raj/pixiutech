@@ -265,3 +265,21 @@ SESSION_COOKIE_SAMESITE = os.environ.get("DJANGO_SESSION_COOKIE_SAMESITE", "Lax"
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() == "true"; SESSION_COOKIE_SECURE = True; CSRF_COOKIE_SECURE = True; SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000")); SECURE_HSTS_INCLUDE_SUBDOMAINS = True; SECURE_HSTS_PRELOAD = True
+
+
+# PixiuMind Xen / Step-700 team pilot configuration.
+# Secrets and numeric tester IDs are set only in the Render service environment.
+XEN_PILOT_ENABLED = os.environ.get("XEN_PILOT_ENABLED", "False").lower() == "true"
+PIXIUMIND_ENDPOINT_URL = os.environ.get("PIXIUMIND_ENDPOINT_URL", "").strip()
+PIXIUMIND_API_KEY = os.environ.get("PIXIUMIND_API_KEY", "").strip()
+PIXIUMIND_MODEL_ID = os.environ.get("PIXIUMIND_MODEL_ID", "pixiumind-step-700").strip()
+PIXIUMIND_TIMEOUT_SECONDS = int(os.environ.get("PIXIUMIND_TIMEOUT_SECONDS", "450"))
+XEN_MAX_PROMPT_CHARS = int(os.environ.get("XEN_MAX_PROMPT_CHARS", "4000"))
+
+_raw_tester_allowlist = os.environ.get("PIXIUMIND_TESTER_ALLOWLIST", "").strip()
+PIXIUMIND_TESTER_ALLOWLIST = [u.strip() for u in _raw_tester_allowlist.split(",") if u.strip()] if _raw_tester_allowlist else None
+
+# Kaggle GPU worker authenticates outbound claim/heartbeat/complete requests with this secret.
+XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip()
+XEN_JOB_LEASE_SECONDS = int(os.environ.get("XEN_JOB_LEASE_SECONDS", "120"))
+XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS = int(os.environ.get("XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "90"))
