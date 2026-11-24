@@ -35,7 +35,7 @@ function isCacheableRead(path, method, accessToken, requestedCache = '') {
   if (!accessToken || !['GET', 'HEAD'].includes(method)) return false;
   if (String(requestedCache || '').toLowerCase() === 'no-store') return false;
   const normalizedPath = String(path || '');
-  if (normalizedPath.startsWith('/auth/')) return false;
+  if (normalizedPath.startsWith('/auth/') || normalizedPath.startsWith('/xen/')) return false;
   if (normalizedPath === '/health' || normalizedPath.startsWith('/health/')) return false;
   if (/^\/content\/[^/]+\/file\/?$/.test(normalizedPath)) return false;
   if (/^\/careers\/applications\/[^/]+\/cv\/?$/.test(normalizedPath)) return false;

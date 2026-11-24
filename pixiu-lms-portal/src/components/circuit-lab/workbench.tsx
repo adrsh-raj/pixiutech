@@ -410,6 +410,11 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const [isDoctorOpen, setIsDoctorOpen] = useState(false)
   const [highlightPartIds, setHighlightPartIds] = useState<string[]>([])
   const [isCopilotOpen, setIsCopilotOpen] = useState(false)
+  const [activeLessonContext, setActiveLessonContext] = useState<(Lesson & {
+    launchId: string
+    progressScope: string
+    checkpoint?: Lesson["steps"][number]
+  }) | null>(null)
 
   // Stepping debugger state & refs
   const [isPaused, setIsPaused] = useState(false)
@@ -436,28 +441,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   useEffect(() => {
     debugSpeedRef.current = debugSpeed
   }, [debugSpeed])
-
-  // Ensure that whenever a Beginner mission is active, its Blockly code is automatically loaded
-  useEffect(() => {
-    if (!activeLessonId) return
-    const lesson = getLessonById(activeLessonId)
-    if (!lesson || lesson.difficulty !== "Beginner") return
-
-    const seed = getLessonSeed(lesson)
-    if (!seed.blocklyXml) return
-
-    const isBlank =
-      !blocklyXml ||
-      blocklyXml.trim() === DEFAULT_XML.trim() ||
-      blocklyXml.includes('<block type="arduino_program" x="40" y="40"></block>') ||
-      blocklyXml.includes('<block type="arduino_program" x="40" y="40">\n  </block>') ||
-      blocklyXml.includes('<block type="arduino_program" x="40" y="40">\r\n  </block>')
-
-    if (isBlank && seed.blocklyXml !== blocklyXml) {
-      setBlocklyXml(seed.blocklyXml)
-      setBlocklyDocumentVersion((v) => v + 1)
-    }
-  }, [activeLessonId, blocklyXml])
 
   const handleProbeClip = useCallback((ref: PinRef) => {
     if (activeProbeToPlace === "red") {
@@ -2015,6 +1998,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setView("circuit")
     setBlocklyXml(saved.blocklyXml || DEFAULT_XML)
     setBlocklyDocumentVersion((value) => value + 1)
+    setActiveLessonContext(null)
     setActiveLessonId(null)
     setActiveLessonSessionId(null)
     setActiveTemplateId(null)
@@ -2048,6 +2032,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsScopeOpen(false)
     setLastSaved(project.savedAt)
     setIsDirty(false)
+    setActiveLessonContext(null)
     setActiveLessonId(null)
     setActiveLessonSessionId(null)
     setActiveTemplateId(null)
@@ -2071,26 +2056,19 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
+    setActiveLessonContext(null)
     setActiveLessonId(null)
     setActiveLessonSessionId(null)
     setActiveTemplateId(null)
   }, [projectStorageScope, stopProgram, stopAiRuntime])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
-    // A lesson change must never leave the previous lesson's Blockly program on screen.
-    stopProgram()
-    setPressed(new Set())
-    pressedRef.current = new Set()
     setActiveLessonId(lesson.id)
-    setActiveLessonSessionId((current) => current === lesson.id ? current : null)
-    setActiveTemplateId(null)
-    const seed = getLessonSeed(lesson)
-    setBlocklyXml(seed.blocklyXml || DEFAULT_XML)
-    setBlocklyDocumentVersion((value) => value + 1)
-  }, [stopProgram])
+  }, [])
 
   const handleLoadLesson = useCallback(
     (lesson: Lesson, snapshot?: { circuit?: CircuitState; blocklyXml?: string }) => {
+      setActiveLessonContext(null)
       const seed = getLessonSeed(lesson)
       const restoredCircuit = isRestorableCircuitSnapshot(snapshot?.circuit) ? snapshot.circuit : seed.state
       const restoredBlocklyXml = typeof snapshot?.blocklyXml === "string" && snapshot.blocklyXml.length <= 50000 && snapshot.blocklyXml.includes("<xml") ? snapshot.blocklyXml : seed.blocklyXml
@@ -2119,10 +2097,23 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     [stopProgram, updateState, stopAiRuntime],
   )
 
+  const handleAsk8SquareLesson = useCallback(
+    (lesson: Lesson, checkpoint?: Lesson["steps"][number]) => {
+      if (!state.parts.length && !state.wires.length && blocklyXml === DEFAULT_XML && !activeLessonSessionId) {
+        handleLoadLesson(lesson)
+      }
+      setActiveLessonContext({ ...lesson, progressScope: projectStorageScope, launchId: crypto.randomUUID(), checkpoint })
+      setIsLessonsOpen(false)
+      setIsCopilotOpen(true)
+    },
+    [state, blocklyXml, activeLessonSessionId, projectStorageScope, handleLoadLesson],
+  )
+
   const handleSelectTemplate = useCallback(
     (tmpl: ProjectTemplate) => {
       stopProgram()
       updateState(() => tmpl.circuit)
+      setActiveLessonContext(null)
       setActiveLessonId(null)
       setActiveLessonSessionId(null)
       setActiveTemplateId(tmpl.id)
@@ -2160,6 +2151,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
       {/* PIXIU AI Circuit Copilot Chatbot Widget */}
       <CircuitCopilotChat
+        meter={{ red: probeRed, black: probeBlack }}
+        scope={{ ch1: scopeProbeCH1, ch2: scopeProbeCH2 }}
+        key={projectStorageScope + ":" + (activeLessonContext?.launchId || "workspace")}
+        userRole={userRole}
         currentCircuit={state}
         currentBlocklyXml={blocklyXml}
         running={running}
@@ -2168,6 +2163,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         pinStates={pinStates}
         copilotAction={copilotAction}
         onHighlightParts={handleHighlightParts}
+        lessonContext={activeLessonContext}
         isOpen={isCopilotOpen}
         onToggleOpen={() => setIsCopilotOpen((prev) => !prev)}
       />
@@ -2297,6 +2293,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         copilotAction={copilotAction}
         onHighlightParts={handleHighlightParts}
         onOpenCopilot={() => setIsCopilotOpen(true)}
+        onAsk8Square={handleAsk8SquareLesson}
       />
 
       <TemplateBrowser

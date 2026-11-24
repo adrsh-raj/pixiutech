@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Send, Square, RotateCcw, Trash2, Check, Copy, AlertTriangle, ShieldCheck, Sparkles, Terminal, Cpu } from 'lucide-react';
-import { createXenRequestLifecycle, sendXenChat, sanitizeClientOutput, fetchXenStatus } from '../../lib/ai/xen/xen-client.js';
+import { createXenRequestLifecycle, streamXenChat, sanitizeClientOutput, fetchXenStatus } from '../../lib/ai/xen/xen-client.js';
+
+import { splitXenResponse } from '../../lib/ai/xen/xen-sanitizer.js';
 
 export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [messages, setMessages] = useState([
@@ -19,11 +21,13 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [status, setStatus] = useState('idle'); // idle | generating | cancelled | error
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
+  const [stickyFormatPreference, setStickyFormatPreference] = useState(null);
   const [workerStatus, setWorkerStatus] = useState({ online: true, activeWorkers: 0, checked: false });
   const [queueInfo, setQueueInfo] = useState({ status: '', queuePosition: 0 });
 
   const [requests] = useState(createXenRequestLifecycle);
   const messagesEndRef = useRef(null);
+  useEffect(() => () => requests.cancel(), [requests]);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,6 +60,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     const attempt = requests.begin(retry ? null : {
       prompt: userText,
       intent,
+      formatPreference: stickyFormatPreference,
       history: messages.slice(1).filter((message) => !message.isCancelled).slice(-10)
         .map(({ role, content }) => ({ role, content })),
     });
@@ -67,11 +72,17 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     if (!retry) setMessages([...messages, { role: 'user', content: userText }]);
     setStatus('generating');
 
-    const result = await sendXenChat({
+    const partialId = attempt.idempotencyKey;
+    const result = await streamXenChat({
       ...attempt,
+      onChunk: (_, content) => setMessages(prev => {
+        const partial = { role: 'assistant', content, partialId };
+        return [...prev.filter(message => message.partialId !== partialId), partial];
+      }),
       onStatusUpdate: (info) => setQueueInfo(info),
     });
     requests.finish(result.success);
+    setMessages(prev => prev.filter(message => message.partialId !== partialId));
 
     if (attempt.signal.aborted) {
       setStatus('cancelled');
@@ -96,6 +107,13 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
 
     const resp = result.response;
     const cleanOutput = sanitizeClientOutput(resp.text);
+    const resolvedFormatMode = result.formatMode || 'DEFAULT_EDUCATIONAL';
+
+    if (resolvedFormatMode === 'CODE_ONLY') {
+      setStickyFormatPreference('CODE_ONLY');
+    } else if (resolvedFormatMode === 'CODE_AND_EXPLANATION' || resolvedFormatMode === 'OUTPUT_ONLY') {
+      setStickyFormatPreference(resolvedFormatMode);
+    }
 
     setMessages((prev) => [
       ...prev,
@@ -107,6 +125,8 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         syntaxValid: resp.syntax_valid,
         displayAstValid: resp.display_ast_valid,
         tested: resp.tested,
+        formatMode: resolvedFormatMode,
+        formatValid: resp.format_valid,
         requestId: result.requestId,
       },
     ]);
@@ -119,6 +139,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
 
   const handleClear = () => {
     requests.clear();
+    setStickyFormatPreference(null);
     setMessages([
       {
         role: 'assistant',
@@ -139,39 +160,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   };
 
   const renderMessageContent = (msg, msgIdx) => {
-    // Client-side defense: Never permit <|im_end|> into the DOM
-    const safeContent = sanitizeClientOutput(msg.content);
-    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
-    const parts = [];
-    let lastIndex = 0;
-    let match;
-
-    while ((match = codeBlockRegex.exec(safeContent)) !== null) {
-      if (match.index > lastIndex) {
-        parts.push({
-          type: 'text',
-          content: safeContent.slice(lastIndex, match.index),
-        });
-      }
-      parts.push({
-        type: 'code',
-        language: match[1] || 'python',
-        code: match[2],
-      });
-      lastIndex = match.index + match[0].length;
-    }
-
-    if (lastIndex < safeContent.length) {
-      parts.push({
-        type: 'text',
-        content: safeContent.slice(lastIndex),
-      });
-    }
-
-    if (parts.length === 0) {
-      parts.push({ type: 'text', content: safeContent });
-    }
-
+    const parts = splitXenResponse(msg.content);
     return (
       <div className="space-y-3">
         {parts.map((p, pIdx) => {
@@ -213,28 +202,31 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
               </pre>
 
               {/* Status and Verification Badges */}
-              <div className="px-3 py-1.5 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between gap-2 text-[10px]">
-                {msg.isComplete && msg.displayAstValid ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Syntax Valid (AST Verified)
-                  </span>
-                ) : !msg.isComplete ? (
-                  <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Incomplete Generation (Truncated)
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-red-400 font-medium">
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    Syntax Error Detected
-                  </span>
-                )}
+              {/* Suppressed in CODE_ONLY mode to maintain clean code presentation (Part 10) */}
+              {msg.formatMode !== 'CODE_ONLY' && (
+                <div className="px-3 py-1.5 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between gap-2 text-[10px]">
+                  {msg.isComplete && msg.displayAstValid ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-400 font-medium">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Syntax Valid (AST Verified)
+                    </span>
+                  ) : !msg.isComplete ? (
+                    <span className="inline-flex items-center gap-1 text-amber-400 font-medium">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Incomplete Generation (Truncated)
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-red-400 font-medium">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Syntax Error Detected
+                    </span>
+                  )}
 
-                <span className="text-slate-500 font-mono">
-                  {msg.tested ? 'Runtime Verified' : 'Static Syntax Only'}
-                </span>
-              </div>
+                  <span className="text-slate-500 font-mono">
+                    {msg.tested ? 'Runtime Verified' : 'Static Syntax Only'}
+                  </span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -333,11 +325,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         {status === 'generating' && (
           <div className="flex items-center gap-2 text-cyan-400 text-xs py-2 px-3 rounded-lg bg-cyan-950/40 border border-cyan-800/40 w-fit">
             <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            {queueInfo.status === 'queued'
-              ? `Queued in job queue (position #${queueInfo.queuePosition || 1})... waiting for Kaggle GPU worker.`
-              : queueInfo.status === 'claimed' || queueInfo.status === 'running'
-              ? 'Processing on Kaggle GPU (Dual Tesla T4)...'
-              : 'Generating response with Xen Step-700...'}
+            {queueInfo.message || 'Sending request…'}
           </div>
         )}
 

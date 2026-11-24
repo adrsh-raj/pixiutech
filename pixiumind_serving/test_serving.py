@@ -168,11 +168,88 @@ class TestServingApi(unittest.TestCase):
             {"role": "user", "content": "Hello"},
         ]}
         with patch.object(model_holder, "system_prompt", "Frozen A1"):
-            with patch("server.async_generate") as generate:
-                response = client.post("/v1/chat/completions", json=payload, headers=headers)
+            with patch.object(model_holder, "composite_system_prompt", "Composite A1"):
+                with patch("server.async_generate") as generate:
+                    response = client.post("/v1/chat/completions", json=payload, headers=headers)
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["detail"]["code"], "INVALID_SYSTEM_PROMPT")
         generate.assert_not_called()
+
+    def test_exact_a1_prompt_accepted(self):
+        headers = {"X-API-Key": config.api_key}
+        payload = {"messages": [
+            {"role": "system", "content": "Frozen A1 Exact"},
+            {"role": "user", "content": "Hello"},
+        ]}
+        mock_result = {
+            "text": "Response from A1",
+            "finish_reason": "stop",
+            "prompt_tokens": 10,
+            "completion_tokens": 5,
+            "total_tokens": 15,
+            "latency_seconds": 0.1,
+            "throughput_tok_s": 50.0,
+        }
+        with patch.object(model_holder, "system_prompt", "Frozen A1 Exact"):
+            with patch.object(model_holder, "composite_system_prompt", "Canonical 8square Composite"):
+                with patch("server.async_generate", return_value=mock_result) as generate:
+                    response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        generate.assert_called_once()
+        passed_messages = generate.call_args[0][2]
+        self.assertEqual(passed_messages[0]["role"], "system")
+        self.assertEqual(passed_messages[0]["content"], "Frozen A1 Exact")
+
+    def test_exact_canonical_composite_prompt_accepted(self):
+        headers = {"X-API-Key": config.api_key}
+        payload = {"messages": [
+            {"role": "system", "content": "Canonical 8square Composite"},
+            {"role": "user", "content": "Hello"},
+        ]}
+        mock_result = {
+            "text": "Response from Composite",
+            "finish_reason": "stop",
+            "prompt_tokens": 20,
+            "completion_tokens": 8,
+            "total_tokens": 28,
+            "latency_seconds": 0.1,
+            "throughput_tok_s": 80.0,
+        }
+        with patch.object(model_holder, "system_prompt", "Frozen A1 Exact"):
+            with patch.object(model_holder, "composite_system_prompt", "Canonical 8square Composite"):
+                with patch("server.async_generate", return_value=mock_result) as generate:
+                    response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        generate.assert_called_once()
+        passed_messages = generate.call_args[0][2]
+        self.assertEqual(passed_messages[0]["role"], "system")
+        self.assertEqual(passed_messages[0]["content"], "Canonical 8square Composite")
+
+    def test_canonical_identity_reaches_engine_when_system_prompt_omitted(self):
+        headers = {"X-API-Key": config.api_key}
+        payload = {"messages": [
+            {"role": "user", "content": "Who are you?"},
+        ]}
+        mock_result = {
+            "text": "I am 8square powered by Xen.",
+            "finish_reason": "stop",
+            "prompt_tokens": 25,
+            "completion_tokens": 10,
+            "total_tokens": 35,
+            "latency_seconds": 0.1,
+            "throughput_tok_s": 100.0,
+        }
+        composite_content = "You are 8square, an AI assistant developed by PixiuTech...\n\nFrozen A1"
+        with patch.object(model_holder, "system_prompt", "Frozen A1"):
+            with patch.object(model_holder, "composite_system_prompt", composite_content):
+                with patch("server.async_generate", return_value=mock_result) as generate:
+                    response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        generate.assert_called_once()
+        passed_messages = generate.call_args[0][2]
+        self.assertEqual(passed_messages[0]["role"], "system")
+        self.assertEqual(passed_messages[0]["content"], composite_content)
+        self.assertIn("8square", passed_messages[0]["content"])
 
     def test_timed_out_generation_keeps_its_concurrency_slot(self):
         async def check_capacity():

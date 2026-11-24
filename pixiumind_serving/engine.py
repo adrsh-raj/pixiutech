@@ -68,6 +68,50 @@ def encode_chat_prompt(tokenizer, messages):
     return token_ids
 
 
+class VisibleText:
+    """Remove an initial Qwen reasoning block while retaining literal tags in an answer."""
+    def __init__(self):
+        self.buffer = ""
+        self.hidden = False
+        self.answer_started = False
+
+    def feed(self, text, final=False):
+        if self.answer_started:
+            return text
+        self.buffer += text
+        if not self.hidden:
+            prefix = self.buffer.lstrip()
+            if not final and "<think>".startswith(prefix):
+                return ""
+            if not prefix.startswith("<think>"):
+                self.answer_started = True
+                result, self.buffer = self.buffer, ""
+                return result
+            self.hidden = True
+            self.buffer = prefix[len("<think>"):]
+        _, closed, answer = self.buffer.partition("</think>")
+        if closed:
+            self.answer_started = True
+            self.buffer = ""
+            return answer
+        # Only a partial closing delimiter can affect the next emission.
+        self.buffer = self.buffer[-(len("</think>") - 1):]
+        return ""
+
+
+def generation_streamer(tokenizer, emit):
+    from transformers import TextStreamer
+    visible = VisibleText()
+
+    class WorkerStreamer(TextStreamer):
+        def on_finalized_text(self, text, stream_end=False):
+            delta = visible.feed(text, final=stream_end)
+            if delta:
+                emit(delta)
+
+    return WorkerStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+
+
 def _sync_generate(
     model: Any,
     tokenizer: Any,
@@ -75,6 +119,7 @@ def _sync_generate(
     max_new_tokens: int = 1024,
     temperature: float = 0.1,
     top_p: float = 0.9,
+    emit=None,
 ) -> Dict[str, Any]:
     """Synchronous inference worker executed in background thread."""
     start_time = time.time()
@@ -94,6 +139,7 @@ def _sync_generate(
     with torch.no_grad():
         output_ids = model.generate(
             input_ids=input_ids,
+            **({"streamer": generation_streamer(tokenizer, emit)} if emit else {}),
             max_new_tokens=max_new_tokens,
             temperature=temperature if temperature > 0 else None,
             do_sample=temperature > 0,
@@ -121,6 +167,8 @@ def _sync_generate(
     # Preserves legitimate literal text (e.g. print("<|im_end|>")) while omitting protocol tokens
     decoded_output = tokenizer.decode(content_tokens, skip_special_tokens=True)
 
+    decoded_output = VisibleText().feed(decoded_output, final=True)
+
     latency_s = time.time() - start_time
 
     return {
@@ -142,6 +190,7 @@ async def async_generate(
     temperature: float = 0.1,
     top_p: float = 0.9,
     timeout_seconds: Optional[float] = 450.0,
+    emit=None,
 ) -> Dict[str, Any]:
     """
     Non-blocking async wrapper that offloads PyTorch generation to INFERENCE_EXECUTOR.
@@ -159,6 +208,7 @@ async def async_generate(
             max_new_tokens,
             temperature,
             top_p,
+            emit,
         ),
         timeout=timeout_seconds,
     )

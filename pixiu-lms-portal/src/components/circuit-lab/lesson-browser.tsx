@@ -59,6 +59,7 @@ interface Props {
   copilotAction?: UseCircuitCopilotActionResult
   onHighlightParts?: (partIds: string[]) => void
   onOpenCopilot?: () => void
+  onAsk8Square?: (lesson: Lesson, checkpoint?: Lesson["steps"][number]) => void
   missionLoaded?: boolean
 }
 
@@ -145,6 +146,7 @@ export function LessonBrowser({
   copilotAction,
   onHighlightParts,
   onOpenCopilot,
+  onAsk8Square,
   missionLoaded = false,
 }: Props) {
   const normalizedRole = String(userRole || "").toLowerCase()
@@ -835,7 +837,22 @@ export function LessonBrowser({
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => setShowCircuitCheck((visible) => !visible)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Activity size={13} />{showCircuitCheck ? "Hide diagnosis" : "Circuit diagnosis"}</button>
-                        {onOpenCopilot && <button type="button" onClick={onOpenCopilot} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/20 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400">Ask 8 Square</button>}
+                        {(onAsk8Square || onOpenCopilot) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (onAsk8Square && activeLesson) {
+                                onAsk8Square(activeLesson, nextStep ?? undefined)
+                              } else if (onOpenCopilot) {
+                                onOpenCopilot()
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-950/40 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+                          >
+                            <Sparkles size={12} className="text-cyan-300" />
+                            <span>Ask 8 Square</span>
+                          </button>
+                        )}
                          {!missionComplete && <button type="button" onClick={() => setHintLevels((current) => ({ ...current, [nextStepKey]: Math.min(3, (current[nextStepKey] || 0) + 1) }))} disabled={guideLevel >= 3} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400/10 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Lightbulb size={13} />{guideLevel === 0 ? "Get a hint" : guideLevel < 3 ? "Next hint" : "All hints shown"}</button>}
                       </div>
                     </div>

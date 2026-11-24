@@ -4,7 +4,7 @@ Verifies token-aware boundary trimming, preservation of literal strings in code,
 AST validation, truncation policy, and hint-only safety.
 """
 
-from django.test import SimpleTestCase
+import unittest
 from core.xen_decoder import (
     decode_model_response,
     trim_trailing_protocol_tokens,
@@ -15,7 +15,7 @@ from core.xen_decoder import (
 )
 
 
-class XenDecoderUnitTests(SimpleTestCase):
+class XenDecoderUnitTests(unittest.TestCase):
     def test_trim_trailing_protocol_tokens(self):
         # Trims trailing protocol marker
         text = "Hello world!<|im_end|>"
@@ -88,6 +88,13 @@ class XenDecoderUnitTests(SimpleTestCase):
         self.assertTrue(res_untested["display_ast_valid"])
         self.assertFalse(res_untested["tested"])
 
+    def test_private_reasoning_never_appears_in_the_display_answer(self):
+        result = decode_model_response("<think>internal notes</think>Haan bhai.")
+        self.assertEqual(result["text"], "Haan bhai.")
+        self.assertFalse(decode_model_response("<think>unfinished")["is_complete"])
+        literal = 'A literal example: print("<think>")'
+        self.assertEqual(decode_model_response(literal)["text"], literal)
+
     def test_truncated_output_policy_finish_reason_length(self):
         code_truncated = (
             "```python\n"
@@ -147,3 +154,42 @@ class XenDecoderUnitTests(SimpleTestCase):
         pure_hint = "Consider using a loop that steps through each character and checks if it belongs to a vowel set."
         flagged, _ = detect_code_in_explanation(pure_hint)
         self.assertFalse(flagged)
+
+    def test_validate_code_only_format_valid(self):
+        valid_code = "```python\nfor i in range(1, 6):\n    print(i)\n```"
+        res = decode_model_response(valid_code, finish_reason="stop", format_mode="CODE_ONLY")
+        self.assertTrue(res["format_valid"])
+        self.assertIsNone(res["format_error"])
+        self.assertEqual(res["extracted_code"].strip(), "for i in range(1, 6):\n    print(i)")
+        # In CODE_ONLY mode, display_ast_valid is suppressed from polluting UI
+        self.assertFalse(res["display_ast_valid"])
+
+    def test_validate_code_only_format_leading_prose_fails(self):
+        dirty_code = "Here is the code:\n```python\nfor i in range(1, 6):\n    print(i)\n```"
+        res = decode_model_response(dirty_code, finish_reason="stop", format_mode="CODE_ONLY")
+        self.assertFalse(res["format_valid"])
+        self.assertIn("PROSE_BEFORE_CODE", res["format_error"])
+
+    def test_validate_code_only_format_trailing_prose_fails(self):
+        dirty_code = "```python\nfor i in range(1, 6):\n    print(i)\n```\nExplanation: this prints 1 to 5."
+        res = decode_model_response(dirty_code, finish_reason="stop", format_mode="CODE_ONLY")
+        self.assertFalse(res["format_valid"])
+        self.assertIn("PROSE_AFTER_CODE", res["format_error"])
+
+    def test_validate_code_only_format_comments_inside_fails(self):
+        commented_code = "```python\n# Print numbers 1 to 5\nfor i in range(1, 6):\n    print(i)\n```"
+        res = decode_model_response(commented_code, finish_reason="stop", format_mode="CODE_ONLY")
+        self.assertFalse(res["format_valid"])
+        self.assertIn("EXPLANATORY_COMMENT_DETECTED", res["format_error"])
+
+    def test_format_output_only_not_executed(self):
+        raw_output = "1\n2\n3\n4\n5"
+        res = decode_model_response(raw_output, finish_reason="stop", format_mode="OUTPUT_ONLY", actually_executed=False)
+        self.assertTrue(res["text"].startswith("Expected output (not executed)"))
+        self.assertIn("1\n2\n3\n4\n5", res["text"])
+
+    def test_format_output_only_actually_executed(self):
+        raw_output = "1\n2\n3\n4\n5"
+        res = decode_model_response(raw_output, finish_reason="stop", format_mode="OUTPUT_ONLY", actually_executed=True)
+        self.assertTrue(res["text"].startswith("Executed output:"))
+        self.assertIn("1\n2\n3\n4\n5", res["text"])

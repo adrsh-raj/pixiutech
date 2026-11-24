@@ -16,7 +16,7 @@ const { outputFiles } = await build({
   format: 'esm',
   define: { 'import.meta.env': '{}' },
 });
-const { createXenRequestLifecycle, sanitizeClientOutput, sendXenChat, fetchXenStatus, clearAuthStorage } = await import(
+const { createXenRequestLifecycle, sanitizeClientOutput, sendXenChat, streamXenChat, fetchXenStatus, clearAuthStorage } = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`
 );
 
@@ -270,6 +270,87 @@ test('Xen Client - sendXenChat handles HTTP 202 job queue and polls until comple
     assert.equal(statusUpdates.length >= 2, true);
     assert.equal(statusUpdates[0].status, 'queued');
     assert.equal(statusUpdates[1].status, 'running');
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test('Xen Client - stream displays a delta before completion after two empty reads of the same cursor', async (t) => {
+  const session = new Map([['pixiu_session_role', 'trainer']]);
+  const browser = Object.assign(new EventTarget(), {
+    setTimeout, clearTimeout,
+    sessionStorage: {
+      getItem: (key) => session.get(key),
+      removeItem: (key) => session.delete(key),
+    },
+    localStorage: { removeItem() {} },
+  });
+  const previousWindow = globalThis.window;
+  globalThis.window = browser;
+
+  let pollCount = 0;
+  const partials = [];
+  const statusUpdates = [];
+
+  try {
+    t.mock.method(globalThis, 'fetch', async (url, options) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'test-csrf' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'test-access-token' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json(
+          {
+            status: 'queued',
+            job_id: 'job-uuid-456',
+            worker_available: true,
+            queue_position: 1,
+          },
+          { status: 202 }
+        );
+      }
+      if (path.includes('/xen/jobs/job-uuid-456')) {
+        pollCount++;
+        if (pollCount <= 2) {
+          return Response.json({
+            status: 'running',
+            job_id: 'job-uuid-456',
+            worker_available: true,
+          });
+        }
+        if (pollCount === 3) return Response.json({ status: 'running', chunks: [{seq: 1, delta: 'Haan bhai'}] });
+        assert.deepEqual(partials, ['Haan bhai']);
+        assert.equal(new URL(url).searchParams.get('after'), '1');
+        return Response.json({
+          status: 'completed',
+          job_id: 'job-uuid-456',
+          model: 'xen-step-700',
+          assistant: '8square',
+          response: {
+            text: '```python\nprint("Kaggle GPU result")\n```',
+            is_complete: true,
+            syntax_valid: true,
+            display_ast_valid: true,
+            tested: false,
+          },
+          usage: { prompt_tokens: 20, completion_tokens: 10, total_tokens: 30 },
+        });
+      }
+      return Response.json({}, { status: 404 });
+    });
+
+    const result = await streamXenChat({
+      onChunk: (_, visible) => partials.push(visible),
+      prompt: 'Print Kaggle GPU result',
+      onStatusUpdate: (update) => statusUpdates.push(update),
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.response.text.includes('print("Kaggle GPU result")'), true);
+    assert.equal(result.response.syntax_valid, true);
+    assert.equal(pollCount, 4);
+    assert.equal(statusUpdates.length >= 2, true);
+    assert.equal(statusUpdates[0].status, 'sending');
+    assert.equal(statusUpdates[1].status, 'queued');
   } finally {
     globalThis.window = previousWindow;
   }

@@ -5,13 +5,14 @@ FastAPI Server for PixiuMind Persistent Inference Service.
 import asyncio
 from contextlib import asynccontextmanager
 import hmac
+import json
 import logging
 import time
 import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import config
@@ -174,7 +175,7 @@ async def get_attestation(request: Request):
     )
 
 
-async def handle_chat_completion(req: ChatCompletionRequest, request: Request):
+async def handle_chat_completion(req: ChatCompletionRequest, request: Request, emit=None):
     """Shared completion handler for /v1/chat/completions and alias /chat/completions."""
     verify_authentication(
         request.headers.get("Authorization"),
@@ -232,11 +233,16 @@ async def handle_chat_completion(req: ChatCompletionRequest, request: Request):
             detail={"error": f"Aggregate prompt exceeds 16000 characters (got {aggregate_chars})", "code": "AGGREGATE_PROMPT_TOO_LARGE"},
         )
 
+    active_system_prompt = model_holder.composite_system_prompt or model_holder.system_prompt
     messages_dicts = [{"role": m.role, "content": m.content} for m in req.messages]
     if messages_dicts and messages_dicts[0]["role"] == "system":
         supplied_prompt = messages_dicts.pop(0)["content"]
-        if supplied_prompt != model_holder.system_prompt:
+        if (
+            supplied_prompt != model_holder.composite_system_prompt
+            and supplied_prompt != model_holder.system_prompt
+        ):
             raise HTTPException(status_code=400, detail={"code": "INVALID_SYSTEM_PROMPT"})
+        active_system_prompt = supplied_prompt
     if any(message["role"] == "system" for message in messages_dicts):
         raise HTTPException(status_code=400, detail={"code": "INVALID_SYSTEM_PROMPT"})
     for message in messages_dicts:
@@ -252,8 +258,8 @@ async def handle_chat_completion(req: ChatCompletionRequest, request: Request):
 
     if not messages_dicts or messages_dicts[-1]["role"] != "user" or not messages_dicts[-1]["content"]:
         raise HTTPException(status_code=400, detail={"code": "INVALID_MESSAGE_HISTORY"})
-    if model_holder.system_prompt is not None:
-        messages_dicts.insert(0, {"role": "system", "content": model_holder.system_prompt})
+    if active_system_prompt is not None:
+        messages_dicts.insert(0, {"role": "system", "content": active_system_prompt})
 
     # Acquire concurrency slot with queue timeout
     semaphore = get_concurrency_semaphore()
@@ -275,6 +281,7 @@ async def handle_chat_completion(req: ChatCompletionRequest, request: Request):
             temperature=req.temperature if req.temperature is not None else 0.1,
             top_p=req.top_p if req.top_p is not None else 0.9,
             timeout_seconds=None,
+            **({"emit": emit} if emit else {}),
         ))
         result = await asyncio.wait_for(
             asyncio.shield(generation), timeout=config.inference_timeout_seconds,
@@ -346,3 +353,33 @@ async def chat_completions(req: ChatCompletionRequest, request: Request):
 async def chat_completions_alias(req: ChatCompletionRequest, request: Request):
     """OpenAI standard endpoint alias."""
     return await handle_chat_completion(req, request)
+
+@app.post("/internal/worker/generation")
+async def worker_generation(req: ChatCompletionRequest, request: Request):
+    """Private NDJSON feed for the authenticated outbound worker."""
+    verify_authentication(request.headers.get("Authorization"), request.headers.get("X-API-Key"))
+    loop = asyncio.get_running_loop()
+    events = asyncio.Queue()
+
+    async def generate():
+        try:
+            response = await handle_chat_completion(req, request, emit=lambda delta: loop.call_soon_threadsafe(
+                events.put_nowait, {"delta": delta}
+            ))
+            events.put_nowait({"completion": json.loads(response.body)})
+        except HTTPException as exc:
+            events.put_nowait({"error": exc.detail.get("code", "INFERENCE_FAILED") if isinstance(exc.detail, dict) else "INFERENCE_FAILED"})
+
+    async def stream():
+        task = asyncio.create_task(generate())
+        try:
+            while True:
+                event = await events.get()
+                yield json.dumps(event, ensure_ascii=False) + "\n"
+                if "delta" not in event:
+                    break
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson")

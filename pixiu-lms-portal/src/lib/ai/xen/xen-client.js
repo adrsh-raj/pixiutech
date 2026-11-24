@@ -5,24 +5,8 @@
  */
 
 import { apiFetch } from '../../../context/AuthContext.jsx';
-
-/**
- * Defensive client-side sanitizer to trim leaked protocol boundary markers
- * while strictly preserving legitimate literal strings in code and documentation.
- */
-export function sanitizeClientOutput(text) {
-  if (!text || typeof text !== 'string') return '';
-  let cleaned = text.trim();
-  // Strip leaked ChatML header if present at the very start
-  cleaned = cleaned.replace(/^<\|im_start\|>(?:assistant|user|system)?\s*/i, '');
-  // Strip trailing protocol tokens only if at the end of the response
-  for (const suffix of ['<|im_end|>', '<|endoftext|>']) {
-    if (cleaned.endsWith(suffix)) {
-      cleaned = cleaned.slice(0, -suffix.length).trimEnd();
-    }
-  }
-  return cleaned;
-}
+import { sanitizeClientOutput } from './xen-sanitizer.js';
+export { sanitizeClientOutput };
 
 // Keep one logical message across attempts, including a browser-side cancellation.
 export function createXenRequestLifecycle() {
@@ -74,6 +58,8 @@ function waitSignal(ms, signal) {
 export async function sendXenChat({
   prompt,
   intent = 'TEACHING',
+  formatPreference = null,
+  contextEnvelope = null,
   history = [],
   maxTokens = 1024,
   temperature = 0.0,
@@ -104,6 +90,8 @@ export async function sendXenChat({
         max_tokens: maxTokens,
         temperature,
         idempotency_key: idempotencyKey,
+        ...(formatPreference ? { format_preference: formatPreference } : {}),
+        ...(contextEnvelope ? { context_envelope: contextEnvelope } : {}),
         ...(useQueue ? { job_mode: true } : {}),
       }),
     });
@@ -158,18 +146,21 @@ export async function sendXenChat({
         if (jobData.status === 'completed') {
           const rawText = jobData?.response?.text || '';
           const cleanText = sanitizeClientOutput(rawText);
+          const formatMode = jobData?.format_mode || jobData?.intent || intent;
           return {
             success: true,
             requestId: jobData?.request_id || jobId,
             assistant: jobData?.assistant || '8square',
             model: jobData?.model || 'xen-step-700',
             intent: jobData?.intent || intent,
+            formatMode,
             response: {
               text: cleanText,
               is_complete: Boolean(jobData?.response?.is_complete),
               completion_status: jobData?.response?.completion_status || 'COMPLETED',
               syntax_valid: Boolean(jobData?.response?.syntax_valid),
               display_ast_valid: Boolean(jobData?.response?.display_ast_valid),
+              format_valid: Boolean(jobData?.response?.format_valid ?? true),
               tested: Boolean(jobData?.response?.tested),
               code_leakage_detected: Boolean(jobData?.response?.code_leakage_detected),
             },
@@ -216,6 +207,7 @@ export async function sendXenChat({
     const data = await response.json();
     const rawText = data?.response?.text || '';
     const cleanText = sanitizeClientOutput(rawText);
+    const formatMode = data?.format_mode || data?.intent || intent;
 
     return {
       success: true,
@@ -223,14 +215,263 @@ export async function sendXenChat({
       assistant: data?.assistant || '8square',
       model: data?.model || 'xen-step-700',
       intent: data?.intent || intent,
+      formatMode,
       response: {
         text: cleanText,
         is_complete: Boolean(data?.response?.is_complete),
         completion_status: data?.response?.completion_status || 'COMPLETED',
         syntax_valid: Boolean(data?.response?.syntax_valid),
         display_ast_valid: Boolean(data?.response?.display_ast_valid),
+        format_valid: Boolean(data?.response?.format_valid ?? true),
         tested: Boolean(data?.response?.tested),
         code_leakage_detected: Boolean(data?.response?.code_leakage_detected),
+      },
+      usage: data?.usage || {},
+    };
+  } catch {
+    const isAborted = activeSignal.aborted;
+    return {
+      success: false,
+      error: {
+        status: isAborted ? 499 : 500,
+        code: signal?.aborted ? 'CANCELLED' : isAborted ? 'TIMEOUT' : 'NETWORK_ERROR',
+        message: signal?.aborted ? 'Request cancelled.' : isAborted ? 'Xen request timed out.' : 'Network request failed.',
+      },
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Stream a chat/tutoring prompt from the Django Xen endpoint with progressive token rendering.
+ * Uses low-latency cursor polling (250-300ms) against /xen/jobs/<id>/chunks.
+ */
+export async function streamXenChat({
+  prompt,
+  intent = 'TEACHING',
+  formatPreference = null,
+  contextEnvelope = null,
+  history = [],
+  maxTokens = 1024,
+  temperature = 0.0,
+  signal = null,
+  idempotencyKey = crypto.randomUUID(),
+  timeoutMs = 120000,
+  onStatusUpdate = null,
+  onChunk = null,
+  useQueue = true,
+}) {
+  const controller = new AbortController();
+  const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    onStatusUpdate?.({
+      status: 'sending',
+      message: 'Connecting to 8square...',
+      queuePosition: 0,
+    });
+
+    const response = await apiFetch('/xen/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      signal: activeSignal,
+      timeoutMs,
+      body: JSON.stringify({
+        prompt,
+        intent,
+        history,
+        max_tokens: maxTokens,
+        temperature,
+        idempotency_key: idempotencyKey,
+        ...(formatPreference ? { format_preference: formatPreference } : {}),
+        ...(contextEnvelope ? { context_envelope: contextEnvelope } : {}),
+        ...(useQueue ? { job_mode: true } : {}),
+      }),
+    });
+
+    if (response.status === 202) {
+      const queueData = await response.json();
+      const jobId = queueData.job_id;
+      if (!jobId) {
+        return {
+          success: false,
+          error: {
+            status: 500,
+            code: 'INVALID_QUEUE_RESPONSE',
+            message: 'Queue job ID was missing from server response.',
+          },
+        };
+      }
+
+      onStatusUpdate?.({
+        status: queueData.status || 'queued',
+        message:
+          queueData.queue_position > 1
+            ? `In queue (position ${queueData.queue_position})...`
+            : 'In queue · 8square preparing response...',
+        queuePosition: queueData.queue_position || 1,
+        workerAvailable: queueData.worker_available ?? true,
+      });
+
+      let lastSeq = 0;
+      let accumulatedText = '';
+      let attempt;
+      let delay = 280;
+      let isCompleted = false;
+
+      // Low-latency chunk polling (250-300ms intervals)
+      while (!activeSignal.aborted && !isCompleted) {
+        await waitSignal(delay, activeSignal);
+        if (activeSignal.aborted) break;
+
+        const chunksRes = await apiFetch(`/xen/jobs/${jobId}/chunks?after=${lastSeq}${attempt == null ? "" : "&attempt=" + attempt}`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          signal: activeSignal,
+        });
+
+        if (!chunksRes.ok) {
+          if (![404, 405].includes(chunksRes.status)) {
+            return { success: false, error: { status: chunksRes.status, code: "POLL_FAILED", message: "Unable to read this response." } };
+          }
+          delay = 1200;
+          // Compatibility with a backend without a chunk route.
+          const pollRes = await apiFetch(`/xen/jobs/${jobId}`, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            signal: activeSignal,
+          });
+          if (!pollRes.ok) return { success: false, error: { status: pollRes.status, code: "POLL_FAILED", message: "Unable to read this job." } };
+          const jobData = await pollRes.json();
+          if (jobData.status === 'completed') {
+            const cleanText = sanitizeClientOutput(jobData?.response?.text || '');
+            onChunk?.(cleanText, cleanText);
+            return {
+              success: true,
+              requestId: jobData?.request_id || jobId,
+              assistant: jobData?.assistant || '8square',
+              model: jobData?.model || 'xen-step-700',
+              intent: jobData?.intent || intent,
+              formatMode: jobData?.format_mode || jobData?.intent || intent,
+              response: {
+                ...jobData.response,
+                text: cleanText,
+              },
+              usage: jobData?.usage || {},
+            };
+          } else if (jobData.status === 'failed') {
+            return {
+              success: false,
+              error: jobData.error || { code: 'INFERENCE_FAILED', message: 'Inference failed on GPU worker.' },
+            };
+          }
+          continue;
+        }
+
+        const data = await chunksRes.json();
+        const incomingChunks = Array.isArray(data.chunks) ? data.chunks : [];
+
+        if (attempt != null && data.attempt !== attempt) {
+          lastSeq = 0;
+          accumulatedText = "";
+          onChunk?.("", "");
+        }
+        attempt = data.attempt;
+        delay = incomingChunks.length ? 280 : Math.min(data.status === "queued" ? 1200 : 600, delay + 140);
+        if (incomingChunks.length > 0) {
+          for (const ch of incomingChunks) {
+            const seq = ch.seq;
+            if (!Number.isSafeInteger(seq) || seq < 1 || seq > lastSeq + 1) {
+              return { success: false, error: { code: "INVALID_SEQUENCE", message: "The response stream lost its place. Retry to reconnect." } };
+            }
+            if (seq > lastSeq) {
+              lastSeq = seq;
+              const delta = ch.delta || ch.text || '';
+              accumulatedText += delta;
+              onChunk?.(delta, accumulatedText);
+            }
+          }
+          onStatusUpdate?.({
+            status: 'streaming',
+            message: '8square is replying...',
+            queuePosition: 0,
+          });
+        } else if (!lastSeq && (data.status === 'claimed' || data.status === 'running')) {
+          onStatusUpdate?.({
+            status: 'running',
+            message: '8square is thinking...',
+            queuePosition: 0,
+          });
+        }
+
+        if (data.is_complete || data.status === 'completed') {
+          isCompleted = true;
+          const finalRaw = data?.response?.text ?? accumulatedText;
+          const cleanText = sanitizeClientOutput(finalRaw);
+          if (cleanText !== accumulatedText) {
+            onChunk?.(cleanText.startsWith(accumulatedText) ? cleanText.slice(accumulatedText.length) : "", cleanText);
+          }
+          return {
+            success: true,
+            formatMode: data.format_mode,
+            usage: data.usage || {},
+            deliveryMode: data.delivery_mode || "batch_fallback",
+            requestId: data?.request_id || jobId,
+            assistant: '8square',
+            model: 'xen-step-700',
+            intent,
+            response: {
+              ...(data?.response || {}),
+              text: cleanText,
+            },
+          };
+        }
+
+        if (data.is_failed || ['failed', 'expired', 'cancelled'].includes(data.status)) {
+          return {
+            success: false,
+            error: data.error || { code: 'INFERENCE_FAILED', message: 'Execution failed on GPU worker.' },
+          };
+        }
+      }
+    }
+
+    if (!response.ok) {
+      const errorJson = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: {
+          status: response.status,
+          code: errorJson.code || 'UPSTREAM_ERROR',
+          message: errorJson.error || `Xen request failed (HTTP ${response.status}).`,
+          requestId: errorJson.request_id || null,
+        },
+      };
+    }
+
+    const data = await response.json();
+    const rawText = data?.response?.text || '';
+    const cleanText = sanitizeClientOutput(rawText);
+    onChunk?.(cleanText, cleanText);
+
+    return {
+      success: true,
+      requestId: data?.request_id || data?.id || null,
+      assistant: data?.assistant || '8square',
+      model: data?.model || 'xen-step-700',
+      intent: data?.intent || intent,
+      formatMode: data?.format_mode || data?.intent || intent,
+      response: {
+        ...data?.response,
+        text: cleanText,
       },
       usage: data?.usage || {},
     };

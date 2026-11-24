@@ -466,6 +466,7 @@ class XenJob(models.Model):
     )
     role = models.CharField(max_length=20, choices=UserRole.choices)
     intent = models.CharField(max_length=40, default="TEACHING")
+    format_mode = models.CharField(max_length=40, default="DEFAULT_EDUCATIONAL", blank=True)
     status = models.CharField(
         max_length=20,
         choices=XenJobStatus.choices,
@@ -513,6 +514,20 @@ class XenJob(models.Model):
         if self.status in {XenJobStatus.CLAIMED, XenJobStatus.RUNNING} and self.lease_expires_at:
             return self.lease_expires_at <= timezone.now()
         return False
+
+    @property
+    def effective_format_mode(self) -> str:
+        if self.format_mode:
+            return self.format_mode
+        if self.intent in {"CODE_ONLY", "OUTPUT_ONLY", "EXPLANATION_ONLY", "CODE_AND_EXPLANATION", "DEFAULT_EDUCATIONAL"}:
+            return self.intent
+        return "DEFAULT_EDUCATIONAL"
+
+    @property
+    def effective_intent(self) -> str:
+        if self.intent in {"CODE_ONLY", "OUTPUT_ONLY", "EXPLANATION_ONLY", "CODE_AND_EXPLANATION", "DEFAULT_EDUCATIONAL"}:
+            return "TEACHING"
+        return self.intent or "TEACHING"
 
     def __str__(self):
         return f"XenJob {self.id} [{self.status}] ({self.role} - {self.intent})"

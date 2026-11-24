@@ -16,6 +16,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +35,13 @@ from accounts.models import UserRole
 from accounts.permissions import IsActiveAccount
 from academics.models_xen import XenSession, XenJob, XenJobStatus, XenWorkerHeartbeat
 from core.xen_decoder import decode_model_response
+from core.xen_intent import (
+    XenResponseMode,
+    resolve_xen_response_mode,
+    get_additive_mode_instruction,
+    sanitize_context_envelope,
+    format_context_envelope,
+)
 from core.xen_ratelimit import check_xen_rate_limit
 
 logger = logging.getLogger("security.xen")
@@ -64,6 +72,40 @@ def sanitize_xen_message(content):
         if cleaned == content:
             return cleaned.strip()
         content = cleaned
+
+
+def compact_xen_history(history: List[Dict[str, Any]], active_mode: XenResponseMode) -> List[Dict[str, Any]]:
+    """
+    Specification Part 8:
+    History management and compaction.
+    Preserves:
+    - All relevant user requirements and instructions.
+    - Active format preferences and corrections.
+    - Code context from prior turns.
+    Prunes:
+    - Verbose explanatory paragraphs and redundant repetitive assistant text.
+    - Failed previous assistant answers that violated format contracts.
+    """
+    compacted = []
+    for turn in history:
+        role = turn.get("role")
+        content = turn.get("content", "")
+        if role == "user":
+            compacted.append({"role": "user", "content": sanitize_xen_message(content)})
+        elif role == "assistant":
+            code_blocks = re.findall(r"```(?:[a-zA-Z0-9_-]*)\n([\s\S]*?)```", content)
+            if code_blocks:
+                lang_match = re.search(r"```([a-zA-Z0-9_-]*)\n", content)
+                lang = lang_match.group(1) if lang_match else "python"
+                compact_turn = f"```{lang}\n{code_blocks[0].strip()}\n```"
+                compacted.append({"role": "assistant", "content": sanitize_xen_message(compact_turn)})
+            else:
+                trimmed = content.strip()
+                if len(trimmed) > 200:
+                    trimmed = trimmed[:200] + "..."
+                compacted.append({"role": "assistant", "content": sanitize_xen_message(trimmed)})
+    return compacted
+
 
 
 class XenBaseView(APIView):
@@ -457,11 +499,31 @@ class XenChatView(XenBaseView):
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
+        # 8. Resolve response format mode and compact history (Specifications Part 5, 6, 7, 8)
+        format_pref = request.data.get("format_preference")
+        format_mode, mode_source = resolve_xen_response_mode(
+            prompt, history=history, active_sticky_preference=format_pref
+        )
+
+        compacted_history = compact_xen_history(history, format_mode)
+        mode_directive = get_additive_mode_instruction(format_mode)
+
+        # Context envelope handling (sanitized mission & circuit context)
+        context_envelope_raw = request.data.get("context_envelope")
+        context_envelope = sanitize_context_envelope(context_envelope_raw)
+        context_prefix = format_context_envelope(context_envelope)
+
+        effective_prompt = prompt
+        if context_prefix:
+            effective_prompt = f"{context_prefix}\n\n{effective_prompt}"
+        if mode_directive:
+            effective_prompt = f"[{mode_directive}]\n\n{effective_prompt}"
+
         # 9. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
         messages = [
             {"role": "system", "content": COMPOSITE_SYSTEM_PROMPT},
-            *({"role": turn["role"], "content": sanitize_xen_message(turn["content"])} for turn in history),
-            {"role": "user", "content": prompt},
+            *({"role": turn["role"], "content": turn["content"]} for turn in compacted_history),
+            {"role": "user", "content": effective_prompt},
         ]
 
         model_id = getattr(settings, "PIXIUMIND_MODEL_ID", "pixiumind-step-700")
@@ -489,7 +551,7 @@ class XenChatView(XenBaseView):
         cached = False
         request_hash = hashlib.sha256(
             json.dumps(
-                {"body": request.data, "payload": upstream_payload, "intent": intent, "role": role},
+                {"body": request.data, "payload": upstream_payload, "intent": intent, "format_mode": format_mode.value, "role": role},
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -559,8 +621,52 @@ class XenChatView(XenBaseView):
                     request_id, user.id, role, (time.monotonic() - start_time) * 1000,
                 )
                 decoded = decode_model_response(
-                    raw_text=raw_text, finish_reason=finish_reason, actually_executed=False, intent=intent,
+                    raw_text=raw_text,
+                    finish_reason=finish_reason,
+                    actually_executed=False,
+                    intent=intent,
+                    format_mode=format_mode.value,
                 )
+
+                # Specification Part 9.2: One-time retry if response violates CODE_ONLY format
+                if format_mode == XenResponseMode.CODE_ONLY and not decoded.get("format_valid", True):
+                    logger.info("Chat request %s failed CODE_ONLY validation; executing one-time retry", request_id)
+                    strict_retry_directive = (
+                        "MANDATORY STRICT RETRY DIRECTIVE:\n"
+                        "Your previous response violated the CODE_ONLY format requirement.\n"
+                        "You must return EXCLUSIVELY the single ```python ... ``` code block.\n"
+                        "Do NOT include any greetings, prose, comments, or explanations.\n"
+                        "Output ONLY the code fence."
+                    )
+                    retry_prompt = f"[{strict_retry_directive}]\n\n{prompt}"
+                    retry_messages = [
+                        {"role": "system", "content": COMPOSITE_SYSTEM_PROMPT},
+                        *({"role": turn["role"], "content": turn["content"]} for turn in compacted_history),
+                        {"role": "user", "content": retry_prompt},
+                    ]
+                    retry_payload = {**upstream_payload, "messages": retry_messages}
+                    retry_code, retry_resp = self.call_upstream(
+                        "/v1/chat/completions", method="POST", payload=retry_payload,
+                    )
+                    if retry_code == 200:
+                        try:
+                            retry_choice = retry_resp["choices"][0]
+                            retry_raw_text = retry_choice["message"]["content"]
+                            retry_finish = retry_choice.get("finish_reason", "stop")
+                            retry_usage = retry_resp.get("usage", usage)
+                            retry_decoded = decode_model_response(
+                                raw_text=retry_raw_text,
+                                finish_reason=retry_finish,
+                                actually_executed=False,
+                                intent=intent,
+                                format_mode=format_mode.value,
+                            )
+                            decoded = retry_decoded
+                            finish_reason = retry_finish
+                            usage = retry_usage
+                        except Exception as e:
+                            logger.warning("Retry parsing failed for %s: %s", request_id, e)
+
                 if session_obj is not None and decoded["is_complete"]:
                     session_obj.is_completed = True
                     session_obj.response_summary = decoded["text"]
@@ -569,7 +675,9 @@ class XenChatView(XenBaseView):
                             key: decoded[key] for key in (
                                 "text", "is_complete", "completion_status", "syntax_valid",
                                 "display_ast_valid", "tested", "code_leakage_in_explanation",
+                                "format_mode", "format_valid",
                             )
+                            if key in decoded
                         },
                         "finish_reason": finish_reason,
                         "usage": usage,
@@ -610,10 +718,12 @@ class XenChatView(XenBaseView):
                         "request_id": request_id,
                         "status": "ok",
                         "intent": intent,
+                        "format_mode": format_mode.value,
                         **({"cached": True} if cached else {}),
                         "is_complete": decoded["is_complete"],
                         "completion_status": decoded["completion_status"],
                         "syntax_valid": decoded["syntax_valid"],
+                        "format_valid": decoded.get("format_valid", True),
                         "tested": decoded["tested"],
                     },
                 },
@@ -627,6 +737,7 @@ class XenChatView(XenBaseView):
                 "assistant": "8square",
                 "model": model_id,
                 "intent": intent,
+                "format_mode": format_mode.value,
                 **({"cached": True} if cached else {}),
                 "teacher_memory_enabled": False,  # Personal Teacher Memory explicitly disabled in v0.1
                 "response": {
@@ -635,6 +746,7 @@ class XenChatView(XenBaseView):
                     "completion_status": decoded["completion_status"],
                     "syntax_valid": decoded["syntax_valid"],
                     "display_ast_valid": decoded["display_ast_valid"],
+                    "format_valid": decoded.get("format_valid", True),
                     "tested": decoded["tested"],
                     "code_leakage_detected": decoded["code_leakage_in_explanation"],
                 },
@@ -792,72 +904,40 @@ class XenJobCreateView(XenBaseView):
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
-        # 5. Idempotency Key Handling
+        # 5. Resolve format mode and compact history (Specifications Part 5, 6, 7, 8)
+        format_pref = request.data.get("format_preference")
+        format_mode, mode_source = resolve_xen_response_mode(
+            prompt, history=history, active_sticky_preference=format_pref
+        )
+
+        compacted_history = compact_xen_history(history, format_mode)
+        mode_directive = get_additive_mode_instruction(format_mode)
+
+        # Context envelope handling (sanitized mission & circuit context)
+        context_envelope_raw = request.data.get("context_envelope")
+        context_envelope = sanitize_context_envelope(context_envelope_raw)
+        context_prefix = format_context_envelope(context_envelope)
+
+        effective_prompt = prompt
+        if context_prefix:
+            effective_prompt = f"{context_prefix}\n\n{effective_prompt}"
+        if mode_directive:
+            effective_prompt = f"[{mode_directive}]\n\n{effective_prompt}"
+
+        if len(effective_prompt) > 4000 or len(effective_prompt) + sum(len(m["content"]) for m in compacted_history) + len(COMPOSITE_SYSTEM_PROMPT) > 16000:
+            return Response({"code": "CONTEXT_TOO_LARGE", "error": "Conversation and circuit context exceed the serving limit."}, status=400)
+
+        # 6. Idempotency Key Handling
         idempotency_key = request.data.get("idempotency_key")
-        if idempotency_key is not None:
-            if not isinstance(idempotency_key, str) or not idempotency_key.strip() or len(idempotency_key) > 128 or "\x00" in idempotency_key:
-                return Response(
-                    {"error": "A valid idempotency key of at most 128 characters is required.", "code": "INVALID_IDEMPOTENCY_KEY", "request_id": request_id},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            idempotency_key = idempotency_key.strip()
-        else:
-            idempotency_key = str(uuid.uuid4())
-
-        # Check existing job with this idempotency key for this user
-        existing_job = XenJob.objects.filter(user=user, idempotency_key=idempotency_key).first()
-        if existing_job:
-            worker_online = XenWorkerHeartbeat.is_any_worker_online()
-            if existing_job.status == XenJobStatus.COMPLETED:
-                payload = existing_job.response_payload if isinstance(existing_job.response_payload, dict) else {}
-                decoded = payload.get("decoded", {})
-                return Response(
-                    {
-                        "status": "completed",
-                        "job_id": str(existing_job.id),
-                        "request_id": request_id,
-                        "model": "pixiumind-1.4-d14-step700",
-                        "intent": existing_job.intent,
-                        "cached": True,
-                        "response": {
-                            "text": existing_job.response_summary,
-                            "is_complete": decoded.get("is_complete", True),
-                            "completion_status": decoded.get("completion_status", "complete"),
-                            "syntax_valid": decoded.get("syntax_valid", True),
-                            "display_ast_valid": decoded.get("display_ast_valid", True),
-                            "tested": decoded.get("tested", False),
-                            "code_leakage_detected": decoded.get("code_leakage_in_explanation", False),
-                        },
-                        "usage": payload.get("usage", {}),
-                        "completed_at": existing_job.completed_at.isoformat() if existing_job.completed_at else None,
-                        "created_at": existing_job.created_at.isoformat(),
-                    },
-                    status=status.HTTP_200_OK,
-                )
-            else:
-                queue_pos = 0
-                if existing_job.status == XenJobStatus.QUEUED:
-                    queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=existing_job.created_at).count()
-                return Response(
-                    {
-                        "status": existing_job.status,
-                        "job_id": str(existing_job.id),
-                        "request_id": request_id,
-                        "idempotency_key": idempotency_key,
-                        "worker_available": worker_online,
-                        "queue_position": queue_pos,
-                        "created_at": existing_job.created_at.isoformat(),
-                    },
-                    status=status.HTTP_202_ACCEPTED,
-                )
-
-        request_hash = hashlib.sha256(f"{user.id}:{intent}:{prompt}:{json.dumps(history, sort_keys=True)}".encode("utf-8")).hexdigest()
-
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip() or len(idempotency_key) > 128 or "\x00" in idempotency_key:
+            return Response({"code": "INVALID_IDEMPOTENCY_KEY", "request_id": request_id}, status=400)
+        idempotency_key = idempotency_key.strip()
+        request_hash = hashlib.sha256(f"{user.id}:{intent}:{effective_prompt}:{json.dumps(compacted_history, sort_keys=True)}".encode("utf-8")).hexdigest()
         try:
             max_tokens = int(request.data.get("max_tokens", 2048))
         except (ValueError, TypeError):
             max_tokens = 2048
-        max_tokens = min(max(max_tokens, 1), 4096)
+        max_tokens = min(max(max_tokens, 1), 2048)
 
         try:
             temperature = float(request.data.get("temperature", 0.7))
@@ -865,19 +945,12 @@ class XenJobCreateView(XenBaseView):
             temperature = 0.7
         temperature = max(min(temperature, 2.0), 0.0)
 
-        # 6. Create Persistent Queued XenJob
         try:
-            job = XenJob.objects.create(
-                user=user,
-                role=role,
-                intent=intent,
-                status=XenJobStatus.QUEUED,
-                idempotency_key=idempotency_key,
-                request_hash=request_hash,
-                prompt=prompt,
-                history=history,
-                max_tokens=max_tokens,
-                temperature=temperature,
+            job, created = XenJob.objects.get_or_create(
+                user=user, idempotency_key=idempotency_key,
+                defaults={"role": role, "intent": intent, "format_mode": format_mode.value, "status": XenJobStatus.QUEUED,
+                          "request_hash": request_hash, "prompt": effective_prompt, "history": compacted_history,
+                          "max_tokens": max_tokens, "temperature": temperature},
             )
         except DatabaseError:
             logger.exception("Could not persist XenJob %s", request_id)
@@ -885,6 +958,57 @@ class XenJobCreateView(XenBaseView):
                 {"error": "Failed to enqueue inference job.", "code": "JOB_CREATION_FAILED", "request_id": request_id},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+        if not created:
+            if (job.request_hash != request_hash or job.max_tokens != max_tokens or job.temperature != temperature):
+                return Response({"code": "IDEMPOTENCY_CONFLICT", "request_id": request_id}, status=409)
+            worker_online = XenWorkerHeartbeat.is_any_worker_online()
+            if job.status == XenJobStatus.COMPLETED:
+                payload = job.response_payload if isinstance(job.response_payload, dict) else {}
+                decoded = payload.get("decoded", {})
+                return Response(
+                    {
+                        "status": "completed",
+                        "job_id": str(job.id),
+                        "request_id": request_id,
+                        "model": "pixiumind-1.4-d14-step700",
+                        "intent": job.effective_intent,
+                        "format_mode": job.effective_format_mode,
+                        "cached": True,
+                        "response": {
+                            "text": job.response_summary,
+                            "is_complete": decoded.get("is_complete", True),
+                            "completion_status": decoded.get("completion_status", "complete"),
+                            "syntax_valid": decoded.get("syntax_valid", True),
+                            "display_ast_valid": decoded.get("display_ast_valid", False if job.effective_format_mode == "CODE_ONLY" else True),
+                            "format_valid": decoded.get("format_valid", True),
+                            "tested": decoded.get("tested", False),
+                            "code_leakage_detected": decoded.get("code_leakage_in_explanation", False),
+                        },
+                        "usage": payload.get("usage", {}),
+                        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+                        "created_at": job.created_at.isoformat(),
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                queue_pos = 0
+                if job.status == XenJobStatus.QUEUED:
+                    queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
+                return Response(
+                    {
+                        "status": job.status,
+                        "job_id": str(job.id),
+                        "request_id": request_id,
+                        "idempotency_key": idempotency_key,
+                        "intent": job.effective_intent,
+                        "format_mode": job.effective_format_mode,
+                        "worker_available": worker_online,
+                        "queue_position": queue_pos,
+                        "created_at": job.created_at.isoformat(),
+                    },
+                    status=status.HTTP_202_ACCEPTED,
+                )
 
         worker_online = XenWorkerHeartbeat.is_any_worker_online()
         queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
@@ -895,6 +1019,8 @@ class XenJobCreateView(XenBaseView):
                 "job_id": str(job.id),
                 "request_id": request_id,
                 "idempotency_key": idempotency_key,
+                "intent": job.effective_intent,
+                "format_mode": job.effective_format_mode,
                 "worker_available": worker_online,
                 "queue_position": queue_pos,
                 "created_at": job.created_at.isoformat(),
@@ -942,13 +1068,15 @@ class XenJobDetailView(XenBaseView):
                     "request_id": request_id,
                     "assistant": "8square",
                     "model": "xen-step-700",
-                    "intent": job.intent,
+                    "intent": job.effective_intent,
+                    "format_mode": job.effective_format_mode,
                     "response": {
                         "text": job.response_summary,
                         "is_complete": decoded.get("is_complete", True),
                         "completion_status": decoded.get("completion_status", "complete"),
                         "syntax_valid": decoded.get("syntax_valid", True),
-                        "display_ast_valid": decoded.get("display_ast_valid", True),
+                        "display_ast_valid": decoded.get("display_ast_valid", False if job.effective_format_mode == "CODE_ONLY" else True),
+                        "format_valid": decoded.get("format_valid", True),
                         "tested": decoded.get("tested", False),
                         "code_leakage_detected": decoded.get("code_leakage_in_explanation", False),
                     },
@@ -967,7 +1095,7 @@ class XenJobDetailView(XenBaseView):
                     "request_id": request_id,
                     "error": {
                         "code": job.error_code or "INFERENCE_FAILED",
-                        "message": job.error_message or "Execution failed on GPU worker.",
+                        "message": "Inference failed on the GPU worker.",
                     },
                     "completed_at": job.completed_at.isoformat() if job.completed_at else None,
                     "created_at": job.created_at.isoformat(),
@@ -1079,25 +1207,26 @@ class XenWorkerClaimView(XenWorkerBaseView):
         lease_duration = getattr(settings, "XEN_JOB_LEASE_SECONDS", 120)
 
         # 2. Recover expired leases
-        expired_jobs = XenJob.objects.filter(
-            status__in=[XenJobStatus.CLAIMED, XenJobStatus.RUNNING],
-            lease_expires_at__lt=now,
-        )
-        for exp_job in expired_jobs:
-            if exp_job.claim_count >= 3:
-                exp_job.status = XenJobStatus.FAILED
-                exp_job.error_code = "LEASE_TIMEOUT_EXCEEDED"
-                exp_job.error_message = "Worker lease expired 3 times without completion"
-                exp_job.completed_at = now
-                exp_job.save(update_fields=["status", "error_code", "error_message", "completed_at", "updated_at"])
-                logger.warning("Job %s marked failed after 3 lease timeouts", exp_job.id)
-            else:
-                exp_job.status = XenJobStatus.QUEUED
-                exp_job.worker_id = ""
-                exp_job.claimed_at = None
-                exp_job.lease_expires_at = None
-                exp_job.save(update_fields=["status", "worker_id", "claimed_at", "lease_expires_at", "updated_at"])
-                logger.info("Job %s lease expired; requeued for next worker", exp_job.id)
+        with transaction.atomic():
+            expired_jobs = XenJob.objects.select_for_update(skip_locked=True).filter(
+                status__in=[XenJobStatus.CLAIMED, XenJobStatus.RUNNING],
+                lease_expires_at__lt=now,
+            )
+            for exp_job in expired_jobs:
+                if exp_job.claim_count >= 3:
+                    exp_job.status = XenJobStatus.FAILED
+                    exp_job.error_code = "LEASE_TIMEOUT_EXCEEDED"
+                    exp_job.error_message = "Worker lease expired 3 times without completion"
+                    exp_job.completed_at = now
+                    exp_job.save(update_fields=["status", "error_code", "error_message", "completed_at", "updated_at"])
+                    logger.warning("Job %s marked failed after 3 lease timeouts", exp_job.id)
+                else:
+                    exp_job.status = XenJobStatus.QUEUED
+                    exp_job.worker_id = ""
+                    exp_job.claimed_at = None
+                    exp_job.lease_expires_at = None
+                    exp_job.save(update_fields=["status", "worker_id", "claimed_at", "lease_expires_at", "updated_at"])
+                    logger.info("Job %s lease expired; requeued for next worker", exp_job.id)
 
         # 3. Atomically claim oldest queued job
         with transaction.atomic():
@@ -1112,11 +1241,12 @@ class XenWorkerClaimView(XenWorkerBaseView):
 
             job.status = XenJobStatus.CLAIMED
             job.worker_id = worker_id
+            job.response_payload = {}
             job.claim_count += 1
             job.claimed_at = now
             job.lease_expires_at = now + timedelta(seconds=lease_duration)
             job.heartbeat_at = now
-            job.save(update_fields=["status", "worker_id", "claim_count", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
+            job.save(update_fields=["response_payload", "status", "worker_id", "claim_count", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
 
         return Response(
             {
@@ -1128,7 +1258,8 @@ class XenWorkerClaimView(XenWorkerBaseView):
                     "system_prompt": COMPOSITE_SYSTEM_PROMPT,
                     "max_tokens": job.max_tokens,
                     "temperature": job.temperature,
-                    "intent": job.intent,
+                    "intent": job.effective_intent,
+                    "format_mode": job.effective_format_mode,
                     "lease_expires_at": job.lease_expires_at.isoformat(),
                 },
             },
@@ -1136,22 +1267,31 @@ class XenWorkerClaimView(XenWorkerBaseView):
         )
 
 
-class XenWorkerHeartbeatView(XenWorkerBaseView):
-    """Worker endpoint to extend lease on a running job and register active worker heartbeat."""
+class XenActiveJobView(XenWorkerBaseView):
+    """Serialize callbacks with claim recovery and reject stale leases."""
     def post(self, request, job_id):
         auth_err = self.check_worker_auth(request)
         if auth_err:
             return auth_err
+        if not isinstance(request.data, dict):
+            return Response({"code": "INVALID_BODY"}, status=400)
+        worker_id = request.data.get("worker_id")
+        with transaction.atomic():
+            try:
+                job = XenJob.objects.select_for_update().get(id=job_id)
+            except (XenJob.DoesNotExist, ValueError):
+                return Response({"code": "JOB_NOT_FOUND"}, status=404)
+            if not worker_id or worker_id != job.worker_id:
+                return Response({"code": "WORKER_MISMATCH"}, status=409)
+            if (job.status not in (XenJobStatus.CLAIMED, XenJobStatus.RUNNING)
+                    or not job.lease_expires_at or job.lease_expires_at <= timezone.now()):
+                return Response({"code": "JOB_NOT_ACTIVE"}, status=409)
+            return self.update_job(request, job, worker_id)
 
-        worker_id = str(request.data.get("worker_id", "")).strip()
-        try:
-            job = XenJob.objects.get(id=job_id)
-        except (XenJob.DoesNotExist, ValueError):
-            return Response({"error": "Job not found", "code": "JOB_NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
 
-        if job.worker_id and worker_id and job.worker_id != worker_id:
-            return Response({"error": "Worker mismatch", "code": "WORKER_MISMATCH"}, status=status.HTTP_409_CONFLICT)
-
+class XenWorkerHeartbeatView(XenActiveJobView):
+    """Worker endpoint to extend lease on a running job and register active worker heartbeat."""
+    def update_job(self, request, job, worker_id):
         now = timezone.now()
         lease_duration = getattr(settings, "XEN_JOB_LEASE_SECONDS", 120)
         job.status = XenJobStatus.RUNNING
@@ -1163,59 +1303,76 @@ class XenWorkerHeartbeatView(XenWorkerBaseView):
         return Response({"status": "ok", "lease_expires_at": job.lease_expires_at.isoformat()}, status=status.HTTP_200_OK)
 
 
-class XenWorkerCompleteView(XenWorkerBaseView):
+class XenWorkerCompleteView(XenActiveJobView):
     """Worker endpoint to report completed inference results for a job."""
-    def post(self, request, job_id):
-        auth_err = self.check_worker_auth(request)
-        if auth_err:
-            return auth_err
+    def update_job(self, request, job, worker_id):
+        usage = request.data.get("usage", {})
+        if not isinstance(usage, dict):
+            return Response({"code": "INVALID_COMPLETION"}, status=400)
+        usage = {key: usage.get(key, 0) for key in ("prompt_tokens", "completion_tokens", "total_tokens")}
+        if any(type(value) is not int or value < 0 for value in usage.values()):
+            return Response({"code": "INVALID_COMPLETION"}, status=400)
+        output = request.data
+        if "choices" in output:
+            choices = output["choices"]
+            if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+                return Response({"code": "INVALID_COMPLETION"}, status=400)
+            output = choices[0]
+        message = output.get("message", {})
+        if not isinstance(message, dict):
+            return Response({"code": "INVALID_COMPLETION"}, status=400)
+        raw_text = message.get("content") or output.get("raw_response") or output.get("text") or output.get("content")
+        finish_reason = output.get("finish_reason", "stop")
+        if not isinstance(raw_text, str) or not raw_text.strip() or len(raw_text) > 65536 or not isinstance(finish_reason, str):
+            return Response({"code": "INVALID_COMPLETION"}, status=400)
 
-        worker_id = str(request.data.get("worker_id", "")).strip()
-        try:
-            job = XenJob.objects.get(id=job_id)
-        except (XenJob.DoesNotExist, ValueError):
-            return Response({"error": "Job not found", "code": "JOB_NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
-
-        raw_text = ""
-        finish_reason = "stop"
-        usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
-
-        if "choices" in request.data:
-            choices = request.data.get("choices")
-            if isinstance(choices, list) and choices:
-                first = choices[0]
-                if isinstance(first, dict):
-                    raw_text = first.get("message", {}).get("content", "") or first.get("text", "")
-                    finish_reason = first.get("finish_reason", "stop")
-            if "usage" in request.data and isinstance(request.data["usage"], dict):
-                usage = request.data["usage"]
-        elif "raw_response" in request.data:
-            raw_text = str(request.data.get("raw_response", ""))
-            finish_reason = str(request.data.get("finish_reason", "stop"))
-            if "usage" in request.data and isinstance(request.data["usage"], dict):
-                usage = request.data["usage"]
-        else:
-            raw_text = str(request.data.get("text", request.data.get("content", "")))
-            finish_reason = str(request.data.get("finish_reason", "stop"))
-            if "usage" in request.data and isinstance(request.data["usage"], dict):
-                usage = request.data["usage"]
-
+        fmt_mode = job.effective_format_mode
         decoded = decode_model_response(
             raw_text=raw_text,
             finish_reason=finish_reason,
             actually_executed=False,
-            intent=job.intent,
+            intent=job.effective_intent,
+            format_mode=fmt_mode,
         )
 
         now = timezone.now()
+
+        # Specification Part 9.2: One-time retry if response violates CODE_ONLY format
+        if fmt_mode == "CODE_ONLY" and not decoded.get("format_valid", True) and job.claim_count == 1:
+            logger.warning(
+                "Job %s failed CODE_ONLY validation on attempt 1 (%s); requeueing for one-time retry",
+                job.id, decoded.get("format_error"),
+            )
+            strict_retry_directive = (
+                "MANDATORY STRICT RETRY DIRECTIVE:\n"
+                "Your previous response violated the CODE_ONLY format requirement.\n"
+                "You must return EXCLUSIVELY the single ```python ... ``` code block.\n"
+                "Do NOT include any greetings, prose, comments, or explanations.\n"
+                "Output ONLY the code fence."
+            )
+            job.prompt = f"[{strict_retry_directive}]\n\n{job.prompt}"
+            job.response_payload = {}
+            job.status = XenJobStatus.QUEUED
+            job.worker_id = ""
+            job.claimed_at = None
+            job.lease_expires_at = None
+            job.heartbeat_at = None
+            job.save(update_fields=["response_payload", "prompt", "status", "worker_id", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
+            return Response({"status": "requeued_for_retry", "job_id": str(job.id)}, status=status.HTTP_200_OK)
+
+        existing_chunks = []
+        if isinstance(job.response_payload, dict):
+            existing_chunks = job.response_payload.get("chunks", [])
         job.status = XenJobStatus.COMPLETED
         job.completed_at = now
         job.response_summary = decoded["text"]
         job.response_payload = {
-            "decoded": decoded,
+            "decoded": {k: v for k, v in decoded.items() if k != "raw_text"},
             "finish_reason": finish_reason,
             "usage": usage,
             "worker_id": worker_id or job.worker_id,
+            "chunks": existing_chunks,
+            "delivery_mode": "incremental" if existing_chunks else "batch_fallback",
         }
         job.save(update_fields=["status", "completed_at", "response_summary", "response_payload", "updated_at"])
 
@@ -1223,24 +1380,113 @@ class XenWorkerCompleteView(XenWorkerBaseView):
         return Response({"status": "completed", "job_id": str(job.id)}, status=status.HTTP_200_OK)
 
 
-class XenWorkerFailView(XenWorkerBaseView):
-    """Worker endpoint to report inference failure for a job."""
-    def post(self, request, job_id):
-        auth_err = self.check_worker_auth(request)
-        if auth_err:
-            return auth_err
+class XenWorkerChunkView(XenActiveJobView):
+    """
+    Worker endpoint to append streaming token chunks to an active job.
+    Called incrementally by the worker as tokens are generated.
+    """
+    def update_job(self, request, job, worker_id):
+        seq = request.data.get("seq")
+        delta = request.data.get("delta")
+        if type(seq) is not int or not 1 <= seq <= 2048 or not isinstance(delta, str) or not 0 < len(delta) <= 4096:
+            return Response({"code": "INVALID_CHUNK"}, status=400)
+        payload = job.response_payload or {}
+        chunks = payload.get("chunks", [])
+        if seq <= len(chunks) and chunks[seq - 1]["delta"] == delta:
+            return Response({"status": "ok", "seq": seq})
+        if seq != len(chunks) + 1:
+            return Response({"code": "CHUNK_SEQUENCE_CONFLICT"}, status=409)
+        if sum(len(chunk["delta"]) for chunk in chunks) + len(delta) > 65536:
+            return Response({"code": "STREAM_TOO_LARGE"}, status=400)
+        chunks.append({"seq": seq, "delta": delta, "ts": timezone.now().timestamp()})
+        job.response_payload = {**payload, "chunks": chunks, "delivery_mode": "incremental"}
+        job.save(update_fields=["response_payload", "updated_at"])
+        return Response({"status": "ok", "seq": seq}, status=status.HTTP_200_OK)
 
-        worker_id = str(request.data.get("worker_id", "")).strip()
+
+class XenJobChunksView(XenBaseView):
+    """
+    Retrieves real-time token chunks for a XenJob.
+    Allows clients to stream response tokens with low latency (250-350ms cursor polling).
+    """
+    def get(self, request, job_id):
+        request_id = str(uuid.uuid4())
+        user = request.user
+
+        denial = self.cohort_denial(user, request_id)
+        if denial:
+            return denial
+
         try:
             job = XenJob.objects.get(id=job_id)
         except (XenJob.DoesNotExist, ValueError):
-            return Response({"error": "Job not found", "code": "JOB_NOT_FOUND"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Job not found.", "code": "JOB_NOT_FOUND", "request_id": request_id},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
+        if job.user_id != user.id and getattr(user, "role", "") != UserRole.ADMIN:
+            return Response(
+                {"error": "Job not found.", "code": "JOB_NOT_FOUND", "request_id": request_id},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        try:
+            after_seq = int(request.query_params.get("after", 0))
+        except (ValueError, TypeError):
+            after_seq = 0
+
+        payload = job.response_payload if isinstance(job.response_payload, dict) else {}
+        if "attempt" in request.query_params and request.query_params["attempt"] != str(job.claim_count):
+            after_seq = 0
+        all_chunks = payload.get("chunks", [])
+        filtered_chunks = [c for c in all_chunks if c.get("seq", 0) > after_seq]
+
+        response_data: Dict[str, Any] = {
+            "job_id": str(job.id),
+            "status": job.status,
+            "chunks": filtered_chunks,
+            "intent": job.effective_intent,
+            "format_mode": job.effective_format_mode,
+            "usage": payload.get("usage", {}),
+            "attempt": job.claim_count,
+            "delivery_mode": payload.get("delivery_mode", "batch_fallback" if job.status == XenJobStatus.COMPLETED else "pending"),
+            "is_complete": job.status == XenJobStatus.COMPLETED,
+            "is_failed": job.status == XenJobStatus.FAILED,
+            "request_id": request_id,
+        }
+
+        if job.status == XenJobStatus.COMPLETED:
+            decoded = payload.get("decoded", {})
+            response_data["response"] = {
+                "text": job.response_summary,
+                "is_complete": decoded.get("is_complete", True),
+                "completion_status": decoded.get("completion_status", "complete"),
+                "syntax_valid": decoded.get("syntax_valid", True),
+                "display_ast_valid": decoded.get("display_ast_valid", False if job.effective_format_mode == "CODE_ONLY" else True),
+                "format_valid": decoded.get("format_valid", True),
+                "tested": decoded.get("tested", False),
+                "code_leakage_detected": decoded.get("code_leakage_in_explanation", False),
+            }
+            response_data["completed_at"] = job.completed_at.isoformat() if job.completed_at else None
+
+        elif job.status == XenJobStatus.FAILED:
+            response_data["error"] = {
+                "code": job.error_code or "INFERENCE_FAILED",
+                "message": "Inference failed on the GPU worker.",
+            }
+
+        return Response(response_data, status=status.HTTP_200_OK, headers={"Cache-Control": "private, no-store"})
+
+
+class XenWorkerFailView(XenActiveJobView):
+    """Worker endpoint to report inference failure for a job."""
+    def update_job(self, request, job, worker_id):
         now = timezone.now()
         job.status = XenJobStatus.FAILED
         job.completed_at = now
-        job.error_code = str(request.data.get("error_code", "WORKER_EXECUTION_ERROR"))
-        job.error_message = str(request.data.get("error_message", "Inference failed on worker"))
+        job.error_code = "CUDA_OUT_OF_MEMORY" if request.data.get("error_code") == "CUDA_OUT_OF_MEMORY" else "WORKER_EXECUTION_ERROR"
+        job.error_message = "Inference failed on the GPU worker."
         job.save(update_fields=["status", "error_code", "error_message", "completed_at", "updated_at"])
 
         XenWorkerHeartbeat.record_heartbeat(worker_id=worker_id or job.worker_id)

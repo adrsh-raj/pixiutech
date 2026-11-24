@@ -140,11 +140,73 @@ def detect_code_in_explanation(text: str) -> Tuple[bool, List[str]]:
     return (len(detected) > 0), detected
 
 
+def validate_code_only_format(text: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Specification Part 9.1:
+    Validate strict CODE_ONLY response format:
+    1. Exactly one fenced code block exists.
+    2. No prose exists before the code block.
+    3. No prose exists after the code block.
+    4. No explanatory comments exist inside the code.
+    Returns: (is_valid, error_reason, extracted_code)
+    """
+    if not text or not isinstance(text, str):
+        return False, "EMPTY_RESPONSE", None
+
+    cleaned = text.strip()
+    code_blocks = re.findall(r"```(?:[a-zA-Z0-9_-]*)\n([\s\S]*?)```", cleaned)
+    if len(code_blocks) != 1:
+        return False, f"EXPECTED_EXACTLY_ONE_CODE_BLOCK_GOT_{len(code_blocks)}", None
+
+    first_fence = cleaned.find("```")
+    last_fence = cleaned.rfind("```")
+    leading_text = cleaned[:first_fence].strip()
+    trailing_text = cleaned[last_fence + 3:].strip()
+
+    if leading_text:
+        return False, f"PROSE_BEFORE_CODE: {leading_text[:50]}", None
+    if trailing_text:
+        return False, f"PROSE_AFTER_CODE: {trailing_text[:50]}", None
+
+    code_content = code_blocks[0]
+    lines = code_content.splitlines()
+    for line in lines:
+        stripped_line = line.strip()
+        if stripped_line.startswith("#") and not stripped_line.startswith("#!"):
+            return False, f"EXPLANATORY_COMMENT_DETECTED: {stripped_line[:40]}", code_content
+
+    return True, None, code_content
+
+
+def format_output_only_response(raw_text: str, actually_executed: bool = False) -> str:
+    """
+    Specification Part 10:
+    For OUTPUT_ONLY: If actual sandbox execution did not take place, display:
+    'Expected output (not executed)'
+    """
+    if not raw_text or not isinstance(raw_text, str):
+        return ""
+
+    cleaned = raw_text.strip()
+    fence_match = re.match(r"^```(?:[a-zA-Z0-9_-]*)\n([\s\S]*?)```$", cleaned)
+    if fence_match:
+        cleaned = fence_match.group(1).strip()
+
+    if actually_executed:
+        return f"Executed output:\n{cleaned}"
+
+    if cleaned.lower().startswith("expected output"):
+        return cleaned
+
+    return f"Expected output (not executed)\n\n{cleaned}"
+
+
 def decode_model_response(
     raw_text: str,
     finish_reason: str = "stop",
     actually_executed: bool = False,
     intent: str = "CODE_GENERATION",
+    format_mode: str = "DEFAULT_EDUCATIONAL",
 ) -> Dict[str, Any]:
     """
     Authoritative decoding pipeline for PixiuMind Step-700 responses.
@@ -156,9 +218,14 @@ def decode_model_response(
     - Never awards valid_syntax badge if generation is incomplete/truncated.
     - Corrects unverified 'tested' claims unless actually_executed is True.
     - Flags code leakage in hint-only/explanation intents.
+    - Enforces format validation contracts for CODE_ONLY and OUTPUT_ONLY modes.
     """
     # 1. Trim boundary protocol tokens only (preserves internal literal occurrences)
     cleaned_text, stripped_tokens = trim_trailing_protocol_tokens(raw_text)
+    if cleaned_text.lstrip().startswith("<think>"):
+        _, closed, answer = cleaned_text.partition("</think>")
+        cleaned_text = answer.lstrip() if closed else ""
+
 
     # 2. Check fence completeness
     fences_closed, unclosed_count, code_blocks = check_fence_completeness(cleaned_text)
@@ -170,6 +237,7 @@ def decode_model_response(
     is_complete_response = (
         not is_truncated_by_length
         and not has_unclosed_fence
+        and bool(cleaned_text.strip())
         and (finish_reason in {"stop", "end_turn", "eos_token"})
     )
 
@@ -178,6 +246,8 @@ def decode_model_response(
         completion_status = "TRUNCATED_MAX_TOKENS"
     elif has_unclosed_fence:
         completion_status = "UNCLOSED_CODE_FENCE"
+    elif not is_complete_response:
+        completion_status = "INCOMPLETE"
 
     # 4. Validate Python syntax across extracted code blocks
     all_blocks_valid = True
@@ -198,10 +268,22 @@ def decode_model_response(
     # 5. Correct deceptive "tested" claims
     sanitized_text = sanitize_testing_claims(cleaned_text, actually_executed=actually_executed)
 
-    # 6. Check hint-only / explanation safety
+    # 6. Mode-specific format validation
+    format_valid = True
+    format_error = None
+    extracted_code = None
+
+    if format_mode == "CODE_ONLY":
+        format_valid, format_error, extracted_code = validate_code_only_format(sanitized_text)
+        # Suppress syntax badge from polluting code-only UI presentation
+        display_ast_valid = False
+    elif format_mode == "OUTPUT_ONLY":
+        sanitized_text = format_output_only_response(sanitized_text, actually_executed=actually_executed)
+
+    # 7. Check hint-only / explanation safety
     code_leakage_detected = False
     leakage_details = []
-    if intent in {"HINT_ONLY", "EXPLANATION_ONLY", "PEDAGOGICAL_GUIDANCE"}:
+    if intent in {"HINT_ONLY", "EXPLANATION_ONLY", "PEDAGOGICAL_GUIDANCE"} or format_mode == "EXPLANATION_ONLY":
         code_leakage_detected, leakage_details = detect_code_in_explanation(sanitized_text)
 
     return {
@@ -220,4 +302,8 @@ def decode_model_response(
         "tokens_stripped": stripped_tokens,
         "code_leakage_in_explanation": code_leakage_detected,
         "leakage_details": leakage_details,
+        "format_mode": format_mode,
+        "format_valid": format_valid,
+        "format_error": format_error,
+        "extracted_code": extracted_code,
     }

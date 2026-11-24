@@ -100,7 +100,7 @@ class XenEndToEndWorkerSimulationTest(SimpleTestCase):
         # STEP 1: Portal / Trainer submits job to POST /api/v1/xen/jobs
         # -------------------------------------------------------------
         with patch.object(XenJob.objects, "filter") as mock_filter, \
-             patch.object(XenJob.objects, "create", return_value=job), \
+             patch.object(XenJob.objects, "get_or_create", return_value=(job, True)), \
              patch.object(XenWorkerHeartbeat, "is_any_worker_online", return_value=True):
             qs = MagicMock()
             qs.first.return_value = None
@@ -152,7 +152,7 @@ class XenEndToEndWorkerSimulationTest(SimpleTestCase):
         # -------------------------------------------------------------
         # STEP 3: Worker sends heartbeat while running GPU inference
         # -------------------------------------------------------------
-        with patch.object(XenJob.objects, "get", return_value=job), \
+        with patch.object(XenJob.objects, "select_for_update", return_value=MagicMock(get=MagicMock(return_value=job))), \
              patch.object(XenWorkerHeartbeat, "record_heartbeat"):
             hb_req = self.factory.post(
                 f"/api/v1/xen/worker/jobs/{job_id}/heartbeat",
@@ -180,7 +180,7 @@ class XenEndToEndWorkerSimulationTest(SimpleTestCase):
             "This computes the factorial step by step."
         )
 
-        with patch.object(XenJob.objects, "get", return_value=job), \
+        with patch.object(XenJob.objects, "select_for_update", return_value=MagicMock(get=MagicMock(return_value=job))), \
              patch.object(XenWorkerHeartbeat, "record_heartbeat"):
             comp_req = self.factory.post(
                 f"/api/v1/xen/worker/jobs/{job_id}/complete",

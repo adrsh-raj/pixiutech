@@ -1,0 +1,52 @@
+--- a/build_worker_notebook.py
++++ b/build_worker_notebook.py
+@@ -15,6 +15,7 @@
+ CONFIG_SRC = (BASE_DIR / "config.py").read_text(encoding="utf-8")
+ LOADER_SRC = (BASE_DIR / "loader.py").read_text(encoding="utf-8")
+ ENGINE_SRC = (BASE_DIR / "engine.py").read_text(encoding="utf-8")
++RELAY_SRC = (BASE_DIR / "worker_relay.py").read_text(encoding="utf-8")
+ SERVER_SRC = (BASE_DIR / "server.py").read_text(encoding="utf-8")
+ A1_PROMPT_SRC = Path("/home/kali/XEN_STEP700_KAGGLE_QUALIFICATION/frozen_a1_prompt.txt").read_text(encoding="utf-8")
+ 
+@@ -368,6 +369,7 @@
+ (pkg_dir / "__init__.py").write_text("", encoding="utf-8")
+ 
+ config_code = {repr(CONFIG_SRC)}
++Path("/kaggle/working/worker_relay.py").write_text({repr(RELAY_SRC)}, encoding="utf-8")
+ loader_code = {repr(LOADER_SRC)}
+ engine_code = {repr(ENGINE_SRC)}
+ server_code = {repr(SERVER_SRC)}
+@@ -725,26 +727,14 @@
+             messages.extend(history)
+             messages.append({"role": "user", "content": prompt})
+ 
+-            local_resp = httpx.post(
+-                "http://127.0.0.1:8000/v1/chat/completions",
+-                headers={
+-                    "Authorization": f"Bearer {local_token}",
+-                    "Content-Type": "application/json",
+-                },
+-                json={
+-                    "model": "pixiumind-step-700",
+-                    "messages": messages,
+-                    "max_tokens": max_tokens,
+-                    "temperature": temperature,
+-                },
+-                timeout=120.0,
+-            )
+-
++            from worker_relay import relay_generation
++            with httpx.Client() as client:
++                result_data = relay_generation(
++                    client, local_token, DJANGO_URL, WORKER_SECRET, WORKER_ID, job_id,
++                    {"model": "pixiumind-step-700", "messages": messages,
++                     "max_tokens": max_tokens, "temperature": temperature},
++                )
+             latency = round(time.time() - inference_start, 2)
+-            if local_resp.status_code != 200:
+-                raise RuntimeError(f"Local server returned HTTP {local_resp.status_code}: {local_resp.text}")
+-
+-            result_data = local_resp.json()
+             choice = result_data.get("choices", [{}])[0]
+             output_text = choice.get("message", {}).get("content", "")
+             finish_reason = choice.get("finish_reason", "stop")

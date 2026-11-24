@@ -168,9 +168,11 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job = MagicMock()
         mock_job.id = job_id
         mock_job.created_at = timezone.now()
+        mock_job.effective_intent = "TEACHING"
+        mock_job.effective_format_mode = "DEFAULT_EDUCATIONAL"
 
         with patch.object(XenJob.objects, "filter") as mock_filter, \
-             patch.object(XenJob.objects, "create", return_value=mock_job) as mock_create, \
+             patch.object(XenJob.objects, "get_or_create", return_value=(mock_job, True)) as mock_create, \
              patch.object(XenWorkerHeartbeat, "is_any_worker_online", return_value=True):
             qs = MagicMock()
             qs.first.return_value = None
@@ -179,7 +181,7 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
 
             req = self.factory.post(
                 "/api/v1/xen/jobs",
-                {"prompt": "Write a Python loop to sum numbers from 1 to 10."},
+                {"prompt": "Write a Python loop to sum numbers from 1 to 10.", "idempotency_key": "loop-1"},
                 format="json",
             )
             force_authenticate(req, user=self.mock_trainer)
@@ -203,6 +205,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job.max_tokens = 2048
         mock_job.temperature = 0.7
         mock_job.intent = "TEACHING"
+        mock_job.format_mode = "DEFAULT_EDUCATIONAL"
+        mock_job.effective_intent = "TEACHING"
+        mock_job.effective_format_mode = "DEFAULT_EDUCATIONAL"
         mock_job.claim_count = 0
         mock_job.lease_expires_at = now + timedelta(seconds=120)
 
@@ -233,7 +238,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job.worker_id = "kaggle-worker-1"
         mock_job.lease_expires_at = timezone.now() + timedelta(seconds=120)
 
-        with patch.object(XenJob.objects, "get", return_value=mock_job), \
+        mock_job.status = XenJobStatus.RUNNING
+        mock_job.lease_expires_at = timezone.now() + timedelta(seconds=120)
+        with patch.object(XenJob.objects, "select_for_update", return_value=MagicMock(get=MagicMock(return_value=mock_job))), \
              patch.object(XenWorkerHeartbeat, "record_heartbeat"):
             req = self.factory.post(
                 f"/api/v1/xen/worker/jobs/{job_id}/heartbeat",
@@ -252,6 +259,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job.id = job_id
         mock_job.worker_id = "kaggle-worker-1"
         mock_job.intent = "TEACHING"
+        mock_job.format_mode = "DEFAULT_EDUCATIONAL"
+        mock_job.effective_intent = "TEACHING"
+        mock_job.effective_format_mode = "DEFAULT_EDUCATIONAL"
 
         model_raw_output = (
             "Here is the program:\n\n"
@@ -262,7 +272,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
             "This computes the sum step-by-step."
         )
 
-        with patch.object(XenJob.objects, "get", return_value=mock_job), \
+        mock_job.status = XenJobStatus.RUNNING
+        mock_job.lease_expires_at = timezone.now() + timedelta(seconds=120)
+        with patch.object(XenJob.objects, "select_for_update", return_value=MagicMock(get=MagicMock(return_value=mock_job))), \
              patch.object(XenWorkerHeartbeat, "record_heartbeat"):
             req = self.factory.post(
                 f"/api/v1/xen/worker/jobs/{job_id}/complete",
@@ -289,7 +301,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job.id = job_id
         mock_job.worker_id = "kaggle-worker-1"
 
-        with patch.object(XenJob.objects, "get", return_value=mock_job), \
+        mock_job.status = XenJobStatus.RUNNING
+        mock_job.lease_expires_at = timezone.now() + timedelta(seconds=120)
+        with patch.object(XenJob.objects, "select_for_update", return_value=MagicMock(get=MagicMock(return_value=mock_job))), \
              patch.object(XenWorkerHeartbeat, "record_heartbeat"):
             req = self.factory.post(
                 f"/api/v1/xen/worker/jobs/{job_id}/fail",
@@ -316,6 +330,9 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
         mock_job.user_id = self.mock_trainer.id
         mock_job.status = XenJobStatus.COMPLETED
         mock_job.intent = "TEACHING"
+        mock_job.format_mode = "DEFAULT_EDUCATIONAL"
+        mock_job.effective_intent = "TEACHING"
+        mock_job.effective_format_mode = "DEFAULT_EDUCATIONAL"
         mock_job.response_summary = "Result text"
         mock_job.response_payload = {
             "decoded": {

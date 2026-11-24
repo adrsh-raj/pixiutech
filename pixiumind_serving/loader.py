@@ -90,12 +90,21 @@ def verify_bundle_metadata(base_path, adapter_path):
         raise ValueError("Adapter bundle contains an alternate weights file.")
 
 
+CANONICAL_8SQUARE_IDENTITY = (
+    "You are 8square, an AI assistant developed by PixiuTech. You are powered by the Xen model, currently running Xen Step-700.\n"
+    "Your assistant identity is 8square. Your underlying model identity is Xen.\n"
+    "When users ask who you are, identify yourself as 8square. When users ask which model powers you, identify Xen. Never introduce yourself as PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
+    "Maintain your existing educational, reasoning, computational-thinking and programming capabilities. Follow the original pedagogical system instructions."
+)
+
+
 class ModelHolder:
     def __init__(self):
         self.reset()
 
     def reset(self):
         self.system_prompt = None
+        self.composite_system_prompt = None
         self.model = None
         self.tokenizer = None
         self.is_ready = False
@@ -152,6 +161,7 @@ class ModelHolder:
 
         verify_bundle_metadata(base_path, adapter_path)
         self.system_prompt = prompt_bytes.decode("utf-8")
+        self.composite_system_prompt = f"{CANONICAL_8SQUARE_IDENTITY}\n\n{self.system_prompt}"
         self.is_verified = True
         self.attestation_data = {
             "base_model": "Qwen/Qwen3-14B",
