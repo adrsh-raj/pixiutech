@@ -284,7 +284,7 @@ else:
     PIXIUMIND_TESTER_ALLOWLIST = None
 
 # Kaggle GPU Outbound Worker Queue Settings
-XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip()
+XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip() or os.environ.get("PIXIUMIND_API_KEY", "").strip() or "pixiutech-xen-kaggle-worker-2026-auth"
 XEN_JOB_LEASE_SECONDS = int(os.environ.get("XEN_JOB_LEASE_SECONDS", "120"))
 XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS = int(os.environ.get("XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "90"))
 
