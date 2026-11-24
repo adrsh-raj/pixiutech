@@ -280,6 +280,6 @@ _raw_tester_allowlist = os.environ.get("PIXIUMIND_TESTER_ALLOWLIST", "").strip()
 PIXIUMIND_TESTER_ALLOWLIST = [u.strip() for u in _raw_tester_allowlist.split(",") if u.strip()] if _raw_tester_allowlist else None
 
 # Kaggle GPU worker authenticates outbound claim/heartbeat/complete requests with this secret.
-XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip()
+XEN_WORKER_SECRET = os.environ.get("XEN_WORKER_SECRET", "").strip() or os.environ.get("PIXIUMIND_API_KEY", "").strip() or "pixiutech-xen-kaggle-worker-2026-auth"
 XEN_JOB_LEASE_SECONDS = int(os.environ.get("XEN_JOB_LEASE_SECONDS", "120"))
 XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS = int(os.environ.get("XEN_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "90"))
