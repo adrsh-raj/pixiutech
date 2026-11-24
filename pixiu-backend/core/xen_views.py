@@ -21,7 +21,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from django.conf import settings
 from django.db import DatabaseError, transaction
