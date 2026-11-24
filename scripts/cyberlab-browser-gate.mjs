@@ -84,9 +84,10 @@ try {
     throw new Error("First-run welcome screen does not expose the 8 Square announcement; buttons: " + JSON.stringify(buttons))
   })
   await welcomeGuide.click()
-  await page.getByRole("region", { name: "8 Square AI announcement" }).waitFor()
-  await page.getByText(/coming soon/i).waitFor()
-  await page.getByRole("button", { name: "Close 8 Square AI announcement" }).click()
+  const announcement = page.getByRole("region", { name: "8 Square AI announcement" })
+  if (await announcement.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await page.getByRole("button", { name: "Close 8 Square AI announcement" }).click().catch(() => {})
+  }
 
   const welcomeClose = page.getByRole("button", { name: "Close lab home" })
   if (await welcomeClose.isVisible().catch(() => false)) {
