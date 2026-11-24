@@ -59,7 +59,8 @@ test('Xen Client - sendXenChat handles cancellation cleanly', async () => {
 test('Xen Client - AST badge and tested truthfulness mapping', () => {
   const mockServerResponse = {
     status: 'ok',
-    model: 'pixiumind-step-700',
+    model: 'xen-step-700',
+    assistant: '8square',
     response: {
       text: 'def test():\n    pass',
       is_complete: false,
@@ -181,7 +182,8 @@ test('Xen Client - fetchXenStatus reports operational worker vitality', async (t
           active_worker_count: 1,
           queued_jobs: 2,
           running_jobs: 1,
-          model: 'pixiumind-1.4-d14-step700',
+          model: 'xen-step-700',
+          assistant: '8square',
         });
       }
       return Response.json({}, { status: 404 });
@@ -241,7 +243,8 @@ test('Xen Client - sendXenChat handles HTTP 202 job queue and polls until comple
         return Response.json({
           status: 'completed',
           job_id: 'job-uuid-456',
-          model: 'pixiumind-1.4-d14-step700',
+          model: 'xen-step-700',
+          assistant: '8square',
           response: {
             text: '```python\nprint("Kaggle GPU result")\n```',
             is_complete: true,

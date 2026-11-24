@@ -44,6 +44,16 @@ CONDITION_A1_SYSTEM_PROMPT = (
     "When a student explicitly requests an implementation, program, or code solution, always provide the complete, correct, and executable Python code in a properly formatted ```python code block, followed by a concise, student-friendly explanation. Never substitute conceptual discussion alone for requested code."
 )
 
+# Authoritative Canonical Identity Grounding for 8square AI / Xen Step-700
+CANONICAL_8SQUARE_IDENTITY = (
+    "You are 8square, an AI assistant developed by PixiuTech. You are powered by the Xen model, currently running Xen Step-700.\n"
+    "Your assistant identity is 8square. Your underlying model identity is Xen.\n"
+    "When users ask who you are, identify yourself as 8square. When users ask which model powers you, identify Xen. Never introduce yourself as PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
+    "Maintain your existing educational, reasoning, computational-thinking and programming capabilities. Follow the original pedagogical system instructions."
+)
+
+COMPOSITE_SYSTEM_PROMPT = f"{CANONICAL_8SQUARE_IDENTITY}\n\n{CONDITION_A1_SYSTEM_PROMPT}"
+
 
 def sanitize_xen_message(content):
     content = content.replace("\x00", "")
@@ -392,7 +402,7 @@ class XenChatView(XenBaseView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        aggregate_chars = len(CONDITION_A1_SYSTEM_PROMPT) + len(prompt)
+        aggregate_chars = len(COMPOSITE_SYSTEM_PROMPT) + len(prompt)
         for idx, turn in enumerate(history):
             if not isinstance(turn, dict) or turn.get("role") not in ("user", "assistant"):
                 return Response(
@@ -449,7 +459,7 @@ class XenChatView(XenBaseView):
 
         # 9. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
         messages = [
-            {"role": "system", "content": CONDITION_A1_SYSTEM_PROMPT},
+            {"role": "system", "content": COMPOSITE_SYSTEM_PROMPT},
             *({"role": turn["role"], "content": sanitize_xen_message(turn["content"])} for turn in history),
             {"role": "user", "content": prompt},
         ]
@@ -614,6 +624,7 @@ class XenChatView(XenBaseView):
             {
                 "status": "ok",
                 "request_id": request_id,
+                "assistant": "8square",
                 "model": model_id,
                 "intent": intent,
                 **({"cached": True} if cached else {}),
@@ -726,7 +737,7 @@ class XenJobCreateView(XenBaseView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        aggregate_chars = len(CONDITION_A1_SYSTEM_PROMPT) + len(prompt)
+        aggregate_chars = len(COMPOSITE_SYSTEM_PROMPT) + len(prompt)
         for idx, turn in enumerate(history):
             if not isinstance(turn, dict) or turn.get("role") not in ("user", "assistant"):
                 return Response(
@@ -929,7 +940,8 @@ class XenJobDetailView(XenBaseView):
                     "status": "completed",
                     "job_id": str(job.id),
                     "request_id": request_id,
-                    "model": "pixiumind-1.4-d14-step700",
+                    "assistant": "8square",
+                    "model": "xen-step-700",
                     "intent": job.intent,
                     "response": {
                         "text": job.response_summary,
@@ -1002,7 +1014,8 @@ class XenStatusView(XenBaseView):
             {
                 "status": "ok",
                 "service": "pixiumind-xen",
-                "model": "pixiumind-1.4-d14-step700",
+                "assistant": "8square",
+                "model": "xen-step-700",
                 "worker_online": worker_online,
                 "active_worker_count": active_workers.count(),
                 "queued_jobs": queued_count,
@@ -1022,11 +1035,7 @@ class XenWorkerBaseView(APIView):
     permission_classes = []
 
     def check_worker_auth(self, request):
-        configured_secret = (
-            getattr(settings, "XEN_WORKER_SECRET", "").strip()
-            or getattr(settings, "PIXIUMIND_API_KEY", "").strip()
-            or "pixiutech-xen-kaggle-worker-2026-auth"
-        )
+        configured_secret = getattr(settings, "XEN_WORKER_SECRET", "").strip()
         if not configured_secret:
             logger.error("XEN_WORKER_SECRET is not configured on server. Rejecting worker request.")
             return Response(
@@ -1116,7 +1125,7 @@ class XenWorkerClaimView(XenWorkerBaseView):
                     "id": str(job.id),
                     "prompt": job.prompt,
                     "history": job.history,
-                    "system_prompt": CONDITION_A1_SYSTEM_PROMPT,
+                    "system_prompt": COMPOSITE_SYSTEM_PROMPT,
                     "max_tokens": job.max_tokens,
                     "temperature": job.temperature,
                     "intent": job.intent,

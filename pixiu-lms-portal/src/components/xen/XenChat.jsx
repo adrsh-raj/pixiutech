@@ -6,7 +6,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: 'Hello! I am PixiuMind Xen, your specialized STEM and AI programming tutor. How can I assist your learning today?',
+      content: "Hello! I'm 8square, your AI tutor for computational thinking, STEM and programming. I'm powered by Xen. What would you like to explore today?",
       isComplete: true,
       displayAstValid: true,
       tested: false,
@@ -252,9 +252,9 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
           </div>
           <div>
             <h2 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-              PixiuMind Xen Tutor
+              8square
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                Step-700
+                Xen Step-700
               </span>
             </h2>
             <p className="text-[11px] text-slate-400">Role: <span className="text-slate-200 capitalize">{userRole}</span></p>
@@ -322,7 +322,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
               {renderMessageContent(m, idx)}
             </div>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1 px-1">
-              <span>{m.role === 'user' ? 'You' : 'PixiuMind Xen'}</span>
+              <span>{m.role === 'user' ? 'You' : '8square'}</span>
               {m.requestId && (
                 <span className="font-mono text-slate-600">[{m.requestId}]</span>
               )}
@@ -337,7 +337,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
               ? `Queued in job queue (position #${queueInfo.queuePosition || 1})... waiting for Kaggle GPU worker.`
               : queueInfo.status === 'claimed' || queueInfo.status === 'running'
               ? 'Processing on Kaggle GPU (Dual Tesla T4)...'
-              : 'Generating response with Step-700...'}
+              : 'Generating response with Xen Step-700...'}
           </div>
         )}
 

@@ -1,5 +1,5 @@
 /**
- * Client library for PixiuMind Xen AI Tutor API.
+ * Client library for 8square AI Tutor API (powered by Xen).
  * Connects strictly to authenticated Django backend endpoints (/api/v1/xen/...)
  * Never communicates directly with private GPU inference servers.
  */
@@ -161,7 +161,8 @@ export async function sendXenChat({
           return {
             success: true,
             requestId: jobData?.request_id || jobId,
-            model: jobData?.model || 'pixiumind-1.4-d14-step700',
+            assistant: jobData?.assistant || '8square',
+            model: jobData?.model || 'xen-step-700',
             intent: jobData?.intent || intent,
             response: {
               text: cleanText,
@@ -219,7 +220,8 @@ export async function sendXenChat({
     return {
       success: true,
       requestId: data?.request_id || data?.id || null,
-      model: data?.model || 'pixiumind-step-700',
+      assistant: data?.assistant || '8square',
+      model: data?.model || 'xen-step-700',
       intent: data?.intent || intent,
       response: {
         text: cleanText,
@@ -281,7 +283,8 @@ export async function fetchXenStatus() {
       activeWorkerCount: data.active_worker_count || 0,
       queuedJobs: data.queued_jobs || 0,
       runningJobs: data.running_jobs || 0,
-      model: data.model || 'pixiumind-1.4-d14-step700',
+      assistant: data.assistant || '8square',
+      model: data.model || 'xen-step-700',
     };
   } catch {
     return { success: false, error: 'Failed to contact Xen status endpoint' };

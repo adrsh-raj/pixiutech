@@ -92,6 +92,18 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
 
     # --- Worker Authentication Tests ---
 
+    def test_worker_claim_fails_closed_when_worker_secret_unconfigured(self):
+        with override_settings(XEN_WORKER_SECRET=""):
+            req = self.factory.post(
+                "/api/v1/xen/worker/claim",
+                {"worker_id": "kaggle-worker-1"},
+                format="json",
+                HTTP_X_WORKER_SECRET="any-secret",
+            )
+            res = self.claim_view(req)
+            self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+            self.assertEqual(res.data["code"], "WORKER_AUTH_UNCONFIGURED")
+
     def test_worker_claim_unauthorized_when_secret_missing(self):
         req = self.factory.post("/api/v1/xen/worker/claim", {}, format="json")
         res = self.claim_view(req)
@@ -211,6 +223,8 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
             self.assertEqual(res.data["job"]["id"], str(job_id))
             self.assertEqual(res.data["job"]["prompt"], "Write a Python loop.")
             self.assertIn("Grade 6 Computational Thinking", res.data["job"]["system_prompt"])
+            self.assertIn("8square", res.data["job"]["system_prompt"])
+            self.assertIn("Xen Step-700", res.data["job"]["system_prompt"])
 
     def test_worker_heartbeat_extends_lease(self):
         job_id = uuid.uuid4()
@@ -324,6 +338,8 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
 
             self.assertEqual(res.status_code, status.HTTP_200_OK)
             self.assertEqual(res.data["status"], "completed")
+            self.assertEqual(res.data["assistant"], "8square")
+            self.assertEqual(res.data["model"], "xen-step-700")
             self.assertEqual(res.data["response"]["text"], "Result text")
             self.assertTrue(res.data["response"]["syntax_valid"])
 
@@ -357,6 +373,8 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
             res = self.status_view(req)
 
             self.assertEqual(res.status_code, status.HTTP_200_OK)
+            self.assertEqual(res.data["assistant"], "8square")
+            self.assertEqual(res.data["model"], "xen-step-700")
             self.assertTrue(res.data["worker_online"])
             self.assertEqual(res.data["active_worker_count"], 2)
             self.assertEqual(res.data["queued_jobs"], 3)

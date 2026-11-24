@@ -256,8 +256,8 @@ class XenViewsUnitTests(SimpleTestCase):
         sent_req = mock_urlopen.call_args[0][0]
         sent_body = json.loads(sent_req.data.decode("utf-8"))
         self.assertEqual([turn["content"] for turn in sent_body["messages"][1:-1]], ["First", "Second", "Last"])
-        from core.xen_views import CONDITION_A1_SYSTEM_PROMPT
-        self.assertEqual(sent_body["messages"][0], {"role": "system", "content": CONDITION_A1_SYSTEM_PROMPT})
+        from core.xen_views import COMPOSITE_SYSTEM_PROMPT
+        self.assertEqual(sent_body["messages"][0], {"role": "system", "content": COMPOSITE_SYSTEM_PROMPT})
         user_message = sent_body["messages"][-1]["content"]
         self.assertNotIn("<|im_start|>", user_message)
         self.assertNotIn("<|im_end|>", user_message)
