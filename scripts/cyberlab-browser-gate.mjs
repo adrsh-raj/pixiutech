@@ -87,9 +87,9 @@ try {
   await copilotPanel.waitFor({ state: "visible", timeout: 10_000 })
 
   // Regression guard: top toolbar dropdown menus must stay clickable even while Copilot panel is open.
-  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("button", { name: "Tools", exact: true }).click()
   await page.getByRole("menuitem", { name: /Templates/ }).waitFor({ state: "visible", timeout: 5000 })
-  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("button", { name: "Tools", exact: true }).click()
 
   // Verify minimize, expand, and close controls before proceeding with workspace template checks.
   await copilotPanel.getByLabel("Minimize 8square Window").click()
@@ -104,10 +104,10 @@ try {
   }
 
   // Template → Blockly
-  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("button", { name: "Tools", exact: true }).click()
   await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "Dual Alternating Police Strobe" }).click()
-  await page.getByRole("button", { name: "Code" }).click()
+  await page.getByRole("button", { name: "Code", exact: true }).click()
   const blink = await page.locator("body").innerText()
   if (!/void setup\(\)/.test(blink) || !/digitalWrite|HIGH|LOW/.test(blink)) {
     throw new Error("Blink template did not hydrate Blockly/code")
@@ -115,30 +115,30 @@ try {
   await page.screenshot({ path: artifactDir + "/simulation-template.png", fullPage: true })
 
   // AI template → AI Blockly → automatic Pixiu runtime HUD
-  await page.getByRole("button", { name: "Circuit" }).click()
-  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
+  await page.getByRole("button", { name: "Tools", exact: true }).click()
   await page.getByRole("menuitem", { name: /Templates/ }).click()
   await page.locator("h3").filter({ hasText: "AI Vision Smart Boom Barrier Gate" }).click()
-  await page.getByRole("button", { name: "Code" }).click()
+  await page.getByRole("button", { name: "Code", exact: true }).click()
   const aiCodeView = await page.locator("body").innerText()
   if (!/AI sees/.test(aiCodeView) || !/car/i.test(aiCodeView)) {
     throw new Error("AI template Blockly did not hydrate")
   }
 
-  await page.getByRole("button", { name: "Circuit" }).click()
-  await page.getByRole("button", { name: "Run" }).click()
+  await page.getByRole("button", { name: "Circuit", exact: true }).click()
+  await page.getByRole("button", { name: "Run", exact: true }).click()
   await page.getByText("PIXIU VISION CORE", { exact: true }).waitFor()
   if ((await page.locator("video").count()) < 1) throw new Error("AI camera video element did not mount")
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
 
   // Object restart lifecycle
-  await page.getByRole("button", { name: "Stop" }).click()
-  await page.getByRole("button", { name: "Run" }).click()
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
+  await page.getByRole("button", { name: "Run", exact: true }).click()
   await page.getByText("LIVE FEED", { exact: true }).waitFor()
-  await page.getByRole("button", { name: "Stop" }).click()
+  await page.getByRole("button", { name: "Stop", exact: true }).click()
 
   // Pose browser lifecycle
-  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("button", { name: "Tools", exact: true }).click()
   await page.getByText("PIXIU AI Studio", { exact: true }).click()
   await page.getByText("Pose", { exact: true }).click()
   await page.getByRole("button", { name: "Turn On Camera" }).last().click()
