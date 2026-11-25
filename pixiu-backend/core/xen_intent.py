@@ -1049,7 +1049,7 @@ def build_xen_effective_prompt(
     effective_grounding = grounding_directive
     if effective_grounding:
         remaining_budget = max_limit - base_overhead - len(effective_grounding) - 94
-        if remaining_budget < 250:
+        if remaining_budget < 500:
             compact_grounding = get_cyberlab_grounding_directive(context_envelope, compact=True)
             if base_overhead + len(compact_grounding) + 2 <= max_limit:
                 effective_grounding = compact_grounding
