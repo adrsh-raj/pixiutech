@@ -68,9 +68,8 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
-  // The current product exposes 8 Square as an announcement, not a live
-  // conversational Copilot. Verify the real first-run entry point and its
-  // explicit coming-soon state without claiming that chat functionality exists.
+  // Verify the live interactive 8square Copilot entry point from welcome dialog,
+  // verify minimize/expand/close controls, and verify top-bar Tools dropdown still opens above it.
   const welcomeDialog = page.getByRole("dialog", { name: "Build it. Run it. Find out why." })
   await welcomeDialog.waitFor({ state: "visible", timeout: 10_000 }).catch(async () => {
     const startup = await page.locator("body").innerText().catch(() => "")
@@ -81,13 +80,23 @@ try {
     const buttons = await welcomeDialog.locator("button").evaluateAll((items) =>
       items.map((button) => ({ text: button.innerText, aria: button.getAttribute("aria-label"), title: button.title })),
     )
-    throw new Error("First-run welcome screen does not expose the 8 Square announcement; buttons: " + JSON.stringify(buttons))
+    throw new Error("First-run welcome screen does not expose Open 8 Square; buttons: " + JSON.stringify(buttons))
   })
   await welcomeGuide.click()
-  const announcement = page.getByRole("region", { name: "8 Square AI announcement" })
-  if (await announcement.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await page.getByRole("button", { name: "Close 8 Square AI announcement" }).click().catch(() => {})
-  }
+  const copilotPanel = page.getByLabel("8square Circuit Copilot Panel")
+  await copilotPanel.waitFor({ state: "visible", timeout: 10_000 })
+
+  // Regression guard: top toolbar dropdown menus must stay clickable even while Copilot panel is open.
+  await page.getByRole("button", { name: "Tools" }).click()
+  await page.getByRole("menuitem", { name: /Templates/ }).waitFor({ state: "visible", timeout: 5000 })
+  await page.getByRole("button", { name: "Tools" }).click()
+
+  // Verify minimize, expand, and close controls before proceeding with workspace template checks.
+  await copilotPanel.getByLabel("Minimize 8square Window").click()
+  await page.getByLabel("Expand 8square Window").click()
+  await copilotPanel.waitFor({ state: "visible", timeout: 5000 })
+  await copilotPanel.getByLabel("Close 8square Panel").click()
+  await page.getByLabel("Open 8square AI Circuit Copilot").waitFor({ state: "visible", timeout: 5000 })
 
   const welcomeClose = page.getByRole("button", { name: "Close lab home" })
   if (await welcomeClose.isVisible().catch(() => false)) {

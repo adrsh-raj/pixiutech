@@ -333,12 +333,15 @@ def sanitize_context_envelope(envelope: Any) -> Dict[str, Any]:
     return sanitized
 
 
-def format_context_envelope(envelope: Dict[str, Any]) -> str:
+def format_context_envelope(envelope: Dict[str, Any], max_chars: int = 2800) -> str:
     """
     Formats the sanitized context envelope into a clean, bounded text prompt prefix.
-    Max 2000 chars to avoid crowding out generation capacity.
+    Clamped by max_chars (up to 2800) so combined prompt + mode directive + context stays within serving limits.
     """
     if not envelope:
+        return ""
+    limit = max(0, min(2800, int(max_chars)))
+    if limit < 40:
         return ""
 
     # Keep a valid JSON document even for a large circuit. Preserve real counts
@@ -356,7 +359,7 @@ def format_context_envelope(envelope: Dict[str, Any]) -> str:
             raw = raw.replace(char, f"\\u{ord(char):04x}")
         return raw.replace("[MISSION CONTEXT]", "\\u005bMISSION CONTEXT]").replace("[/MISSION CONTEXT]", "\\u005b/MISSION CONTEXT]")
     body = encode()
-    while len(body) > 2800:
+    while len(body) > limit:
         circuit = data.get("circuit", {})
         field = max(("parts", "wires"), key=lambda key: len(circuit.get(key, [])))
         if circuit.get(field):
@@ -364,15 +367,22 @@ def format_context_envelope(envelope: Dict[str, Any]) -> str:
             circuit["partial"] = True
         elif data.get("blockly", {}).get("blocks"):
             data["blockly"] = {**data["blockly"], "blocks": [], "partial": True}
+        elif circuit.get("readings"):
+            circuit["readings"] = []
+            circuit["partial"] = True
         else:
             lesson = data.get("lesson", {})
             longest = max(("steps", "required_parts", "starter_parts", "completed_step_ids", "concepts"),
                           key=lambda key: len(lesson.get(key, [])))
             if lesson.get(longest):
                 data["lesson"] = {**lesson, longest: lesson[longest][:-1], "partial": True}
-            elif circuit.get("readings"):
-                circuit["readings"] = []
-                circuit["partial"] = True
+            elif "circuit" in data and data.get("lesson"):
+                # Keep core circuit summary and lesson id/title under strict tiny budgets
+                trimmed_lesson = {k: v for k, v in data["lesson"].items() if k in ("id", "title")}
+                if trimmed_lesson != data["lesson"]:
+                    data["lesson"] = {**trimmed_lesson, "partial": True}
+                else:
+                    return ""
             else:
                 return ""
         body = encode()

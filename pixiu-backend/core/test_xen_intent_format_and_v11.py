@@ -431,3 +431,142 @@ class XenIntentFormatModeAndVersion11Tests(TestCase):
         )
         self.assertEqual(expired_res.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(expired_res.data["code"], "JOB_NOT_ACTIVE")
+
+    def test_long_prompt_with_full_circuit_context_and_code_only_budgets_within_4000(self):
+        """Regression: 1500-char prompt + full circuit envelope + CODE_ONLY must fit <= 4000 chars and not 400 CONTEXT_TOO_LARGE."""
+        long_prompt = "Check my Arduino LED wiring and write the fixed sketch.\n" * 28  # ~1568 chars
+        large_context = {
+            "source": "virtual-lab",
+            "circuit": {
+                "running": True,
+                "parts": [{"id": f"part_{i:02d}", "type": "resistor" if i % 2 else "led"} for i in range(32)],
+                "wires": [
+                    {"from": {"partId": f"part_{i:02d}", "pinId": "A"}, "to": {"partId": f"part_{(i+1)%32:02d}", "pinId": "B"}}
+                    for i in range(32)
+                ],
+                "readings": [{"instrument": "multimeter", "source": "simulated", "value": 4.95, "unit": "V", "probeA": "uno:5V", "probeB": "uno:GND"}],
+            },
+            "lesson": {"id": "led-blink", "title": "LED Blink Basics", "concepts": ["ohm-law", "current-limiting", "gpio"]},
+        }
+        res = self.trainer_client.post(
+            "/api/v1/xen/jobs",
+            {
+                "prompt": long_prompt,
+                "format_preference": "CODE_ONLY",
+                "context_envelope": large_context,
+                "idempotency_key": "budget-test-1",
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED, res.data)
+        job = XenJob.objects.get(id=res.data["job_id"])
+        self.assertLessEqual(len(job.prompt), 4000)
+        self.assertIn("[MISSION CONTEXT]", job.prompt)
+        self.assertIn("Check my Arduino LED wiring", job.prompt)
+
+    def test_code_only_retry_directive_stays_within_v11_4000_char_limit(self):
+        """Regression: Attempt 1 CODE_ONLY retry prepend must keep job.prompt <= 4000 chars for V11 server.py."""
+        prompt_3900 = "Write python sorting code.\n" + ("x" * 3800)
+        res = self.trainer_client.post(
+            "/api/v1/xen/jobs",
+            {"prompt": prompt_3900, "format_preference": "CODE_ONLY", "idempotency_key": "retry-limit-1"},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_202_ACCEPTED)
+        job_id = res.data["job_id"]
+        self.worker_client.post("/api/v1/xen/worker/claim", {"worker_id": "v11-retry-worker"}, format="json")
+        comp_res = self.worker_client.post(
+            f"/api/v1/xen/worker/jobs/{job_id}/complete",
+            {"worker_id": "v11-retry-worker", "text": "Here is prose:\n```python\nprint(1)\n```"},
+            format="json",
+        )
+        self.assertEqual(comp_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(comp_res.data["status"], "requeued_for_retry")
+        job = XenJob.objects.get(id=job_id)
+        self.assertLessEqual(len(job.prompt), 4000)
+        self.assertIn("MANDATORY STRICT RETRY DIRECTIVE", job.prompt)
+
+    def test_heartbeat_and_complete_preserve_worker_metadata(self):
+        """Regression: V11 heartbeat/complete without metadata must not wipe metadata from /claim."""
+        res_job = self.trainer_client.post(
+            "/api/v1/xen/jobs",
+            {"prompt": "Explain resistors.", "idempotency_key": "hb-meta-1"},
+            format="json",
+        )
+        job_id = res_job.data["job_id"]
+        worker_id = "kaggle-dual-t4-meta"
+        self.worker_client.post(
+            "/api/v1/xen/worker/claim",
+            {"worker_id": worker_id, "metadata": {"gpu": "Dual NVIDIA Tesla T4", "model": "Xen-Step-700"}},
+            format="json",
+        )
+        self.worker_client.post(
+            f"/api/v1/xen/worker/jobs/{job_id}/heartbeat",
+            {"worker_id": worker_id},
+            format="json",
+        )
+        hb = XenWorkerHeartbeat.objects.get(worker_id=worker_id)
+        self.assertEqual(hb.metadata.get("gpu"), "Dual NVIDIA Tesla T4")
+        self.assertEqual(hb.metadata.get("model"), "Xen-Step-700")
+
+        self.worker_client.post(
+            f"/api/v1/xen/worker/jobs/{job_id}/complete",
+            {"worker_id": worker_id, "text": "A resistor limits current."},
+            format="json",
+        )
+        hb.refresh_from_db()
+        self.assertEqual(hb.metadata.get("gpu"), "Dual NVIDIA Tesla T4")
+
+    def test_expired_lease_recovery_clears_stale_payload_and_chunks_surfaces_worker_state(self):
+        """Regression: expired lease requeue clears stale payload/heartbeat, and /chunks & detail expose worker_available."""
+        res_job = self.trainer_client.post(
+            "/api/v1/xen/jobs",
+            {"prompt": "Explain voltage.", "idempotency_key": "lease-clean-1"},
+            format="json",
+        )
+        job_id = res_job.data["job_id"]
+
+        # Offline worker visibility on /chunks and detail
+        chunks_offline = self.trainer_client.get(f"/api/v1/xen/jobs/{job_id}/chunks")
+        detail_offline = self.trainer_client.get(f"/api/v1/xen/jobs/{job_id}")
+        self.assertEqual(chunks_offline.status_code, status.HTTP_200_OK)
+        self.assertFalse(chunks_offline.data["worker_available"])
+        self.assertEqual(chunks_offline.data["queue_position"], 1)
+        self.assertFalse(chunks_offline.data["lease_expired"])
+        self.assertEqual(detail_offline.data["intent"], "TEACHING")
+        self.assertEqual(detail_offline.data["format_mode"], "DEFAULT_EDUCATIONAL")
+        self.assertFalse(detail_offline.data["lease_expired"])
+
+        # Claim, write partial chunk, then expire lease without polling another job yet
+        self.worker_client.post("/api/v1/xen/worker/claim", {"worker_id": "worker-1"}, format="json")
+        self.worker_client.post(
+            f"/api/v1/xen/worker/jobs/{job_id}/chunk",
+            {"worker_id": "worker-1", "seq": 1, "delta": "stale chunk"},
+            format="json",
+        )
+        job = XenJob.objects.get(id=job_id)
+        job.lease_expires_at = timezone.now() - timedelta(seconds=10)
+        job.save(update_fields=["lease_expires_at"])
+
+        # Before recovery runs, chunks/detail expose lease_expired=True
+        expired_chunks = self.trainer_client.get(f"/api/v1/xen/jobs/{job_id}/chunks")
+        self.assertTrue(expired_chunks.data["lease_expired"])
+
+        # Requeue only via claim recovery check (create another job first? No, claim_count=1 will be requeued & reclaimed by same claim call; verify clean payload before returning or test direct requeue by making another older queued job? Even simpler: inspect DB cleanup via a second claim on an older queued job!)
+        older_job = XenJob.objects.create(
+            user=self.trainer, role=UserRole.TRAINER, prompt="Older job", idempotency_key="older-job-1",
+            status=XenJobStatus.QUEUED,
+        )
+        XenJob.objects.filter(id=older_job.id).update(created_at=timezone.now() - timedelta(minutes=5))
+        claim_res = self.worker_client.post("/api/v1/xen/worker/claim", {"worker_id": "worker-2"}, format="json")
+        self.assertEqual(claim_res.data["job"]["id"], str(older_job.id))
+
+        # Now original job was recovered to QUEUED (not yet claimed): stale payload/heartbeat must be clean!
+        job.refresh_from_db()
+        self.assertEqual(job.status, XenJobStatus.QUEUED)
+        self.assertEqual(job.response_payload, {})
+        self.assertIsNone(job.heartbeat_at)
+        recovered_chunks = self.trainer_client.get(f"/api/v1/xen/jobs/{job_id}/chunks")
+        self.assertEqual(recovered_chunks.data["chunks"], [])
+        self.assertTrue(recovered_chunks.data["worker_available"])
+        self.assertEqual(recovered_chunks.data["queue_position"], 1)

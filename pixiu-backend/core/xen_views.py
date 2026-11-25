@@ -914,15 +914,32 @@ class XenJobCreateView(XenBaseView):
         mode_directive = get_additive_mode_instruction(format_mode)
 
         # Context envelope handling (sanitized mission & circuit context)
+        # Budget context body dynamically so [mode_directive] + context + prompt fits V11 4000-char limit.
+        effective_mode_directive = mode_directive
+        if effective_mode_directive and len(effective_mode_directive) + 4 + len(prompt) > 4000:
+            compact_directives = {
+                "CODE_ONLY": "MODE: CODE ONLY — output only one executable code fence, zero prose.",
+                "OUTPUT_ONLY": "MODE: OUTPUT ONLY — return only expected output.",
+                "EXPLANATION_ONLY": "MODE: EXPLANATION ONLY — conceptual prose only, no code blocks.",
+                "CODE_AND_EXPLANATION": "MODE: CODE + EXPLANATION — working code plus concise explanation.",
+            }
+            compact = compact_directives.get(format_mode.value, "")
+            if compact and len(compact) + 4 + len(prompt) <= 4000:
+                effective_mode_directive = compact
+
+        mode_overhead = (len(effective_mode_directive) + 4) if effective_mode_directive else 0
+        # wrapper overhead in format_context_envelope is 92 chars + "\n\n" separator (2 chars)
+        max_context_body = 4000 - len(prompt) - mode_overhead - 94
+
         context_envelope_raw = request.data.get("context_envelope")
         context_envelope = sanitize_context_envelope(context_envelope_raw)
-        context_prefix = format_context_envelope(context_envelope)
+        context_prefix = format_context_envelope(context_envelope, max_chars=max_context_body) if max_context_body >= 40 else ""
 
         effective_prompt = prompt
         if context_prefix:
             effective_prompt = f"{context_prefix}\n\n{effective_prompt}"
-        if mode_directive:
-            effective_prompt = f"[{mode_directive}]\n\n{effective_prompt}"
+        if effective_mode_directive:
+            effective_prompt = f"[{effective_mode_directive}]\n\n{effective_prompt}"
 
         if len(effective_prompt) > 4000 or len(effective_prompt) + sum(len(m["content"]) for m in compacted_history) + len(COMPOSITE_SYSTEM_PROMPT) > 16000:
             return Response({"code": "CONTEXT_TOO_LARGE", "error": "Conversation and circuit context exceed the serving limit."}, status=400)
@@ -1112,8 +1129,11 @@ class XenJobDetailView(XenBaseView):
                 "status": job.status,
                 "job_id": str(job.id),
                 "request_id": request_id,
+                "intent": job.effective_intent,
+                "format_mode": job.effective_format_mode,
                 "queue_position": queue_pos,
                 "worker_available": XenWorkerHeartbeat.is_any_worker_online(),
+                "lease_expired": job.is_lease_expired() is True,
                 "claimed_at": job.claimed_at.isoformat() if job.claimed_at else None,
                 "created_at": job.created_at.isoformat(),
             },
@@ -1223,9 +1243,11 @@ class XenWorkerClaimView(XenWorkerBaseView):
                 else:
                     exp_job.status = XenJobStatus.QUEUED
                     exp_job.worker_id = ""
+                    exp_job.response_payload = {}
                     exp_job.claimed_at = None
                     exp_job.lease_expires_at = None
-                    exp_job.save(update_fields=["status", "worker_id", "claimed_at", "lease_expires_at", "updated_at"])
+                    exp_job.heartbeat_at = None
+                    exp_job.save(update_fields=["response_payload", "status", "worker_id", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
                     logger.info("Job %s lease expired; requeued for next worker", exp_job.id)
 
         # 3. Atomically claim oldest queued job
@@ -1299,7 +1321,8 @@ class XenWorkerHeartbeatView(XenActiveJobView):
         job.lease_expires_at = now + timedelta(seconds=lease_duration)
         job.save(update_fields=["status", "heartbeat_at", "lease_expires_at", "updated_at"])
 
-        XenWorkerHeartbeat.record_heartbeat(worker_id=worker_id or job.worker_id)
+        metadata = request.data.get("metadata") if isinstance(request.data.get("metadata"), dict) else None
+        XenWorkerHeartbeat.record_heartbeat(worker_id=worker_id or job.worker_id, metadata=metadata)
         return Response({"status": "ok", "lease_expires_at": job.lease_expires_at.isoformat()}, status=status.HTTP_200_OK)
 
 
@@ -1350,7 +1373,23 @@ class XenWorkerCompleteView(XenActiveJobView):
                 "Do NOT include any greetings, prose, comments, or explanations.\n"
                 "Output ONLY the code fence."
             )
-            job.prompt = f"[{strict_retry_directive}]\n\n{job.prompt}"
+            base_prompt = job.prompt or ""
+            for prefix_tag in ("[RESPONSE MODE:", "[MODE:"):
+                if base_prompt.startswith(prefix_tag):
+                    close_idx = base_prompt.find("]\n\n")
+                    if close_idx != -1:
+                        base_prompt = base_prompt[close_idx + 3:]
+                        break
+            candidate_prompt = f"[{strict_retry_directive}]\n\n{base_prompt}"
+            if len(candidate_prompt) > 4000:
+                short_retry_directive = "MANDATORY STRICT RETRY DIRECTIVE: Output ONLY the code fence, zero prose or comments."
+                candidate_prompt = f"[{short_retry_directive}]\n\n{base_prompt}"
+            if len(candidate_prompt) > 4000 and "[/MISSION CONTEXT]\n\n" in base_prompt:
+                after_ctx = base_prompt.split("[/MISSION CONTEXT]\n\n", 1)[1]
+                candidate_prompt = f"[{short_retry_directive}]\n\n{after_ctx}"
+            if len(candidate_prompt) > 4000:
+                candidate_prompt = candidate_prompt[:4000]
+            job.prompt = candidate_prompt
             job.response_payload = {}
             job.status = XenJobStatus.QUEUED
             job.worker_id = ""
@@ -1442,6 +1481,10 @@ class XenJobChunksView(XenBaseView):
         all_chunks = payload.get("chunks", [])
         filtered_chunks = [c for c in all_chunks if c.get("seq", 0) > after_seq]
 
+        queue_pos = 0
+        if job.status == XenJobStatus.QUEUED:
+            queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
+
         response_data: Dict[str, Any] = {
             "job_id": str(job.id),
             "status": job.status,
@@ -1453,6 +1496,9 @@ class XenJobChunksView(XenBaseView):
             "delivery_mode": payload.get("delivery_mode", "batch_fallback" if job.status == XenJobStatus.COMPLETED else "pending"),
             "is_complete": job.status == XenJobStatus.COMPLETED,
             "is_failed": job.status == XenJobStatus.FAILED,
+            "queue_position": queue_pos,
+            "worker_available": XenWorkerHeartbeat.is_any_worker_online(),
+            "lease_expired": job.is_lease_expired() is True,
             "request_id": request_id,
         }
 

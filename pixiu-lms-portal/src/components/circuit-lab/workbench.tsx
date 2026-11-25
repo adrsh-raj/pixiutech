@@ -2153,7 +2153,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       <CircuitCopilotChat
         meter={{ red: probeRed, black: probeBlack }}
         scope={{ ch1: scopeProbeCH1, ch2: scopeProbeCH2 }}
-        key={projectStorageScope + ":" + (activeLessonContext?.launchId || "workspace")}
+        key={projectStorageScope}
         userRole={userRole}
         currentCircuit={state}
         currentBlocklyXml={blocklyXml}

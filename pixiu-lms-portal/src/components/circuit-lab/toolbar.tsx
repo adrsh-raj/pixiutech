@@ -360,7 +360,7 @@ export function Toolbar({
           {toolsOpen && (
             <div
               role="menu"
-              className="absolute right-0 top-[calc(100%+7px)] z-[70] w-64 overflow-hidden rounded-2xl border border-border bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-xl"
+              className="absolute right-0 top-[calc(100%+7px)] z-[88] w-64 overflow-hidden rounded-2xl border border-border bg-slate-950/95 p-1.5 shadow-2xl backdrop-blur-xl"
             >
               <div className="px-2 py-1.5 text-[9px] font-mono uppercase tracking-[0.18em] text-slate-500">Lab tools</div>
 

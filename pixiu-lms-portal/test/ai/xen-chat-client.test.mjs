@@ -355,3 +355,108 @@ test('Xen Client - stream displays a delta before completion after two empty rea
     globalThis.window = previousWindow;
   }
 });
+
+test('Xen Client - stream updates status on running/offline worker, recovers transient 503 poll, preserves server intent', async (t) => {
+  const session = new Map([['pixiu_session_role', 'trainer']]);
+  const browser = Object.assign(new EventTarget(), {
+    setTimeout, clearTimeout,
+    sessionStorage: {
+      getItem: (key) => session.get(key),
+      removeItem: (key) => session.delete(key),
+    },
+    localStorage: { removeItem() {} },
+  });
+  const previousWindow = globalThis.window;
+  globalThis.window = browser;
+
+  let pollCount = 0;
+  const statusUpdates = [];
+
+  try {
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'test-csrf' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'test-access-token' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json(
+          { status: 'queued', job_id: 'job-recover-1', worker_available: false, queue_position: 2 },
+          { status: 202 }
+        );
+      }
+      if (path.includes('/xen/jobs/job-recover-1/chunks')) {
+        pollCount++;
+        if (pollCount === 1) return Response.json({ error: 'Temporary gateway error' }, { status: 503 });
+        if (pollCount === 2) {
+          return Response.json({
+            status: 'running',
+            worker_available: true,
+            chunks: [],
+          });
+        }
+        return Response.json({
+          status: 'completed',
+          is_complete: true,
+          intent: 'LAB_TEACHING',
+          format_mode: 'DEFAULT_EDUCATIONAL',
+          worker_available: true,
+          response: { text: 'Recovered answer', is_complete: true, syntax_valid: true, display_ast_valid: true, tested: false },
+        });
+      }
+      return Response.json({}, { status: 404 });
+    });
+
+    const result = await streamXenChat({
+      prompt: 'Check circuit',
+      intent: 'TEACHING',
+      onStatusUpdate: (u) => statusUpdates.push(u),
+    });
+
+    assert.equal(result.success, true);
+    assert.equal(result.intent, 'LAB_TEACHING');
+    assert.equal(result.response.text, 'Recovered answer');
+    assert.equal(statusUpdates.some((u) => u.status === 'queued' && u.workerAvailable === false && u.message.toLowerCase().includes('offline')), true);
+    assert.equal(statusUpdates.some((u) => u.status === 'running' && u.workerAvailable === true), true);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test('Xen Client - streamXenChat aborts fast with WORKER_OFFLINE when offlineTimeoutMs elapses', async (t) => {
+  const session = new Map([['pixiu_session_role', 'trainer']]);
+  const browser = Object.assign(new EventTarget(), {
+    setTimeout, clearTimeout,
+    sessionStorage: {
+      getItem: (key) => session.get(key),
+      removeItem: (key) => session.delete(key),
+    },
+    localStorage: { removeItem() {} },
+  });
+  const previousWindow = globalThis.window;
+  globalThis.window = browser;
+
+  try {
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'test-csrf' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'test-access-token' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json({ status: 'queued', job_id: 'job-offline-1', worker_available: false, queue_position: 1 }, { status: 202 });
+      }
+      return Response.json({ status: 'queued', worker_available: false, queue_position: 1, chunks: [] });
+    });
+
+    const t0 = Date.now();
+    const result = await streamXenChat({
+      prompt: 'Quick offline test',
+      offlineTimeoutMs: 120,
+      timeoutMs: 10000,
+    });
+    const elapsed = Date.now() - t0;
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'WORKER_OFFLINE');
+    assert.equal(elapsed < 2000, true);
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});

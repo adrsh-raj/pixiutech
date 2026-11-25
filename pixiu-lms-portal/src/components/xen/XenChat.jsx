@@ -16,18 +16,31 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   ]);
   const [inputPrompt, setInputPrompt] = useState('');
   const [intent, setIntent] = useState(
-    userRole === 'trainer' ? 'TEACHING' : userRole === 'student' ? 'STUDENT_LEARNING' : 'TEACHING_REVIEW'
+    userRole === 'trainer' || userRole === 'student' ? 'TEACHING' : 'TEACHING_REVIEW'
   );
   const [status, setStatus] = useState('idle'); // idle | generating | cancelled | error
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [stickyFormatPreference, setStickyFormatPreference] = useState(null);
   const [workerStatus, setWorkerStatus] = useState({ online: true, activeWorkers: 0, checked: false });
-  const [queueInfo, setQueueInfo] = useState({ status: '', queuePosition: 0 });
+  const [queueInfo, setQueueInfo] = useState({ status: '', queuePosition: 0, workerAvailable: true });
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const [requests] = useState(createXenRequestLifecycle);
   const messagesEndRef = useRef(null);
   useEffect(() => () => requests.cancel(), [requests]);
+
+  useEffect(() => {
+    if (status !== 'generating') {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
 
   useEffect(() => {
     let isMounted = true;
@@ -53,6 +66,20 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, status, queueInfo]);
 
+  const buildCleanHistory = (list) => {
+    const cleaned = [];
+    for (const msg of list.slice(1)) {
+      if (msg.isCancelled || msg.partialId) continue;
+      if (msg.role === 'user' && cleaned.length > 0 && cleaned[cleaned.length - 1].role === 'user') {
+        // Replace unanswered user turn cleanly to prevent consecutive user turns
+        cleaned[cleaned.length - 1] = { role: 'user', content: msg.content };
+      } else {
+        cleaned.push({ role: msg.role, content: msg.content });
+      }
+    }
+    return cleaned.slice(-10);
+  };
+
   const handleSend = async (retry = false) => {
     const userText = inputPrompt.trim();
     if (!retry && !userText) return;
@@ -61,15 +88,17 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
       prompt: userText,
       intent,
       formatPreference: stickyFormatPreference,
-      history: messages.slice(1).filter((message) => !message.isCancelled).slice(-10)
-        .map(({ role, content }) => ({ role, content })),
+      history: buildCleanHistory(messages),
     });
     if (!attempt) return;
     setInputPrompt('');
     setErrorMessage('');
-    setQueueInfo({ status: 'queued', queuePosition: 1 });
+    setQueueInfo({ status: 'queued', queuePosition: 1, workerAvailable: workerStatus.online });
 
-    if (!retry) setMessages([...messages, { role: 'user', content: userText }]);
+    setMessages((prev) => {
+      const base = prev.filter((m) => !m.isCancelled);
+      return retry ? base : [...base, { role: 'user', content: userText }];
+    });
     setStatus('generating');
 
     const partialId = attempt.idempotencyKey;
@@ -269,6 +298,11 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
                 <option value="LAB_TEACHING">Lab Session Guidance</option>
                 {isA05Qualified && <option value="PERSONAL_LEARNING">Personal Learning (A05)</option>}
               </>
+            ) : userRole === 'student' ? (
+              <>
+                <option value="TEACHING">Guided Learning</option>
+                <option value="CIRCUIT_TUTORING">Circuit Tutoring</option>
+              </>
             ) : (
               <>
                 <option value="TEACHING_REVIEW">Teaching Review</option>
@@ -325,7 +359,10 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         {status === 'generating' && (
           <div className="flex items-center gap-2 text-cyan-400 text-xs py-2 px-3 rounded-lg bg-cyan-950/40 border border-cyan-800/40 w-fit">
             <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-            {queueInfo.message || 'Sending request…'}
+            <span>{queueInfo.message || 'Sending request…'}</span>
+            {elapsedSeconds > 0 && (
+              <span className="font-mono text-[10px] text-cyan-300/80">({elapsedSeconds}s)</span>
+            )}
           </div>
         )}
 

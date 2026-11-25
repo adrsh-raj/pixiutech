@@ -552,14 +552,24 @@ class XenWorkerHeartbeat(models.Model):
         if not worker_id:
             return None
         now = timezone.now()
-        hb, _ = cls.objects.update_or_create(
+        hb, created = cls.objects.get_or_create(
             worker_id=worker_id,
             defaults={
                 "last_seen": now,
-                "metadata": metadata or {},
+                "metadata": metadata if isinstance(metadata, dict) else {},
                 "is_active": True,
             },
         )
+        if not created:
+            hb.last_seen = now
+            hb.is_active = True
+            update_fields = ["last_seen", "is_active"]
+            if isinstance(metadata, dict) and metadata:
+                merged = dict(hb.metadata) if isinstance(hb.metadata, dict) else {}
+                merged.update(metadata)
+                hb.metadata = merged
+                update_fields.append("metadata")
+            hb.save(update_fields=update_fields)
         return hb
 
     @classmethod

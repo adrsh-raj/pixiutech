@@ -258,6 +258,7 @@ export async function streamXenChat({
   signal = null,
   idempotencyKey = crypto.randomUUID(),
   timeoutMs = 120000,
+  offlineTimeoutMs = 0,
   onStatusUpdate = null,
   onChunk = null,
   useQueue = true,
@@ -265,6 +266,19 @@ export async function streamXenChat({
   const controller = new AbortController();
   const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let offlineSince = null;
+
+  const formatQueueMessage = (payload) => {
+    const pos = payload?.queue_position || 1;
+    const workerAvail = payload?.worker_available ?? true;
+    if (!workerAvail) {
+      return payload?.lease_expired
+        ? 'GPU worker lease expired · waiting for Kaggle worker reconnect...'
+        : `In queue (position ${pos}) · Kaggle GPU worker offline...`;
+    }
+    if (pos > 1) return `In queue (position ${pos})...`;
+    return 'In queue · 8square preparing response...';
+  };
 
   try {
     onStatusUpdate?.({
@@ -308,12 +322,12 @@ export async function streamXenChat({
         };
       }
 
+      if (queueData.worker_available === false) {
+        offlineSince = Date.now();
+      }
       onStatusUpdate?.({
         status: queueData.status || 'queued',
-        message:
-          queueData.queue_position > 1
-            ? `In queue (position ${queueData.queue_position})...`
-            : 'In queue · 8square preparing response...',
+        message: formatQueueMessage(queueData),
         queuePosition: queueData.queue_position || 1,
         workerAvailable: queueData.worker_available ?? true,
       });
@@ -323,22 +337,47 @@ export async function streamXenChat({
       let attempt;
       let delay = 280;
       let isCompleted = false;
+      let transientErrors = 0;
 
       // Low-latency chunk polling (250-300ms intervals)
       while (!activeSignal.aborted && !isCompleted) {
+        if (offlineTimeoutMs > 0 && offlineSince !== null && Date.now() - offlineSince >= offlineTimeoutMs) {
+          return {
+            success: false,
+            error: {
+              status: 503,
+              code: 'WORKER_OFFLINE',
+              message: 'Kaggle GPU worker is offline.',
+            },
+          };
+        }
         await waitSignal(delay, activeSignal);
         if (activeSignal.aborted) break;
 
-        const chunksRes = await apiFetch(`/xen/jobs/${jobId}/chunks?after=${lastSeq}${attempt == null ? "" : "&attempt=" + attempt}`, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          signal: activeSignal,
-        });
+        let chunksRes;
+        try {
+          chunksRes = await apiFetch(`/xen/jobs/${jobId}/chunks?after=${lastSeq}${attempt == null ? "" : "&attempt=" + attempt}`, {
+            method: 'GET',
+            headers: {
+              Accept: 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            signal: activeSignal,
+          });
+        } catch (pollErr) {
+          if (activeSignal.aborted) break;
+          transientErrors += 1;
+          if (transientErrors > 4) throw pollErr;
+          delay = Math.min(2000, delay + 350);
+          continue;
+        }
 
         if (!chunksRes.ok) {
+          if ([429, 502, 503, 504].includes(chunksRes.status) && transientErrors < 4) {
+            transientErrors += 1;
+            delay = Math.min(2000, delay + 400);
+            continue;
+          }
           if (![404, 405].includes(chunksRes.status)) {
             return { success: false, error: { status: chunksRes.status, code: "POLL_FAILED", message: "Unable to read this response." } };
           }
@@ -351,6 +390,12 @@ export async function streamXenChat({
           });
           if (!pollRes.ok) return { success: false, error: { status: pollRes.status, code: "POLL_FAILED", message: "Unable to read this job." } };
           const jobData = await pollRes.json();
+          transientErrors = 0;
+          if (jobData.worker_available === false) {
+            offlineSince = offlineSince ?? Date.now();
+          } else {
+            offlineSince = null;
+          }
           if (jobData.status === 'completed') {
             const cleanText = sanitizeClientOutput(jobData?.response?.text || '');
             onChunk?.(cleanText, cleanText);
@@ -373,11 +418,23 @@ export async function streamXenChat({
               error: jobData.error || { code: 'INFERENCE_FAILED', message: 'Inference failed on GPU worker.' },
             };
           }
+          onStatusUpdate?.({
+            status: jobData.status || 'queued',
+            message: jobData.status === 'queued' ? formatQueueMessage(jobData) : '8square is thinking...',
+            queuePosition: jobData.queue_position || 0,
+            workerAvailable: jobData.worker_available ?? true,
+          });
           continue;
         }
 
+        transientErrors = 0;
         const data = await chunksRes.json();
         const incomingChunks = Array.isArray(data.chunks) ? data.chunks : [];
+        if (data.worker_available === false) {
+          offlineSince = offlineSince ?? Date.now();
+        } else {
+          offlineSince = null;
+        }
 
         if (attempt != null && data.attempt !== attempt) {
           lastSeq = 0;
@@ -403,12 +460,23 @@ export async function streamXenChat({
             status: 'streaming',
             message: '8square is replying...',
             queuePosition: 0,
+            workerAvailable: data.worker_available ?? true,
           });
         } else if (!lastSeq && (data.status === 'claimed' || data.status === 'running')) {
           onStatusUpdate?.({
-            status: 'running',
-            message: '8square is thinking...',
+            status: data.status === 'claimed' ? 'running' : 'running',
+            message: data.lease_expired && data.worker_available === false
+              ? 'GPU worker lease expired · waiting for recovery...'
+              : '8square is thinking...',
             queuePosition: 0,
+            workerAvailable: data.worker_available ?? true,
+          });
+        } else if (!lastSeq && data.status === 'queued') {
+          onStatusUpdate?.({
+            status: 'queued',
+            message: formatQueueMessage(data),
+            queuePosition: data.queue_position || 1,
+            workerAvailable: data.worker_available ?? true,
           });
         }
 
@@ -425,9 +493,10 @@ export async function streamXenChat({
             usage: data.usage || {},
             deliveryMode: data.delivery_mode || "batch_fallback",
             requestId: data?.request_id || jobId,
-            assistant: '8square',
-            model: 'xen-step-700',
-            intent,
+            assistant: data?.assistant || '8square',
+            model: data?.model || 'xen-step-700',
+            intent: data?.intent || intent,
+            workerAvailable: data?.worker_available ?? true,
             response: {
               ...(data?.response || {}),
               text: cleanText,

@@ -88,6 +88,7 @@ export interface CircuitCopilotChatProps {
   lessonContext?: LessonContextData | null
   isOpen?: boolean
   onToggleOpen?: () => void
+  offlineTimeoutMs?: number
   [key: string]: unknown
 }
 
@@ -118,6 +119,7 @@ export function CircuitCopilotChat({
   lessonContext = null,
   isOpen: externalIsOpen,
   onToggleOpen: externalOnToggleOpen,
+  offlineTimeoutMs = 4000,
 }: CircuitCopilotChatProps) {
   const [internalIsOpen, setInternalIsOpen] = useState(false)
   const isOpen = externalIsOpen ?? internalIsOpen
@@ -305,11 +307,13 @@ export function CircuitCopilotChat({
         health_score: healthScore,
       },
       blockly: {
-        blocks: Array.from(new DOMParser().parseFromString(currentBlocklyXml, "application/xml").querySelectorAll("block"))
-          .slice(0, 20).map(block => {
-            const pin = block.querySelector(':scope > field[name="PIN"]')?.textContent
-            return [block.getAttribute("type"), pin].filter(Boolean).join(" ")
-          }),
+        blocks: typeof DOMParser !== "undefined" && currentBlocklyXml
+          ? Array.from(new DOMParser().parseFromString(currentBlocklyXml, "application/xml").querySelectorAll("block"))
+              .slice(0, 20).map(block => {
+                const pin = block.querySelector(':scope > field[name="PIN"]')?.textContent
+                return [block.getAttribute("type"), pin].filter(Boolean).join(" ")
+              })
+          : [],
         has_code: Boolean(currentBlocklyXml && currentBlocklyXml.length > 40),
         summary: currentBlocklyXml ? "Blockly blocks placed on workspace" : "No code blocks placed",
       },
@@ -364,6 +368,7 @@ export function CircuitCopilotChat({
 
       const contextEnvelope = buildContextEnvelope()
       let streamSucceeded = false
+      let fallbackReason = "GPU response unavailable"
 
       try {
         const streamResult = await streamXenChat({
@@ -371,11 +376,14 @@ export function CircuitCopilotChat({
           prompt: query,
           intent: userRole?.toLowerCase() === "admin" ? "TEACHING_REVIEW" : isLessonKickoff ? "LAB_TEACHING" : "TEACHING",
           contextEnvelope,
+          offlineTimeoutMs,
           history: messages.filter(m => m.id !== "welcome_1" && !m.isStreaming && m.text)
             .slice(-6).map(m => ({ role: m.role, content: m.text.slice(0, 1000) })),
           idempotencyKey: isLessonKickoff ? lessonContext?.launchId : undefined,
           onStatusUpdate: (info) => {
-            if (info.status === "queued") {
+            if (info.workerAvailable === false) {
+              setStreamingStatus("GPU worker offline — switching to local diagnosis...")
+            } else if (info.status === "queued") {
               setStreamingStatus(`8square queued (position ${info.queuePosition || 1})...`)
             } else if (info.status === "running") {
               setStreamingStatus("8square is thinking...")
@@ -407,6 +415,8 @@ export function CircuitCopilotChat({
                 : m
             )
           )
+        } else if (streamResult?.error?.code === "WORKER_OFFLINE") {
+          fallbackReason = "GPU worker offline"
         }
       } catch {
         // Fallback gracefully to local Circuit Intelligence engine
@@ -431,7 +441,7 @@ export function CircuitCopilotChat({
             m.id === streamMsgId
               ? {
                   ...m,
-                  text: "Local circuit guidance (GPU response unavailable)\n\n" + fallbackText,
+                  text: `Local circuit guidance (${fallbackReason})\n\n` + fallbackText,
                   isStreaming: false,
                 }
               : m
@@ -443,7 +453,7 @@ export function CircuitCopilotChat({
       setIsDiagnosing(false)
       setStreamingStatus(null)
     },
-    [userRole, revision, circuitContext, onHighlightParts, buildContextEnvelope, lessonContext, messages]
+    [userRole, revision, circuitContext, onHighlightParts, buildContextEnvelope, lessonContext, messages, offlineTimeoutMs]
   )
 
   // Lesson-aware auto-tutoring effect (idempotent against StrictMode)
@@ -843,6 +853,13 @@ export function CircuitCopilotChat({
                         </div>
                       )}
 
+                      {/* Stale Revision Notice */}
+                      {!msg.applied && msg.baseRevisionHash !== revision && (
+                        <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-2.5 py-1 text-[10px] text-amber-300">
+                          Canvas changed since this diagnosis — ask 8square again to refresh this repair.
+                        </p>
+                      )}
+
                       {/* Action Buttons: Apply Fix & Undo */}
                       <div className="flex items-center gap-2 pt-1">
                         {!msg.applied ? (
@@ -851,7 +868,7 @@ export function CircuitCopilotChat({
                             disabled={msg.baseRevisionHash !== revision}
                             title={msg.baseRevisionHash !== revision ? "Circuit changed. Request a fresh diagnosis." : undefined}
                             onClick={() => handleApplyFix(msg.id, msg.proposal!, msg.baseRevisionHash!)}
-                            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-cyan-900/30 hover:bg-cyan-500 transition"
+                            className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-cyan-900/30 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-cyan-600 transition"
                           >
                             <CheckCircle2 size={13} />
                             <span>Apply Fix to Canvas</span>
