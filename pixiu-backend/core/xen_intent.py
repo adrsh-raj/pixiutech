@@ -292,12 +292,22 @@ CYBERLAB_GROUNDING_DIRECTIVE = (
     "Distinguish simulator-computed values from hardware measurements.\n"
     "Do not claim access to the user's full desktop, browser tabs, webcam or operating system.\n"
     "Do not invent visual observations. Structured circuit data is not the same as a pixel screenshot.\n"
-    "If the user asks 'Can you see my screen?': Explain truthfully: 'I can inspect the live circuit and simulator data that CyberLab shares with me. I cannot inspect your entire desktop or other browser tabs.' Then inspect the circuit context and answer the actual circuit question.\n"
-    "If context is missing or partial, explicitly identify what data you did receive and what specific missing information prevents a reliable diagnosis."
+    "If the user asks 'Can you see my screen?': Explain truthfully: 'I can inspect the live circuit and simulator data that CyberLab shares with me. I cannot inspect your entire desktop or other browser tabs.' Then inspect the circuit context and answer the actual circuit question."
 )
 
 CYBERLAB_GROUNDING_DIRECTIVE_COMPACT = (
     "You are 8square in Pixiu CyberLab. Inspect active virtual circuit components, board, pin connections, and simulator data in mission context before answering. Do not claim you cannot see the circuit."
+)
+
+CYBERLAB_EMPTY_CANVAS_DIRECTIVE = (
+    "You are 8square, embedded inside Pixiu CyberLab. The student is asking about their circuit, but the active workspace canvas currently has 0 components and 0 wires connected to the board.\n"
+    "Explain truthfully and clearly that the canvas is currently empty with no components or wires placed on the breadboard.\n"
+    "Guide the student on which specific components to add from the catalogue (e.g. place an LED and a 220-ohm resistor on the canvas) so you can inspect and troubleshoot the circuit.\n"
+    "Do NOT claim that circuit context was not shared or that there is an inspection error. Explicitly state that the canvas is currently empty."
+)
+
+CYBERLAB_EMPTY_CANVAS_DIRECTIVE_COMPACT = (
+    "You are 8square in Pixiu CyberLab. The student asks about their circuit, but the canvas has 0 components and 0 wires. Explain that the canvas is currently empty and guide them on what components to add."
 )
 
 
@@ -307,6 +317,7 @@ def get_cyberlab_grounding_directive(
 ) -> str:
     """
     Returns the CYBERLAB_GROUNDING_DIRECTIVE when valid circuit context is present in envelope.
+    Distinguishes an empty canvas (0 parts, 0 wires) from an populated circuit with live components.
     """
     if not isinstance(envelope, dict):
         return ""
@@ -322,8 +333,137 @@ def get_cyberlab_grounding_directive(
     )
     if not has_data:
         return ""
+
+    parts = circuit.get("parts") or []
+    wires = circuit.get("wires") or []
+    parts_count = circuit.get("parts_count", len(parts))
+    wires_count = circuit.get("wires_count", len(wires))
+
+    # If canvas is completely empty (no parts and no wires)
+    if parts_count == 0 and wires_count == 0:
+        content = CYBERLAB_EMPTY_CANVAS_DIRECTIVE_COMPACT if compact else CYBERLAB_EMPTY_CANVAS_DIRECTIVE
+        return f"[CYBERLAB GROUNDING DIRECTIVE:\n{content}]"
+
     content = CYBERLAB_GROUNDING_DIRECTIVE_COMPACT if compact else CYBERLAB_GROUNDING_DIRECTIVE
     return f"[CYBERLAB GROUNDING DIRECTIVE:\n{content}]"
+
+
+# General academic / STEM / Physics / Chemistry / Math keywords and patterns
+_ACADEMIC_STEM_PATTERNS = re.compile(
+    r"\b("
+    # Kinetic / Potential / Mechanical / Energy with typos and Hinglish
+    r"k[ie]n[eai]t[ie]c\s*(?:energy|enerfy|urja)?"
+    r"|kitnetic\s*(?:energy|enerfy|urja)?"
+    r"|kenetic\s*(?:energy|enerfy|urja)?"
+    r"|knetic\s*(?:energy|enerfy|urja)?"
+    r"|kintik\s*(?:energy|enerfy|urja)?"
+    r"|enerf[yi]"
+    r"|gatij\s*(?:urja)?"
+    r"|sthitij\s*(?:urja)?"
+    r"|poten[ct]ial\s*energy"
+    # Physics laws and mechanics
+    r"|newton'?s?\s*(?:first|second|third|1st|2nd|3rd|\w+)?\s*(?:law|niyam)?"
+    r"|laws?\s+of\s+motion"
+    r"|momentum|accelerat[ie]on|velocit[ye]|gravit[ye]|gravitat[ie]on|inertia|friction"
+    r"|thermodynamic|entropy|speed\s+of\s+light|relativit[ye]"
+    r"|work\s+done|conservation\s+of\s+energy"
+    # Chemistry / Biology / Math
+    r"|photosynthesis|mitochondria|chemical\s+equation|periodic\s+table"
+    r"|pythagor(?:as|ean)|trigonometr|calculus|derivative|integral|quadratic\s+equation"
+    r")\b",
+    re.IGNORECASE,
+)
+
+# Explicit circuit hardware, components, pins, wiring, and canvas tokens
+_CIRCUIT_HARDWARE_PATTERNS = re.compile(
+    r"\b("
+    # Canvas / Screen / Inspection
+    r"circuit"
+    r"|on\s+(?:the\s+)?canvas|in\s+(?:the\s+)?canvas|workspace"
+    r"|see\s+my\s+screen|screen"
+    r"|circuit\s+doctor|simulator|simulation"
+    # Specific components
+    r"|led\d*|resistor\d*|resister\d*|registor\d*|capacitor\d*|buzzer\d*|buzer\d*"
+    r"|servo\d*|motor\d*|relay\d*|potentiometer\d*|pot\d*|ldr\d*|sensor\d*"
+    r"|pushbutton\d*|switch\d*|diode\d*|breadboard|neopixel|ultrasonic"
+    r"|arduino|esp32|pico|microbit"
+    # Pins, rails, terminals
+    r"|pin\s*[a-d]?\d+|[ad]\d{1,2}\s+pin|pin\b"
+    r"|anode|cathode|gpio\d*|pwm|gnd|ground|vcc|5v|3v3|3\.3v|vin|vsys"
+    # Wiring and connections
+    r"|wire\d*|wires|wiring|taar|wireing"
+    r"|connect(?:ed|ing|ion)?|disconnect(?:ed|ing)?|short\s*circuit|open\s*circuit"
+    # Component behaviors / fault states
+    r"|glow(?:ing)?|jal(?:o)?|blink(?:ing)?|burnout|burned|fused"
+    # Code keywords tied to pins/hardware
+    r"|pinmode|digitalwrite|digitalread|analogwrite|analogread"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def is_circuit_specific_query(
+    prompt: str,
+    history: Optional[List[Dict[str, Any]]] = None,
+) -> bool:
+    """
+    Query-sensitive context router:
+    Returns True if the user question is specifically about the virtual circuit,
+    hardware components, pins, wiring, canvas inspection, or simulation.
+    Returns False for general educational questions (Physics formulas, Newton's laws,
+    definitions, mathematics, biology, chemistry) even if asked inside CyberLab.
+    """
+    if not prompt or not isinstance(prompt, str):
+        return False
+    cleaned = prompt.strip()
+    if not cleaned:
+        return False
+
+    has_hardware_tokens = bool(_CIRCUIT_HARDWARE_PATTERNS.search(cleaned))
+    has_academic_tokens = bool(_ACADEMIC_STEM_PATTERNS.search(cleaned))
+
+    # Explicit general educational indicators (e.g. "BHAI KINETIC ENERFY AK FORMULA", "KITNETIC ENERGY")
+    if has_academic_tokens:
+        # If it asks for an academic concept/formula and does NOT explicitly ask about "my circuit", pins, or wires:
+        # e.g., "kinetic energy formula" vs "why is led in my circuit not glowing"
+        if not re.search(r"\b(my\s+circuit|mera\s+circuit|on\s+canvas|this\s+circuit|why\s+is\s+my|pin\s*[a-d]?\d+|d\d+|wire|gnd)\b", cleaned, re.IGNORECASE):
+            return False
+
+    # Explicit circuit / hardware question
+    if has_hardware_tokens:
+        return True
+
+    # Multi-turn context resolution:
+    # If the current prompt is a short follow-up or affirmative ("what is m?", "units kya hai", "how to fix it", "kar do")
+    if history and isinstance(history, list):
+        last_asst_content = ""
+        for turn in reversed(history):
+            if isinstance(turn, dict) and turn.get("role") == "assistant":
+                content = turn.get("content") or ""
+                if content.strip():
+                    last_asst_content = content.strip().lower()
+                    break
+
+        if last_asst_content:
+            # If the previous assistant message was diagnosing circuit faults (cathode, GND, wiring, pin, etc.)
+            last_was_circuit = any(k in last_asst_content for k in [
+                "circuit", "diagnos", "fault", "wiring", "cathode", "anode", "gnd", "pin", "wire", "breadboard", "resistor", "led1", "circuit doctor", "wiring mistake"
+            ])
+            # If the previous assistant message was explaining a general physics/math formula (kinetic energy, newton, etc.)
+            last_was_academic = any(k in last_asst_content for k in [
+                "kinetic energy", "velocity", "potential energy", "newton", "acceleration", "joule"
+            ])
+
+            if last_was_circuit and not last_was_academic:
+                # Follow up to circuit diagnosis
+                if len(cleaned.split()) <= 8:
+                    return True
+            elif last_was_academic:
+                # Follow up to academic formula (e.g. "what is m here?", "units?")
+                return False
+
+    # Default fallback: If no explicit circuit hardware is mentioned, do not assume circuit intent
+    return False
 
 
 _AFFIRMATIVE_PROMPT_PATTERNS = re.compile(
@@ -881,9 +1021,10 @@ def build_xen_effective_prompt(
     Enforces that the combined effective prompt strictly stays <= max_chars.
     """
     max_limit = max(100, int(max_chars))
+    is_circuit_query = is_circuit_specific_query(prompt, history)
     affirmative_directive = resolve_affirmative_action(prompt, history)
     has_circuit = bool(context_envelope and context_envelope.get("circuit"))
-    grounding_directive = get_cyberlab_grounding_directive(context_envelope) if has_circuit else ""
+    grounding_directive = get_cyberlab_grounding_directive(context_envelope) if (has_circuit and is_circuit_query) else ""
 
     # Mode directive budgeting
     effective_mode_directive = mode_directive or get_additive_mode_instruction(format_mode)
@@ -918,9 +1059,19 @@ def build_xen_effective_prompt(
     grounding_overhead = (len(effective_grounding) + 2) if effective_grounding else 0
     total_non_context_overhead = base_overhead + grounding_overhead
 
-    # Budget remaining characters for context envelope
+    # Budget remaining characters for context envelope:
+    # Only include circuit context if this is a circuit-specific query!
     max_context_body = max_limit - total_non_context_overhead - 94
-    context_prefix = format_context_envelope(context_envelope, max_chars=max_context_body) if max_context_body >= 40 else ""
+    if is_circuit_query:
+        context_prefix = format_context_envelope(context_envelope, max_chars=max_context_body) if max_context_body >= 40 else ""
+    else:
+        # For general educational questions, do NOT inject circuit data!
+        # If envelope has lesson info without circuit, we can format it, but drop the circuit object
+        if context_envelope and any(k for k in context_envelope if k != "circuit"):
+            non_circuit_envelope = {k: v for k, v in context_envelope.items() if k != "circuit"}
+            context_prefix = format_context_envelope(non_circuit_envelope, max_chars=max_context_body) if max_context_body >= 40 else ""
+        else:
+            context_prefix = ""
 
     # Assemble parts
     parts = []

@@ -51,6 +51,7 @@ import {
 import { CATALOG } from "@/lib/components-catalog"
 import { getBoardDefinition } from "@/lib/board-registry"
 import { detectAffirmativeContinuation } from "@/lib/ai/xen/affirmative-detector.js"
+import { isCircuitSpecificQuery } from "@/lib/ai/xen/circuit-query-classifier.js"
 import { splitXenResponse } from "@/lib/ai/xen/xen-sanitizer.js"
 import { XenMarkdown } from "../xen/XenMarkdown.jsx"
 import { streamXenChat } from "@/lib/ai/xen/xen-client.js"
@@ -558,11 +559,14 @@ export function CircuitCopilotChat({
       }
 
       const streamMsgId = `asst_${Date.now()}`
-      setStreamingStatus("8square is analyzing circuit & preparing guidance...")
+      const isCircuitQuery = isCircuitSpecificQuery(query, messages)
+      setStreamingStatus(isCircuitQuery ? "8square is analyzing circuit & preparing guidance..." : "8square is thinking...")
 
-      // Pre-calculate simulator-in-the-loop repair proposal
-      const localResult = processCircuitCopilotQuery(query, circuitContext)
-      if (localResult.highlightPartIds.length > 0 && onHighlightParts) {
+      // Pre-calculate simulator-in-the-loop repair proposal only for circuit-specific queries
+      const localResult = isCircuitQuery
+        ? processCircuitCopilotQuery(query, circuitContext)
+        : { reply: "", highlightPartIds: [], proposal: undefined, verification: undefined }
+      if (localResult.highlightPartIds && localResult.highlightPartIds.length > 0 && onHighlightParts) {
         onHighlightParts(localResult.highlightPartIds)
       }
 
@@ -583,7 +587,7 @@ export function CircuitCopilotChat({
         },
       ])
 
-      const contextEnvelope = buildContextEnvelope(affirmativeAction)
+      const contextEnvelope = isCircuitQuery ? buildContextEnvelope(affirmativeAction) : null
       let streamSucceeded = false
       let fallbackReason = "GPU response unavailable"
 
@@ -643,7 +647,15 @@ export function CircuitCopilotChat({
       // If streaming didn't return text, use local pedagogical reply
       if (!streamSucceeded) {
         let fallbackText = localResult.reply
-        if (affirmativeAction?.detected) {
+        if (!isCircuitQuery) {
+          if (/kinetic|enerf|kitnetic/i.test(query)) {
+            fallbackText = "**Kinetic Energy**\n\n$$\\mathrm{KE} = \\frac{1}{2}mv^2$$\n\nwhere:\n- $m$ = mass of the object\n- $v$ = velocity of the object"
+          } else if (/newton/i.test(query)) {
+            fallbackText = "**Newton's Second Law of Motion**\n\n$$\\vec{F} = m\\vec{a}$$\n\nwhere:\n- $\\vec{F}$ is net force applied\n- $m$ is mass of the object\n- $\\vec{a}$ is acceleration produced"
+          } else {
+            fallbackText = "I am ready to assist you with Physics, STEM concepts, formulas, or your CyberLab circuit."
+          }
+        } else if (affirmativeAction?.detected) {
           if (affirmativeAction.actionType === "latex_formatting") {
             fallbackText = "Here is the mathematical formula in LaTeX:\n\n$$V = I \\times R$$\n\nWhere:\n- $V$ is Voltage (Volts, $\\text{V}$)\n- $I$ is Current (Amperes, $\\text{A}$)\n- $R$ is Resistance (Ohms, $\\Omega$)"
           } else if (affirmativeAction.actionType === "circuit_diagnosis") {
@@ -661,12 +673,13 @@ export function CircuitCopilotChat({
               : "Let's inspect your breadboard and start wiring!")
         }
 
+        const finalText = isCircuitQuery ? `Local circuit guidance (${fallbackReason})\n\n${fallbackText}` : fallbackText
         setMessages((prev) =>
           prev.map((m) =>
             m.id === streamMsgId
               ? {
                   ...m,
-                  text: `Local circuit guidance (${fallbackReason})\n\n` + fallbackText,
+                  text: finalText,
                   isStreaming: false,
                 }
               : m

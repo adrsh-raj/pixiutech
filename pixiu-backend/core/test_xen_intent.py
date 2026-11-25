@@ -521,6 +521,106 @@ class ExpandedContextEnvelopeAndDirectivesTests(unittest.TestCase):
         self.assertIn("[MISSION CONTEXT]", effective)
         self.assertIn(prompt, effective)
 
+    def test_query_sensitive_circuit_context_routing(self):
+        """
+        Regression tests for query-sensitive context routing:
+        General educational questions (Physics formulas, Newton's laws, definitions) must NEVER
+        receive CyberLab circuit-grounding directives or circuit context envelopes, even if asked in CyberLab.
+        Circuit-specific queries (LED, pins, wiring, simulation, screen) must receive full grounding.
+        """
+        from core.xen_intent import (
+            is_circuit_specific_query,
+            build_xen_effective_prompt,
+            XenResponseMode,
+        )
+
+        # 1. "BHAI KINETIC ENERFY AK FORMULA"
+        self.assertFalse(is_circuit_specific_query("BHAI KINETIC ENERFY AK FORMULA"))
+
+        # 2. "KITNETIC ENERGY"
+        self.assertFalse(is_circuit_specific_query("KITNETIC ENERGY"))
+
+        # 3. "What is kinetic energy?"
+        self.assertFalse(is_circuit_specific_query("What is kinetic energy?"))
+
+        # 4. "Explain Newton's second law."
+        self.assertFalse(is_circuit_specific_query("Explain Newton's second law."))
+
+        # 5. "Why is my LED not glowing?"
+        self.assertTrue(is_circuit_specific_query("Why is my LED not glowing?"))
+
+        # 6. "Can you inspect my screen and circuit?"
+        self.assertTrue(is_circuit_specific_query("Can you inspect my screen and circuit?"))
+
+        # 7. "Arduino D13 pin is not working."
+        self.assertTrue(is_circuit_specific_query("Arduino D13 pin is not working."))
+        self.assertTrue(is_circuit_specific_query("Why is Arduino pin D13 not working?"))
+
+        # 8. Multi-turn: ask a Physics question, then send a short follow-up
+        physics_history = [
+            {"role": "user", "content": "BHAI KINETIC ENERFY AK FORMULA"},
+            {"role": "assistant", "content": "**Kinetic Energy**\n\n$$KE = \\frac{1}{2}mv^2$$\n\nwhere $m$ is mass and $v$ is velocity."},
+        ]
+        self.assertFalse(is_circuit_specific_query("what is m here?", physics_history))
+        self.assertFalse(is_circuit_specific_query("units kya hai bhai", physics_history))
+
+        # Multi-turn circuit follow-up
+        circuit_history = [
+            {"role": "user", "content": "Why is my LED not glowing?"},
+            {"role": "assistant", "content": "The cathode (-) of led1 is not connected to Arduino GND."},
+        ]
+        self.assertTrue(is_circuit_specific_query("how to fix it", circuit_history))
+
+        # Test effective prompt generation for general Physics vs Circuit
+        envelope = {
+            "circuit": {
+                "board": {"id": "arduino-uno", "name": "Arduino Uno R3"},
+                "parts": [{"id": "led1", "type": "led", "props": {"color": "red"}}],
+                "wires": [{"from": "5v", "to": "led1:anode"}],
+                "parts_count": 1,
+                "wires_count": 1,
+            }
+        }
+
+        # Physics question must have ZERO grounding directive and ZERO circuit context
+        eff_physics = build_xen_effective_prompt(
+            prompt="BHAI KINETIC ENERFY AK FORMULA",
+            format_mode=XenResponseMode.DEFAULT_EDUCATIONAL,
+            context_envelope=envelope,
+        )
+        self.assertNotIn("CYBERLAB GROUNDING", eff_physics)
+        self.assertNotIn("MISSION CONTEXT", eff_physics)
+        self.assertNotIn("led1", eff_physics)
+        self.assertIn("BHAI KINETIC ENERFY AK FORMULA", eff_physics)
+
+        # Circuit question must receive full grounding and circuit context
+        eff_circuit = build_xen_effective_prompt(
+            prompt="Why is my LED not glowing?",
+            format_mode=XenResponseMode.DEFAULT_EDUCATIONAL,
+            context_envelope=envelope,
+        )
+        self.assertIn("CYBERLAB GROUNDING", eff_circuit)
+        self.assertIn("MISSION CONTEXT", eff_circuit)
+        self.assertIn("led1", eff_circuit)
+
+        # Empty canvas circuit question must truthfully report 0 components and 0 wires
+        empty_envelope = {
+            "circuit": {
+                "board": {"id": "arduino-uno", "name": "Arduino Uno R3"},
+                "parts": [],
+                "wires": [],
+                "parts_count": 0,
+                "wires_count": 0,
+            }
+        }
+        eff_empty = build_xen_effective_prompt(
+            prompt="Why is my LED not glowing?",
+            format_mode=XenResponseMode.DEFAULT_EDUCATIONAL,
+            context_envelope=empty_envelope,
+        )
+        self.assertIn("CYBERLAB GROUNDING", eff_empty)
+        self.assertIn("canvas currently has 0 components and 0 wires", eff_empty)
+
 
 if __name__ == "__main__":
     unittest.main()
