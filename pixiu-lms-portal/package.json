@@ -27,17 +27,22 @@
     "audit:copilot-dataset": "node ../scripts/copilot-dataset/split-by-family.mjs"
   },
   "dependencies": {
+    "@mediapipe/face_mesh": "0.4.1633559619",
+    "@mediapipe/hands": "0.4.1675469240",
     "@tailwindcss/vite": "^4.3.3",
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
     "blockly": "^13.2.1",
+    "katex": "^0.19.1",
     "lucide-react": "^1.37.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
     "recharts": "^3.10.1",
-    "@mediapipe/face_mesh": "0.4.1633559619",
-    "@mediapipe/hands": "0.4.1675469240"
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.18",

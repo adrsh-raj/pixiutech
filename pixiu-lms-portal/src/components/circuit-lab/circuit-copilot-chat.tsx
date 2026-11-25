@@ -48,7 +48,11 @@ import {
   type SimulatorVerificationResult,
   type CircuitDiagnosisContext,
 } from "@/lib/circuit-intelligence"
+import { CATALOG } from "@/lib/components-catalog"
+import { getBoardDefinition } from "@/lib/board-registry"
+import { detectAffirmativeContinuation } from "@/lib/ai/xen/affirmative-detector.js"
 import { splitXenResponse } from "@/lib/ai/xen/xen-sanitizer.js"
+import { XenMarkdown } from "../xen/XenMarkdown.jsx"
 import { streamXenChat } from "@/lib/ai/xen/xen-client.js"
 
 import { loadLessonProgress, type Lesson } from "@/lib/lesson-engine"
@@ -268,9 +272,149 @@ export function CircuitCopilotChat({
   const hasWarning = circuitContext.healthReport.warningCount > 0
 
   // Build context envelope for prompt grounding
-  const buildContextEnvelope = useCallback(() => {
+  const buildContextEnvelope = useCallback((affirmativeAction?: ReturnType<typeof detectAffirmativeContinuation>) => {
     const progress = lessonContext?.progressScope ? loadLessonProgress(lessonContext.progressScope)[lessonContext.id] : undefined
     const checkpoint = progress ? lessonContext?.steps?.find(step => !progress.completedStepIds.includes(step.id)) : lessonContext?.checkpoint
+
+    const boardDef = activeBoard ? getBoardDefinition(activeBoard) : undefined
+    const boardId = activeBoard || boardDef?.id || circuitContext.board?.id || "arduino-uno"
+    const boardName = boardDef?.name || circuitContext.board?.name || "Arduino Uno R3"
+    const logicVoltage = boardDef?.logicVoltage ?? circuitContext.board?.logicVoltage ?? 5.0
+
+    const powerPins = boardDef?.powerPins || {
+      v5: ["5v"],
+      v33: ["3v3"],
+      gnd: ["gnd", "gnd_pwr"],
+      vin: ["vin"],
+    }
+    const powerPinIds = [
+      ...(powerPins.v5 || []),
+      ...(powerPins.v33 || []),
+      ...(powerPins.vin || []),
+    ]
+    const groundPinIds = powerPins.gnd || ["gnd", "gnd_pwr"]
+
+    // Components (Parts) with human-readable names and safe properties
+    const components = currentCircuit.parts.slice(0, 48).map((part) => {
+      const catItem = CATALOG[part.type as keyof typeof CATALOG]
+      const safeProps: Record<string, string | number> = {}
+      if (part.props) {
+        for (const [key, val] of Object.entries(part.props)) {
+          if (["resistance", "color", "unit", "value", "capacitance", "voltage", "label"].includes(key) && val !== undefined) {
+            safeProps[key] = val
+          }
+        }
+      }
+      return {
+        id: part.id,
+        instanceId: part.id,
+        type: part.type,
+        name: catItem?.name || part.type,
+        props: safeProps,
+        pins: (catItem?.pins || []).map((p) => ({
+          id: p.id,
+          label: p.label,
+          kind: p.kind,
+        })),
+      }
+    })
+
+    // Connections (Wires) with net and pin labels
+    const connections = currentCircuit.wires.slice(0, 48).map((wire, idx) => {
+      const fromPart = currentCircuit.parts.find((p) => p.id === wire.from.partId)
+      const fromCat = fromPart ? CATALOG[fromPart.type as keyof typeof CATALOG] : undefined
+      const fromPin = fromCat?.pins?.find((p) => p.id === wire.from.pinId)
+      const fromLabel = fromPin?.label || wire.from.pinId
+
+      const toPart = currentCircuit.parts.find((p) => p.id === wire.to.partId)
+      const toCat = toPart ? CATALOG[toPart.type as keyof typeof CATALOG] : undefined
+      const toPin = toCat?.pins?.find((p) => p.id === wire.to.pinId)
+      const toLabel = toPin?.label || wire.to.pinId
+
+      const fromKey = `${wire.from.partId}:${wire.from.pinId}`
+      const toKey = `${wire.to.partId}:${wire.to.pinId}`
+      const matchedNet = circuitContext.nets.find(
+        (n) => n.pinKeys.includes(fromKey) || n.pinKeys.includes(toKey)
+      )
+
+      return {
+        id: wire.id || `wire_${idx}`,
+        wireId: wire.id || `wire_${idx}`,
+        from: {
+          partId: wire.from.partId,
+          pinId: wire.from.pinId,
+          label: fromLabel,
+        },
+        to: {
+          partId: wire.to.partId,
+          pinId: wire.to.pinId,
+          label: toLabel,
+        },
+        netId: matchedNet?.id ?? null,
+        electricalNetId: matchedNet?.id ?? null,
+        netNominalVoltage: matchedNet?.nominalVoltage ?? null,
+        nominalVoltage: matchedNet?.nominalVoltage ?? null,
+      }
+    })
+
+    // Pin states summary
+    const pinStatesSummary = Object.entries(pinStates || {}).slice(0, 32).reduce<Record<string, unknown>>((acc, [pin, pState]) => {
+      acc[pin] = {
+        state: pState.state,
+        outputMode: pState.outputMode || "digital",
+        value: pState.value,
+        angle: pState.angle,
+        toneHz: pState.toneHz,
+      }
+      return acc
+    }, {})
+
+    // Component runtime state
+    const componentRuntimeState = Object.entries(runtime || {}).slice(0, 32).reduce<Record<string, unknown>>((acc, [partId, r]) => {
+      acc[partId] = {
+        level: r.level,
+        angle: r.angle,
+        burnt: r.burnt,
+        currentMa: r.currentMa,
+        warning: r.warning,
+      }
+      return acc
+    }, {})
+
+    // Multimeter and oscilloscope simulated readings
+    const simulatedReadings = (circuitContext.measurements || []).map((m) => ({
+      instrument: m.instrument,
+      value: m.value,
+      unit: m.unit,
+      probeA: m.probeA,
+      probeB: m.probeB,
+      mode: m.mode,
+      source: "simulated" as const,
+    }))
+
+    // Health report
+    const healthReport = {
+      score: circuitContext.healthReport.score,
+      criticalCount: circuitContext.healthReport.criticalCount,
+      warningCount: circuitContext.healthReport.warningCount,
+      issues: (circuitContext.healthReport.issues || []).map((issue) => ({
+        ruleId: issue.id,
+        severity: issue.severity,
+        title: issue.title,
+        message: issue.message,
+      })),
+    }
+
+    // Code: blockly block types and pin bindings
+    const blockTypes = typeof DOMParser !== "undefined" && currentBlocklyXml
+      ? Array.from(new DOMParser().parseFromString(currentBlocklyXml, "application/xml").querySelectorAll("block"))
+          .slice(0, 30)
+          .map((block) => block.getAttribute("type"))
+          .filter((t): t is string => Boolean(t))
+      : []
+
+    const blocklyPinBindings = circuitContext.code.pinBindings || []
+
     return {
       lesson: lessonContext
         ? {
@@ -282,43 +426,112 @@ export function CircuitCopilotChat({
             concepts: lessonContext.concepts || [],
             active_step: checkpoint,
             completed_step_ids: progress?.completedStepIds || [],
-            steps: lessonContext.steps?.map(step => step.title),
+            steps: lessonContext.steps?.map((step) => step.title),
             target_board: lessonContext.board,
-            starter_parts: lessonContext.seedCircuit?.parts.map(part => part.type),
-            required_parts: lessonContext.steps?.flatMap(step =>
-              (step.checks || []).flatMap(check => check.kind === "parts" ? check.requirements.map(r => r.count + " " + r.type) : [])),
-
+            starter_parts: lessonContext.seedCircuit?.parts.map((part) => part.type),
+            required_parts: lessonContext.steps?.flatMap((step) =>
+              (step.checks || []).flatMap((check) =>
+                check.kind === "parts" ? check.requirements.map((r) => r.count + " " + r.type) : []
+              )
+            ),
             final_goal: lessonContext.finalGoal || "",
           }
         : undefined,
       circuit: {
-        revision,
-        board: activeBoard,
-        running,
-        readings: circuitContext.measurements.map(({ instrument, state, value, unit, probeA, probeB }) =>
-          state === "available" ? { instrument, source:"simulated", value, unit, probeA, probeB } : { instrument, source:"unknown" }),
-        parts: currentCircuit.parts.slice(0, 32).map(({ id, type }) => ({ id, type })),
-        wires: currentCircuit.wires.slice(0, 32).map(({ from, to }) => ({ from, to })),
+        // Board
+        board: {
+          id: boardId,
+          name: boardName,
+          logicVoltage,
+          logic_voltage: logicVoltage,
+          powerPins,
+          power_pins: powerPins,
+          powerPinIds,
+          power_pin_ids: powerPinIds,
+          groundPinIds,
+          ground_pin_ids: groundPinIds,
+        },
+
+        // Components
+        components,
+        parts: currentCircuit.parts.slice(0, 32).map(({ id, type, props }) => {
+          const cat = CATALOG[type as keyof typeof CATALOG]
+          const safeProps: Record<string, string | number> = {}
+          if (props) {
+            for (const [k, v] of Object.entries(props)) {
+              if (["resistance", "color", "unit", "value", "capacitance", "voltage", "label"].includes(k) && v !== undefined) {
+                safeProps[k] = v
+              }
+            }
+          }
+          return {
+            id,
+            type,
+            name: cat?.name || type,
+            props: safeProps,
+            pins: (cat?.pins || []).map((p) => ({ id: p.id, label: p.label })),
+          }
+        }),
         parts_count: currentCircuit.parts.length,
+
+        // Connections
+        connections,
+        wires: currentCircuit.wires.slice(0, 32).map(({ from, to }) => ({ from, to })),
         wires_count: currentCircuit.wires.length,
         summary: `${currentCircuit.parts.length} components, ${currentCircuit.wires.length} wires`,
-        issues: circuitContext.healthReport.issues.map(issue => issue.title).slice(0, 6).join("; "),
+
+        // Simulation
+        simulation: {
+          running,
+          pinStates: pinStatesSummary,
+          pinStatesSummary,
+          componentRuntime: componentRuntimeState,
+          component_runtime: componentRuntimeState,
+          readings: simulatedReadings,
+          healthReport,
+        },
+        running,
+        readings: simulatedReadings,
+        issues: circuitContext.healthReport.issues.map((issue) => issue.title).slice(0, 6).join("; "),
         source: "static circuit checks",
-        health_score: healthScore,
+        health_score: healthReport.score,
+
+        // Code
+        code: {
+          blocks: blockTypes,
+          block_types: blockTypes,
+          blockTypes,
+          pinBindings: blocklyPinBindings,
+          pin_bindings: blocklyPinBindings,
+        },
+
+        // Metadata
+        metadata: {
+          revision,
+          timestamp: Date.now(),
+          partial: false,
+        },
+        revision,
+        timestamp: Date.now(),
+        partial: false,
       },
       blockly: {
         blocks: typeof DOMParser !== "undefined" && currentBlocklyXml
           ? Array.from(new DOMParser().parseFromString(currentBlocklyXml, "application/xml").querySelectorAll("block"))
-              .slice(0, 20).map(block => {
+              .slice(0, 20)
+              .map((block) => {
                 const pin = block.querySelector(':scope > field[name="PIN"]')?.textContent
                 return [block.getAttribute("type"), pin].filter(Boolean).join(" ")
               })
           : [],
         has_code: Boolean(currentBlocklyXml && currentBlocklyXml.length > 40),
         summary: currentBlocklyXml ? "Blockly blocks placed on workspace" : "No code blocks placed",
+        pin_bindings: blocklyPinBindings,
       },
+      affirmativeAction: affirmativeAction || undefined,
+      affirmative_action: affirmativeAction || undefined,
     }
-  }, [lessonContext, revision, circuitContext, currentCircuit, running, activeBoard, hasCritical, hasWarning, healthScore, currentBlocklyXml])
+  }, [lessonContext, revision, circuitContext, currentCircuit, running, activeBoard, healthScore, currentBlocklyXml, pinStates, runtime])
 
   // Execute diagnostic action / AI tutoring with streaming
   const handleRunDiagnosis = useCallback(
@@ -328,6 +541,10 @@ export function CircuitCopilotChat({
       requestRef.current = controller
       setIsDiagnosing(true)
       const query = customQuery || "Find the mistake in this circuit and explain what is wrong."
+
+      // Multi-turn affirmative continuation detection
+      const lastAsst = [...messages].reverse().find((m) => m.role === "assistant" && m.text)
+      const affirmativeAction = detectAffirmativeContinuation(query, lastAsst?.text)
 
       // Add user message unless it's an automated lesson intro
       if (!isLessonKickoff) {
@@ -366,7 +583,7 @@ export function CircuitCopilotChat({
         },
       ])
 
-      const contextEnvelope = buildContextEnvelope()
+      const contextEnvelope = buildContextEnvelope(affirmativeAction)
       let streamSucceeded = false
       let fallbackReason = "GPU response unavailable"
 
@@ -426,7 +643,15 @@ export function CircuitCopilotChat({
       // If streaming didn't return text, use local pedagogical reply
       if (!streamSucceeded) {
         let fallbackText = localResult.reply
-        if (isLessonKickoff && lessonContext) {
+        if (affirmativeAction?.detected) {
+          if (affirmativeAction.actionType === "latex_formatting") {
+            fallbackText = "Here is the mathematical formula in LaTeX:\n\n$$V = I \\times R$$\n\nWhere:\n- $V$ is Voltage (Volts, $\\text{V}$)\n- $I$ is Current (Amperes, $\\text{A}$)\n- $R$ is Resistance (Ohms, $\\Omega$)"
+          } else if (affirmativeAction.actionType === "circuit_diagnosis") {
+            fallbackText = localResult.reply || "Let us inspect the circuit wiring and verify every pin connection."
+          } else if (affirmativeAction.actionType === "code_generation") {
+            fallbackText = "Here is the code for your circuit:\n\n```cpp\nvoid setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}\n```"
+          }
+        } else if (isLessonKickoff && lessonContext) {
           fallbackText =
             `Welcome to **${lessonContext.title}**!\n\n` +
             `**Mission Objective:** ${lessonContext.description || "Build and test this circuit safely."}\n\n` +
@@ -767,11 +992,11 @@ export function CircuitCopilotChat({
                   }`}
                 >
                   {/* Markdown / Formatted Text */}
-                  <div className="whitespace-pre-line leading-relaxed">
+                  <div className="leading-relaxed">
                     {msg.text ? splitXenResponse(msg.text).map((section, index) =>
                       section.type === "code"
-                        ? <pre key={index} className="overflow-x-auto whitespace-pre"><code>{section.code}</code></pre>
-                        : <span key={index}>{section.content}</span>
+                        ? <pre key={index} className="overflow-x-auto whitespace-pre p-2 rounded bg-slate-950 font-mono text-cyan-300 border border-slate-800 my-1 text-xs"><code>{section.code}</code></pre>
+                        : <XenMarkdown key={index} content={section.content} isUser={msg.role === "user"} />
                     ) : (msg.isStreaming ? "..." : "")}
                   </div>
 

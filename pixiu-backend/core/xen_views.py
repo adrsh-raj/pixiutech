@@ -41,6 +41,10 @@ from core.xen_intent import (
     get_additive_mode_instruction,
     sanitize_context_envelope,
     format_context_envelope,
+    CYBERLAB_GROUNDING_DIRECTIVE,
+    get_cyberlab_grounding_directive,
+    resolve_affirmative_action,
+    build_xen_effective_prompt,
 )
 from core.xen_ratelimit import check_xen_rate_limit
 
@@ -511,13 +515,15 @@ class XenChatView(XenBaseView):
         # Context envelope handling (sanitized mission & circuit context)
         context_envelope_raw = request.data.get("context_envelope")
         context_envelope = sanitize_context_envelope(context_envelope_raw)
-        context_prefix = format_context_envelope(context_envelope)
-
-        effective_prompt = prompt
-        if context_prefix:
-            effective_prompt = f"{context_prefix}\n\n{effective_prompt}"
-        if mode_directive:
-            effective_prompt = f"[{mode_directive}]\n\n{effective_prompt}"
+        max_prompt_chars = getattr(settings, "XEN_MAX_PROMPT_CHARS", 4000)
+        effective_prompt = build_xen_effective_prompt(
+            prompt=prompt,
+            format_mode=format_mode,
+            mode_directive=mode_directive,
+            context_envelope=context_envelope,
+            history=history,
+            max_chars=max_prompt_chars,
+        )
 
         # 9. Build upstream message payload (Teacher Memory is explicitly disabled in v0.1)
         messages = [
@@ -914,32 +920,18 @@ class XenJobCreateView(XenBaseView):
         mode_directive = get_additive_mode_instruction(format_mode)
 
         # Context envelope handling (sanitized mission & circuit context)
-        # Budget context body dynamically so [mode_directive] + context + prompt fits V11 4000-char limit.
-        effective_mode_directive = mode_directive
-        if effective_mode_directive and len(effective_mode_directive) + 4 + len(prompt) > 4000:
-            compact_directives = {
-                "CODE_ONLY": "MODE: CODE ONLY — output only one executable code fence, zero prose.",
-                "OUTPUT_ONLY": "MODE: OUTPUT ONLY — return only expected output.",
-                "EXPLANATION_ONLY": "MODE: EXPLANATION ONLY — conceptual prose only, no code blocks.",
-                "CODE_AND_EXPLANATION": "MODE: CODE + EXPLANATION — working code plus concise explanation.",
-            }
-            compact = compact_directives.get(format_mode.value, "")
-            if compact and len(compact) + 4 + len(prompt) <= 4000:
-                effective_mode_directive = compact
-
-        mode_overhead = (len(effective_mode_directive) + 4) if effective_mode_directive else 0
-        # wrapper overhead in format_context_envelope is 92 chars + "\n\n" separator (2 chars)
-        max_context_body = 4000 - len(prompt) - mode_overhead - 94
-
+        # Budget context body dynamically so directives + context + prompt fits V11 4000-char limit.
         context_envelope_raw = request.data.get("context_envelope")
         context_envelope = sanitize_context_envelope(context_envelope_raw)
-        context_prefix = format_context_envelope(context_envelope, max_chars=max_context_body) if max_context_body >= 40 else ""
-
-        effective_prompt = prompt
-        if context_prefix:
-            effective_prompt = f"{context_prefix}\n\n{effective_prompt}"
-        if effective_mode_directive:
-            effective_prompt = f"[{effective_mode_directive}]\n\n{effective_prompt}"
+        max_prompt_chars = getattr(settings, "XEN_MAX_PROMPT_CHARS", 4000)
+        effective_prompt = build_xen_effective_prompt(
+            prompt=prompt,
+            format_mode=format_mode,
+            mode_directive=mode_directive,
+            context_envelope=context_envelope,
+            history=history,
+            max_chars=max_prompt_chars,
+        )
 
         if len(effective_prompt) > 4000 or len(effective_prompt) + sum(len(m["content"]) for m in compacted_history) + len(COMPOSITE_SYSTEM_PROMPT) > 16000:
             return Response({"code": "CONTEXT_TOO_LARGE", "error": "Conversation and circuit context exceed the serving limit."}, status=400)

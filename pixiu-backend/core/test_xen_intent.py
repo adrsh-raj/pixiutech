@@ -217,8 +217,309 @@ class ContextBoundaryTests(unittest.TestCase):
         body = json.loads(rendered.splitlines()[-2])["circuit"]
         self.assertTrue(body["partial"])
         self.assertEqual(body["wires_count"],100)
-        self.assertEqual(body["wires"][0][0][1],"D13")
+        self.assertEqual(body["wires"][0]["from"]["pinId"], "D13")
         self.assertLess(len(rendered),3000)
+
+
+
+class ExpandedContextEnvelopeAndDirectivesTests(unittest.TestCase):
+    def test_sanitize_comprehensive_circuit_and_board(self):
+        """Verify extraction and validation of board, parts, wires, health, readings, nodal summary, and code."""
+        from core.xen_intent import sanitize_context_envelope
+
+        envelope = {
+            "board": {
+                "id": "arduino-uno-rev3",
+                "name": "Arduino Uno R3",
+                "logic_voltage": 5.0,
+                "power_pins": ["5V", "3.3V", "GND"],
+            },
+            "circuit": {
+                "revision": "rev-101",
+                "timestamp": 1700000000,
+                "simulator_running": True,
+                "health_score": 90,
+                "critical_count": 0,
+                "warning_count": 1,
+                "issues": [
+                    {
+                        "rule_id": "resistor-check",
+                        "severity": "warning",
+                        "title": "Low resistance detected",
+                        "message": "Resistor value 10 ohm may cause excessive LED current.",
+                    }
+                ],
+                "parts": [
+                    {
+                        "id": "res1",
+                        "type": "resistor",
+                        "name": "Current Limiter",
+                        "props": {"resistance": 220, "unit": "Ω", "color": "blue"},
+                        "pins": ["1", "2"],
+                    },
+                    {
+                        "id": "led1",
+                        "type": "led",
+                        "name": "Status Indicator",
+                        "props": {"color": "red"},
+                        "pins": ["anode", "cathode"],
+                    },
+                ],
+                "wires": [
+                    {
+                        "from": {"partId": "res1", "pinId": "2", "label": "R_OUT"},
+                        "to": {"partId": "led1", "pinId": "anode", "label": "LED_IN"},
+                        "net_id": "NET_1",
+                        "nominal_voltage": 5.0,
+                    }
+                ],
+                "readings": [
+                    {
+                        "instrument": "multimeter",
+                        "source": "simulated",
+                        "value": 1.95,
+                        "unit": "V",
+                        "probeA": "led1:anode",
+                        "probeB": "led1:cathode",
+                    }
+                ],
+                "nodal_summary": {"NET_1": 5.0, "GND": 0.0},
+            },
+            "blockly": {
+                "summary": "LED blink loop",
+                "blocks": ["pin_mode(13, OUTPUT)", "digital_write(13, HIGH)"],
+                "pin_bindings": {"13": "res1:1"},
+            },
+            "user_token": "secret_jwt_token",  # PII to be stripped
+        }
+
+        sanitized = sanitize_context_envelope(envelope)
+        self.assertNotIn("user_token", sanitized)
+
+        # Board validation
+        board = sanitized["circuit"]["board"]
+        self.assertEqual(board["id"], "arduino-uno-rev3")
+        self.assertEqual(board["name"], "Arduino Uno R3")
+        self.assertEqual(board["logic_voltage"], 5.0)
+        self.assertIn("5V", board["power_pins"])
+
+        # Circuit parts & props
+        parts = sanitized["circuit"]["parts"]
+        self.assertEqual(len(parts), 2)
+        self.assertEqual(parts[0]["props"]["resistance"], 220)
+        self.assertEqual(parts[0]["props"]["unit"], "Ω")
+
+        # Wires & nets
+        wires = sanitized["circuit"]["wires"]
+        self.assertEqual(len(wires), 1)
+        self.assertEqual(wires[0]["from"]["label"], "R_OUT")
+        self.assertEqual(wires[0]["net_id"], "NET_1")
+        self.assertEqual(wires[0]["nominal_voltage"], 5.0)
+
+        # Simulator & Health
+        circuit = sanitized["circuit"]
+        self.assertTrue(circuit["simulator_running"])
+        self.assertEqual(circuit["health_score"], 90)
+        self.assertEqual(circuit["warning_count"], 1)
+        self.assertEqual(circuit["issues"][0]["rule_id"], "resistor-check")
+        self.assertEqual(circuit["readings"][0]["value"], 1.95)
+        self.assertEqual(circuit["nodal_summary"]["NET_1"], 5.0)
+
+        # Blockly
+        self.assertEqual(sanitized["blockly"]["pin_bindings"]["13"], "res1:1")
+
+    def test_priority_truncation_drops_lesson_first(self):
+        """Priority truncation must drop lesson details first before touching electrical circuit data."""
+        import json
+        from core.xen_intent import format_context_envelope, sanitize_context_envelope
+
+        envelope = {
+            "lesson": {
+                "id": "ohm-law-exp",
+                "title": "Ohm's Law Experiment",
+                "description": "A" * 250,
+                "final_goal": "B" * 150,
+                "concepts": ["voltage", "current", "resistance", "power", "circuits"],
+                "steps": [f"Step {i}: connect wire {i}" for i in range(10)],
+            },
+            "circuit": {
+                "board": {"id": "uno", "name": "Arduino Uno", "logic_voltage": 5.0},
+                "parts": [{"id": f"p{i}", "type": "resistor", "props": {"resistance": 100 + i}} for i in range(5)],
+                "wires": [{"from": {"partId": f"p{i}", "pinId": "1"}, "to": {"partId": f"p{i+1}", "pinId": "2"}} for i in range(4)],
+                "issues": [{"rule_id": "r1", "severity": "critical", "title": "Short circuit", "message": "GND directly tied to 5V"}],
+                "parts_count": 5,
+                "wires_count": 4,
+            },
+        }
+
+        sanitized = sanitize_context_envelope(envelope)
+        rendered = format_context_envelope(sanitized, max_chars=900)
+        self.assertTrue(len(rendered) <= 1000)
+        self.assertIn("[MISSION CONTEXT]", rendered)
+
+        body_str = rendered.splitlines()[-2]
+        body = json.loads(body_str)
+
+        lesson = body.get("lesson", {})
+        self.assertNotIn("description", lesson)
+        self.assertNotIn("steps", lesson)
+        self.assertNotIn("final_goal", lesson)
+
+        self.assertIn("circuit", body)
+        self.assertEqual(body["circuit"]["board"]["id"], "uno")
+        self.assertEqual(body["circuit"]["issues"][0]["severity"], "critical")
+        self.assertTrue(body.get("partial", False) or body["circuit"].get("partial", False))
+
+    def test_priority_truncation_drops_non_critical_warnings_when_tight(self):
+        """If still over limit, non-critical warnings and secondary wires are dropped with partial: true."""
+        import json
+        from core.xen_intent import format_context_envelope, sanitize_context_envelope
+
+        envelope = {
+            "circuit": {
+                "board": {"id": "uno", "name": "Arduino Uno"},
+                "parts": [{"id": f"p{i}", "type": "led"} for i in range(15)],
+                "wires": [{"from": {"partId": f"p{i}", "pinId": "1"}, "to": {"partId": f"p{i+1}", "pinId": "2"}} for i in range(14)],
+                "issues": [
+                    {"rule_id": "crit1", "severity": "critical", "title": "Overvoltage", "message": "LED voltage exceeds 3.3V"},
+                    {"rule_id": "warn1", "severity": "warning", "title": "Wire styling", "message": "Messy wire routing"},
+                ],
+                "parts_count": 15,
+                "wires_count": 14,
+            }
+        }
+        sanitized = sanitize_context_envelope(envelope)
+        rendered = format_context_envelope(sanitized, max_chars=600)
+        self.assertIn("[MISSION CONTEXT]", rendered)
+
+        body = json.loads(rendered.splitlines()[-2])
+        circuit = body["circuit"]
+        self.assertTrue(circuit.get("partial", False))
+        issues = circuit.get("issues", [])
+        self.assertTrue(all(iss.get("severity") == "critical" for iss in issues))
+        self.assertIn("omitted_fields", body)
+
+    def test_cyberlab_grounding_directive_generation(self):
+        """Grounding directive must be generated only when valid circuit data is present."""
+        from core.xen_intent import (
+            CYBERLAB_GROUNDING_DIRECTIVE,
+            get_cyberlab_grounding_directive,
+        )
+
+        env_with_circuit = {
+            "circuit": {
+                "board": "arduino-uno",
+                "parts": [{"id": "led1", "type": "led"}],
+                "wires": [],
+            }
+        }
+        directive = get_cyberlab_grounding_directive(env_with_circuit)
+        self.assertIn("You are 8square, embedded inside Pixiu CyberLab", directive)
+        self.assertIn("Do not claim that you cannot see the circuit", directive)
+        self.assertIn("Distinguish simulator-computed values from hardware measurements", directive)
+        self.assertIn("Can you see my screen?", directive)
+
+        self.assertEqual(get_cyberlab_grounding_directive({}), "")
+        self.assertEqual(get_cyberlab_grounding_directive({"lesson": {"id": "1"}}), "")
+        self.assertEqual(get_cyberlab_grounding_directive({"circuit": {}}), "")
+        self.assertEqual(get_cyberlab_grounding_directive(None), "")
+
+    def test_affirmative_action_resolution(self):
+        """Deterministic Multi-Turn Affirmative Resolution triggers when affirmative prompt approves offered action."""
+        from core.xen_intent import resolve_affirmative_action
+
+        # Scenario A: LaTeX formula offer
+        history_latex = [
+            {"role": "user", "content": "What is kinetic energy?"},
+            {"role": "assistant", "content": "Kinetic energy is the energy of motion. Would you like me to format the formula in LaTeX?"},
+        ]
+        res_yes = resolve_affirmative_action("yes", history_latex)
+        self.assertIn("[AFFIRMATIVE ACTION DIRECTIVE", res_yes)
+        self.assertIn("formatting", res_yes)
+        self.assertIn("LaTeX", res_yes)
+        self.assertIn("output the formula using $$...$$ / $...$", res_yes)
+
+        # Hinglish affirmation
+        res_haan = resolve_affirmative_action("haan kar do bhai", history_latex)
+        self.assertIn("[AFFIRMATIVE ACTION DIRECTIVE", res_haan)
+
+        # Scenario B: Circuit diagnosis offer
+        history_circuit = [
+            {"role": "user", "content": "My circuit is not blinking."},
+            {"role": "assistant", "content": "I see your board and parts. Would you like me to diagnose the circuit and find the wiring mistake?"},
+        ]
+        res_sure = resolve_affirmative_action("sure", history_circuit)
+        self.assertIn("[AFFIRMATIVE ACTION DIRECTIVE", res_sure)
+        self.assertIn("diagnosing the circuit", res_sure)
+
+        # Scenario C: Code generation offer
+        history_code = [
+            {"role": "user", "content": "How do I make the servo rotate?"},
+            {"role": "assistant", "content": "You need to sweep the PWM angle. Should I generate the Python code for this?"},
+        ]
+        res_do_it = resolve_affirmative_action("do it", history_code)
+        self.assertIn("[AFFIRMATIVE ACTION DIRECTIVE", res_do_it)
+        self.assertIn("generating", res_do_it)
+        self.assertIn("code", res_do_it)
+
+        # Negative / Non-affirmative cases
+        self.assertEqual(resolve_affirmative_action("no", history_code), "")
+        self.assertEqual(resolve_affirmative_action("what is PWM?", history_code), "")
+        self.assertEqual(resolve_affirmative_action("yes", []), "")
+        self.assertEqual(resolve_affirmative_action("yes", [{"role": "assistant", "content": "The sky is blue."}]), "")
+
+    def test_upright_math_notation_and_fractions_in_directives(self):
+        """Mathematical notation directive must include upright physical quantities and fractions."""
+        from core.xen_intent import ADDITIVE_MODE_DIRECTIVES, XenResponseMode
+
+        default_dir = ADDITIVE_MODE_DIRECTIVES[XenResponseMode.DEFAULT_EDUCATIONAL]
+        self.assertIn(r"\mathrm{KE} = \frac{1}{2}mv^2", default_dir)
+        self.assertIn(r"\frac{a}{b}", default_dir)
+
+        expl_dir = ADDITIVE_MODE_DIRECTIVES[XenResponseMode.EXPLANATION_ONLY]
+        self.assertIn(r"\mathrm{", expl_dir)
+        self.assertIn(r"\frac{a}{b}", expl_dir)
+
+        code_expl_dir = ADDITIVE_MODE_DIRECTIVES[XenResponseMode.CODE_AND_EXPLANATION]
+        self.assertIn(r"\mathrm{", code_expl_dir)
+        self.assertIn(r"\frac{a}{b}", code_expl_dir)
+
+    def test_build_xen_effective_prompt_bounds(self):
+        """build_xen_effective_prompt must combine directives and context while strictly respecting max_chars."""
+        from core.xen_intent import (
+            XenResponseMode,
+            build_xen_effective_prompt,
+            sanitize_context_envelope,
+        )
+
+        envelope = {
+            "circuit": {
+                "board": "arduino-uno",
+                "parts": [{"id": f"p{i}", "type": "resistor", "props": {"resistance": 220}} for i in range(20)],
+                "wires": [{"from": {"partId": f"p{i}", "pinId": "1"}, "to": {"partId": f"p{i+1}", "pinId": "2"}} for i in range(19)],
+                "running": True,
+            }
+        }
+        sanitized = sanitize_context_envelope(envelope)
+        history = [
+            {"role": "user", "content": "Can you check my wiring?"},
+            {"role": "assistant", "content": "Would you like me to diagnose the circuit and find the fault?"},
+        ]
+
+        prompt = "yes, do it please"
+        effective = build_xen_effective_prompt(
+            prompt=prompt,
+            format_mode=XenResponseMode.CODE_ONLY,
+            context_envelope=sanitized,
+            history=history,
+            max_chars=4000,
+        )
+
+        self.assertLessEqual(len(effective), 4000)
+        self.assertIn("[AFFIRMATIVE ACTION DIRECTIVE", effective)
+        self.assertIn("[CYBERLAB GROUNDING DIRECTIVE", effective)
+        self.assertIn("[MISSION CONTEXT]", effective)
+        self.assertIn(prompt, effective)
 
 
 if __name__ == "__main__":

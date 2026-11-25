@@ -3,6 +3,8 @@ import { Send, Square, RotateCcw, Trash2, Check, Copy, AlertTriangle, ShieldChec
 import { createXenRequestLifecycle, streamXenChat, sanitizeClientOutput, fetchXenStatus } from '../../lib/ai/xen/xen-client.js';
 
 import { splitXenResponse } from '../../lib/ai/xen/xen-sanitizer.js';
+import { XenMarkdown } from './XenMarkdown.jsx';
+import { detectAffirmativeContinuation } from '../../lib/ai/xen/affirmative-detector.js';
 
 export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [messages, setMessages] = useState([
@@ -84,11 +86,19 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     const userText = inputPrompt.trim();
     if (!retry && !userText) return;
 
+    // Detect affirmative continuation and inspect previous assistant message
+    const lastAsst = [...messages].reverse().find((m) => m.role === 'assistant' && m.content);
+    const affirmative = detectAffirmativeContinuation(userText, lastAsst?.content);
+
     const attempt = requests.begin(retry ? null : {
       prompt: userText,
       intent,
       formatPreference: stickyFormatPreference,
       history: buildCleanHistory(messages),
+      contextEnvelope: affirmative ? {
+        affirmativeAction: affirmative,
+        affirmative_action: affirmative,
+      } : null,
     });
     if (!attempt) return;
     setInputPrompt('');
@@ -195,9 +205,11 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         {parts.map((p, pIdx) => {
           if (p.type === 'text') {
             return (
-              <p key={pIdx} className="whitespace-pre-wrap leading-relaxed text-sm">
-                {p.content}
-              </p>
+              <XenMarkdown
+                key={pIdx}
+                content={p.content}
+                isUser={msg.role === 'user'}
+              />
             );
           }
           const blockKey = `${msgIdx}-${pIdx}`;
