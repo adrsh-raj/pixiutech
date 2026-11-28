@@ -863,16 +863,18 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
 
       return (
         <g>
-          {/* legs */}
+          {/* legs (Anode x=14, Cathode x=30) */}
           <line x1={14} y1={44} x2={14} y2={62} stroke="#9aa0a6" strokeWidth={2} />
           <line x1={30} y1={40} x2={30} y2={62} stroke="#9aa0a6" strokeWidth={2} />
+          <text x={8} y={56} textAnchor="middle" fontSize={8} fontWeight={800} fill="#f87171" className="select-none">+</text>
+          <text x={36} y={56} textAnchor="middle" fontSize={8} fontWeight={800} fill="#94a3b8" className="select-none">−</text>
 
           {/* Healthy radiant glow */}
           {!isBurnt && level > 0 && (
             <circle cx={22} cy={22} r={28} fill={color} opacity={0.35 * level} />
           )}
 
-          {/* Bulb casing */}
+          {/* Bulb casing with flat Cathode (-) rim */}
           <path
             d="M6 24 A16 16 0 0 1 38 24 L38 40 L6 40 Z"
             fill={isBurnt ? "#3f3f46" : color}
@@ -887,7 +889,8 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
             opacity={isBurnt ? 0.95 : level > 0 ? 0.6 + 0.4 * level : 0.55}
           />
           <ellipse cx={16} cy={18} rx={4} ry={6} fill={isBurnt ? "#52525b" : "#ffffff"} opacity={0.4} />
-          <rect x={6} y={38} width={32} height={5} rx={1} fill="#cfd3d8" />
+          <rect x={6} y={38} width={30} height={5} rx={1} fill="#cfd3d8" />
+          <rect x={36} y={38} width={2} height={5} fill="#64748b" />
 
           {/* Burnout Cracks and Explosion Visuals */}
           {isBurnt && (
@@ -934,6 +937,8 @@ export function PartArt({ part, runtime }: { part: PlacedPart; runtime?: PartRun
         <g>
           <line x1={3} y1={13} x2={26} y2={13} stroke="#9aa0a6" strokeWidth={2} />
           <line x1={62} y1={13} x2={85} y2={13} stroke="#9aa0a6" strokeWidth={2} />
+          <text x={11} y={9} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#94a3b8" className="select-none">T1</text>
+          <text x={77} y={9} textAnchor="middle" fontSize={6.5} fontWeight={700} fill="#94a3b8" className="select-none">T2</text>
           <rect x={24} y={2} width={40} height={22} rx={6} fill="#d9b382" stroke="#b7935f" />
           <ResistorBands resistance={Number(part.props.resistance ?? 220)} />
         </g>

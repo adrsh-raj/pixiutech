@@ -101,7 +101,7 @@ export function WelcomeOverlay({
                 </div>
                 <div className="min-w-0">
                   <p className="truncate text-[10px] font-black uppercase tracking-[0.17em] text-slate-100">PIXIU VIRTUAL LAB</p>
-                  <p className="mt-0.5 text-[10px] text-slate-500">Guided by 8 Square</p>
+                  <p className="mt-0.5 text-[10px] text-slate-500">Guided by Xen</p>
                 </div>
               </div>
               <button
@@ -172,7 +172,7 @@ export function WelcomeOverlay({
                     <div>
                       <span className="grid h-9 w-9 place-items-center rounded-xl border border-violet-400/20 bg-violet-400/10 text-violet-200"><Sparkles size={17} /></span>
                       <p className="mt-3 text-sm font-bold text-white">Need a hint?</p>
-                      <p className="mt-1 text-[11px] leading-5 text-slate-400">Ask the 8 Square guide about the circuit, wiring, code, or readings.</p>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-400">Ask the Xen guide about the circuit, wiring, code, or readings.</p>
                     </div>
                     <button
                       onClick={() => {
@@ -181,7 +181,7 @@ export function WelcomeOverlay({
                       }}
                       className="mt-3 self-start text-[10px] font-bold text-violet-200 transition hover:text-white focus-visible:outline-none focus-visible:underline"
                     >
-                      Open 8 Square <ArrowRight size={12} className="ml-1 inline" />
+                      Open Xen <ArrowRight size={12} className="ml-1 inline" />
                     </button>
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export function WelcomeOverlay({
 
                 <div className="mt-3 flex items-start gap-2 rounded-xl border border-blue-400/15 bg-blue-400/[0.05] p-3 text-[10px] leading-5 text-slate-400">
                   <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-blue-300" />
-                  <p>8 Square is available inside the lab when you want a hint about what your circuit is doing.</p>
+                  <p>Xen is available inside the lab when you want a hint about what your circuit is doing.</p>
                 </div>
               </aside>
             </div>

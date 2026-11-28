@@ -3,41 +3,89 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { normalizeXenMarkdown } from '../../lib/ai/xen/xen-sanitizer.js';
+
+const SAFE_INLINE_HTML_MAP = {
+  u: 'u',
+  ins: 'u',
+  b: 'strong',
+  strong: 'strong',
+  i: 'em',
+  em: 'em',
+  s: 'del',
+  del: 'del',
+  sub: 'sub',
+  sup: 'sup',
+};
+
+function buildSafeInlineElement(tagName, children) {
+  if (tagName === 'code') {
+    const textValue = children.map((c) => (typeof c?.value === 'string' ? c.value : '')).join('');
+    return { type: 'inlineCode', value: textValue };
+  }
+  const hName = SAFE_INLINE_HTML_MAP[tagName];
+  if (!hName) return null;
+  return {
+    type: 'element',
+    data: { hName },
+    children,
+  };
+}
 
 /**
- * Lightweight remark AST plugin to transform HTML <u> and <ins> tags into
- * AST element nodes for deterministic underline rendering without dangerouslySetInnerHTML.
+ * Lightweight remark AST plugin to transform safe inline formatting HTML tags
+ * (<u>, <ins>, <b>, <strong>, <i>, <em>, <s>, <del>, <code>, <sub>, <sup>, <br/>)
+ * without dangerouslySetInnerHTML or raw script/attribute pass-through.
  */
-function remarkUnderline() {
+function remarkSafeInlineHtml() {
   return (tree) => {
     function visit(node) {
-      if (!node.children) return;
+      if (!node || !Array.isArray(node.children)) return;
       const newChildren = [];
       let i = 0;
       while (i < node.children.length) {
         const child = node.children[i];
-        if (child.type === 'html' && /^<(u|ins)>$/i.test(child.value)) {
-          const tag = child.value.match(/^<(u|ins)>$/i)[1].toLowerCase();
-          const closeRegex = new RegExp(`^<\\/${tag}>$`, 'i');
-          const innerChildren = [];
-          let j = i + 1;
-          let foundClose = false;
-          while (j < node.children.length) {
-            if (node.children[j].type === 'html' && closeRegex.test(node.children[j].value)) {
-              foundClose = true;
-              break;
-            }
-            innerChildren.push(node.children[j]);
-            j++;
-          }
-          if (foundClose) {
-            newChildren.push({
-              type: 'element',
-              data: { hName: tag },
-              children: innerChildren,
-            });
-            i = j + 1;
+        if (child.type === 'html' && typeof child.value === 'string') {
+          const trimmedHtml = child.value.trim();
+          if (/^<br\s*\/?>$/i.test(trimmedHtml)) {
+            newChildren.push({ type: 'break' });
+            i++;
             continue;
+          }
+          const selfPaired = trimmedHtml.match(/^<(u|ins|b|strong|i|em|s|del|code|sub|sup)(?:\s+[^>]*)?>([\s\S]*?)<\/\1>$/i);
+          if (selfPaired) {
+            const el = buildSafeInlineElement(selfPaired[1].toLowerCase(), [{ type: 'text', value: selfPaired[2] }]);
+            if (el) {
+              newChildren.push(el);
+              i++;
+              continue;
+            }
+          }
+          const openMatch = trimmedHtml.match(/^<(u|ins|b|strong|i|em|s|del|code|sub|sup)(?:\s+[^>]*)?>$/i);
+          if (openMatch) {
+            const tag = openMatch[1].toLowerCase();
+            const closeRegex = new RegExp(`^<\\/${tag}>$`, 'i');
+            const innerChildren = [];
+            let j = i + 1;
+            let foundClose = false;
+            while (j < node.children.length) {
+              const sib = node.children[j];
+              if (sib.type === 'html' && typeof sib.value === 'string' && closeRegex.test(sib.value.trim())) {
+                foundClose = true;
+                break;
+              }
+              innerChildren.push(sib);
+              j++;
+            }
+            if (foundClose) {
+              const el = buildSafeInlineElement(tag, innerChildren);
+              if (el) {
+                visit(el);
+                newChildren.push(el);
+                i = j + 1;
+                continue;
+              }
+            }
           }
         }
         visit(child);
@@ -51,12 +99,13 @@ function remarkUnderline() {
 }
 
 /**
- * Scoped, dark-theme Markdown & KaTeX LaTeX renderer for 8square / Xen responses.
+ * Scoped, dark-theme Markdown & KaTeX LaTeX renderer for Xen responses.
  * Never uses dangerouslySetInnerHTML.
  * Ensures equations, tables, lists, and typography render cleanly across desktop and mobile.
  */
 export function XenMarkdown({ content, isUser = false, className = '' }) {
   if (!content) return null;
+  const renderedContent = isUser ? content : normalizeXenMarkdown(content);
 
   return (
     <div
@@ -65,7 +114,7 @@ export function XenMarkdown({ content, isUser = false, className = '' }) {
       } ${className}`}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkUnderline]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkSafeInlineHtml]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
         components={{
           h1: ({ children }) => (
@@ -182,7 +231,7 @@ export function XenMarkdown({ content, isUser = false, className = '' }) {
           ),
         }}
       >
-        {content}
+        {renderedContent}
       </ReactMarkdown>
     </div>
   );

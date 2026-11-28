@@ -22,6 +22,14 @@ import { computeWireCurrents } from "@/lib/current-flow"
 import { writePinStateAliases } from "@/lib/pin-state"
 import { isBoardPart, getActiveBoard, getBoardForPart, scaleAdcReading, lookupBoardPinState } from "@/lib/board-registry"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
+import { resolveCanonicalPin, validateCandidateWire } from "@/lib/circuit-validator"
+import type {
+  LiveInteractionEventType,
+  LiveLifecycleEvent,
+  LiveMultimeterTelemetry,
+  LiveOscilloscopeTelemetry,
+  RecentTargetPin,
+} from "@/lib/live-circuit-types"
 import { Multimeter } from "./multimeter"
 import { Oscilloscope } from "./oscilloscope"
 import { LogicAnalyzer } from "./logic-analyzer"
@@ -322,15 +330,45 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [pixiuId, userRole])
   const [history, setHistory] = useState<HistoryState<CircuitState>>(() => createHistory(INITIAL_STATE))
   const state = history.present
-  // The Copilot accepts the selected board ID, not the full board descriptor.
-  // Keep this in component scope so the widget mount cannot reference an
-  // undeclared local and crash the entire CyberLab route.
-  const activeBoard = getActiveBoard(state).id
+  const stateRef = useRef<CircuitState>(state)
+  stateRef.current = state
+  const hasPlacedBoard = state.parts.some((p) => isBoardPart(p.type))
+  const activeBoard = hasPlacedBoard ? getActiveBoard(state).id : null
+
+  const createNewSessionId = () =>
+    "cyberlab-" +
+    (typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
+
+  const [sessionId, setSessionId] = useState<string>(() => createNewSessionId())
+  const sessionIdRef = useRef<string>(sessionId)
+  const [circuitRevision, setCircuitRevision] = useState<number>(0)
+  const circuitRevisionRef = useRef<number>(0)
+  const [interactionRevision, setInteractionRevision] = useState<number>(0)
+  const interactionRevisionRef = useRef<number>(0)
+  const eventSeqRef = useRef<number>(0)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedWireId, setSelectedWireId] = useState<string | null>(null)
   const [activeWireColor, setActiveWireColor] = useState<string>("#22c55e")
   const [wiring, setWiring] = useState<PinRef | null>(null)
+  const wiringRef = useRef<PinRef | null>(null)
+  const [hoverPin, setHoverPin] = useState<PinRef | null>(null)
+  const hoverPinRef = useRef<PinRef | null>(null)
+  const [hoveredPartId, setHoveredPartId] = useState<string | null>(null)
+  const hoveredPartIdRef = useRef<string | null>(null)
+  const [recentTarget, setRecentTarget] = useState<RecentTargetPin | null>(null)
+  const recentTargetRef = useRef<RecentTargetPin | null>(null)
+  const [draftMeta, setDraftMeta] = useState<{ draftId: string; startedAt: string; updatedAt: string } | null>(null)
+  const draftMetaRef = useRef<{ draftId: string; startedAt: string; updatedAt: string } | null>(null)
+  const draftCursorRef = useRef<{ x: number; y: number } | null>(null)
+  const [lastLifecycleEvent, setLastLifecycleEvent] = useState<LiveLifecycleEvent | null>(null)
+  const [lifecycleEventBatch, setLifecycleEventBatch] = useState<LiveLifecycleEvent[]>([])
+  const [multimeterTelemetry, setMultimeterTelemetry] = useState<LiveMultimeterTelemetry | null>(null)
+  const [oscilloscopeTelemetry, setOscilloscopeTelemetry] = useState<LiveOscilloscopeTelemetry | null>(null)
+  const [generatedCode, setGeneratedCode] = useState<string>("")
+  const [stateRevision, setStateRevision] = useState<number>(0)
   const [running, setRunning] = useState(false)
   const [pressed, setPressed] = useState<Set<string>>(new Set())
   const pressedRef = useRef<Set<string>>(new Set())
@@ -352,6 +390,180 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   useEffect(() => {
     pinStatesRef.current = pinStates
   }, [pinStates])
+
+  const emitLifecycleEvent = useCallback(
+    (
+      eventType: LiveInteractionEventType,
+      payload: Record<string, unknown> = {},
+      opts: { circuitBump?: boolean; interactionBump?: boolean; nextSessionId?: string } = {},
+    ): LiveLifecycleEvent => {
+      const nextSid = opts.nextSessionId ?? sessionIdRef.current
+      if (opts.nextSessionId) {
+        sessionIdRef.current = opts.nextSessionId
+        eventSeqRef.current = 0
+        circuitRevisionRef.current = 0
+        interactionRevisionRef.current = 0
+        setSessionId(opts.nextSessionId)
+        setCircuitRevision(0)
+        setInteractionRevision(0)
+      }
+      if (opts.circuitBump) {
+        circuitRevisionRef.current += 1
+        setCircuitRevision(circuitRevisionRef.current)
+      }
+      if (opts.interactionBump ?? true) {
+        interactionRevisionRef.current += 1
+        setInteractionRevision(interactionRevisionRef.current)
+      }
+      setStateRevision(circuitRevisionRef.current + interactionRevisionRef.current)
+      eventSeqRef.current += 1
+      const evt: LiveLifecycleEvent = {
+        event_id: `${nextSid}-ev-${eventSeqRef.current}`,
+        event_seq: eventSeqRef.current,
+        event_type: eventType,
+        session_id: nextSid,
+        circuit_revision: circuitRevisionRef.current,
+        interaction_revision: interactionRevisionRef.current,
+        occurred_at: new Date().toISOString(),
+        payload,
+      }
+      setLastLifecycleEvent(evt)
+      setLifecycleEventBatch((prev) => (opts.nextSessionId ? [evt] : [...prev.slice(-15), evt]))
+      return evt
+    },
+    [],
+  )
+
+  const clearDraftState = useCallback(() => {
+    wiringRef.current = null
+    recentTargetRef.current = null
+    draftMetaRef.current = null
+    draftCursorRef.current = null
+    setWiring(null)
+    setRecentTarget(null)
+    setDraftMeta(null)
+  }, [])
+
+  const cancelActiveWire = useCallback(
+    (reason: string = "cancelled") => {
+      const activeSource = wiringRef.current
+      const hadHover = hoverPinRef.current
+      clearDraftState()
+      if (hadHover) {
+        hoverPinRef.current = null
+        setHoverPin(null)
+      }
+      if (activeSource) {
+        emitLifecycleEvent("wire_cancel", {
+          reason,
+          cancelled_source: activeSource,
+          status: "cancelled",
+        })
+      }
+    },
+    [clearDraftState, emitLifecycleEvent],
+  )
+
+  const rotateSession = useCallback(
+    (reason: string) => {
+      const nextSid = createNewSessionId()
+      clearDraftState()
+      hoverPinRef.current = null
+      setHoverPin(null)
+      hoveredPartIdRef.current = null
+      setHoveredPartId(null)
+      emitLifecycleEvent("session_reset", { reason }, { nextSessionId: nextSid, interactionBump: true })
+    },
+    [clearDraftState, emitLifecycleEvent],
+  )
+
+  const handleHoverPinChange = useCallback(
+    (nextPin: PinRef | null) => {
+      const prev = hoverPinRef.current
+      if (prev && nextPin && samePin(prev, nextPin)) return
+      if (!prev && !nextPin) return
+      hoverPinRef.current = nextPin
+      setHoverPin(nextPin)
+
+      const activeSource = wiringRef.current
+      const nowIso = new Date().toISOString()
+
+      if (nextPin) {
+        if (activeSource) {
+          recentTargetRef.current = null
+          setRecentTarget(null)
+          if (draftMetaRef.current) {
+            const nextMeta = { ...draftMetaRef.current, updatedAt: nowIso }
+            draftMetaRef.current = nextMeta
+            setDraftMeta(nextMeta)
+          }
+          const validation = validateCandidateWire(stateRef.current, activeSource, nextPin, {
+            pressed: pressedRef.current,
+            pinStates: pinStatesRef.current,
+            running: runningRef.current,
+          })
+          emitLifecycleEvent("target_hover_enter", {
+            source: activeSource,
+            target: nextPin,
+            currently_hovered: true,
+            validation: {
+              placement_allowed: validation.placementAllowed,
+              compatibility_status: validation.compatibilityStatus,
+              is_same_pin: validation.isSamePin,
+              is_duplicate_wire: validation.isDuplicateWire,
+              is_already_same_net: validation.isAlreadySameNet,
+              reasons: validation.reasons,
+            },
+          })
+        } else {
+          emitLifecycleEvent("target_hover_enter", {
+            target: nextPin,
+            currently_hovered: true,
+          })
+        }
+      } else if (prev) {
+        if (activeSource && !samePin(prev, activeSource)) {
+          const rt: RecentTargetPin = {
+            partId: prev.partId,
+            pinId: prev.pinId,
+            leftAt: nowIso,
+          }
+          recentTargetRef.current = rt
+          setRecentTarget(rt)
+          if (draftMetaRef.current) {
+            const nextMeta = { ...draftMetaRef.current, updatedAt: nowIso }
+            draftMetaRef.current = nextMeta
+            setDraftMeta(nextMeta)
+          }
+          emitLifecycleEvent("target_hover_leave", {
+            source: activeSource,
+            recent_target: prev,
+            currently_hovered: false,
+            left_at: nowIso,
+          })
+        } else {
+          emitLifecycleEvent("target_hover_leave", {
+            previous_hover: prev,
+            currently_hovered: false,
+          })
+        }
+      }
+    },
+    [emitLifecycleEvent],
+  )
+
+  const handleHoverPartChange = useCallback((partId: string | null) => {
+    if (hoveredPartIdRef.current === partId) return
+    hoveredPartIdRef.current = partId
+    setHoveredPartId(partId)
+  }, [])
+
+  const handleDraftCursorMove = useCallback((cursor: { x: number; y: number } | null) => {
+    draftCursorRef.current = cursor
+    if (cursor && draftMetaRef.current) {
+      draftMetaRef.current = { ...draftMetaRef.current, updatedAt: new Date().toISOString() }
+    }
+  }, [])
   const [blocklyXml, setBlocklyXml] = useState<string>(DEFAULT_XML)
   const [blocklyDocumentVersion, setBlocklyDocumentVersion] = useState(0)
   const [serialLines, setSerialLines] = useState<SerialLine[]>([])
@@ -488,7 +700,6 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   const runnerAbortRef = useRef<AbortController | null>(null)
   const runningRef = useRef(false)
   const partsRef = useRef(state.parts)
-  const stateRef = useRef(state)
   const runtimeCacheRef = useRef<{
     state: CircuitState
     pressed: Set<string>
@@ -683,18 +894,25 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       const next = updater(h.present)
       return pushState(h, next)
     })
+    circuitRevisionRef.current += 1
+    setCircuitRevision(circuitRevisionRef.current)
+    setStateRevision(circuitRevisionRef.current + interactionRevisionRef.current)
     if (storageReady) setIsDirty(true)
   }, [storageReady])
 
   const handleUndo = useCallback(() => {
+    if (wiringRef.current) cancelActiveWire("undo")
     setHistory((h) => historyUndo(h))
+    emitLifecycleEvent("circuit_snapshot", { action: "undo" }, { circuitBump: true, interactionBump: true })
     if (storageReady) setIsDirty(true)
-  }, [storageReady])
+  }, [storageReady, cancelActiveWire, emitLifecycleEvent])
 
   const handleRedo = useCallback(() => {
+    if (wiringRef.current) cancelActiveWire("redo")
     setHistory((h) => historyRedo(h))
+    emitLifecycleEvent("circuit_snapshot", { action: "redo" }, { circuitBump: true, interactionBump: true })
     if (storageReady) setIsDirty(true)
-  }, [storageReady])
+  }, [storageReady, cancelActiveWire, emitLifecycleEvent])
 
   const newId = () =>
     typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `id-${Math.random().toString(36).substring(2, 9)}`
@@ -760,12 +978,21 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [updateState])
 
   const deletePart = useCallback((id: string) => {
+    if (wiringRef.current) {
+      cancelActiveWire(wiringRef.current.partId === id ? "source_part_deleted" : "part_deleted")
+    }
+    if (hoverPinRef.current?.partId === id) {
+      hoverPinRef.current = null
+      setHoverPin(null)
+    }
+    setHoveredPartId((prev) => (prev === id ? null : prev))
     updateState((s) => ({
       parts: s.parts.filter((p) => p.id !== id),
       wires: s.wires.filter((w) => w.from.partId !== id && w.to.partId !== id),
     }))
     if (selectedId === id) setSelectedId(null)
-  }, [selectedId, updateState])
+    emitLifecycleEvent("circuit_snapshot", { action: "part_deleted", part_id: id }, { circuitBump: false, interactionBump: true })
+  }, [selectedId, updateState, cancelActiveWire, emitLifecycleEvent])
 
   const duplicatePart = useCallback((id: string) => {
     const part = state.parts.find((p) => p.id === id)
@@ -782,9 +1009,20 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [state.parts, updateState])
 
   const deleteWire = useCallback((id: string) => {
+    const deleted = stateRef.current.wires.find((w) => w.id === id) ?? null
+    if (wiringRef.current) cancelActiveWire("wire_deleted")
     updateState((s) => ({ ...s, wires: s.wires.filter((w) => w.id !== id) }))
     if (selectedWireId === id) setSelectedWireId(null)
-  }, [selectedWireId, updateState])
+    emitLifecycleEvent(
+      "wire_delete",
+      {
+        wire_id: id,
+        from: deleted?.from ?? null,
+        to: deleted?.to ?? null,
+      },
+      { circuitBump: false, interactionBump: true },
+    )
+  }, [selectedWireId, updateState, cancelActiveWire, emitLifecycleEvent])
 
   const deleteSelectedWire = useCallback(() => {
     if (selectedWireId) {
@@ -803,33 +1041,103 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
   }, [selectedWireId, updateState])
 
   const handlePinDown = useCallback((ref: PinRef) => {
-    if (!wiring) {
+    const activeSource = wiringRef.current
+    const nowIso = new Date().toISOString()
+
+    if (!activeSource) {
+      const draftId = `draft-${sessionIdRef.current}-${eventSeqRef.current + 1}`
+      wiringRef.current = ref
+      recentTargetRef.current = null
+      const initialMeta = { draftId, startedAt: nowIso, updatedAt: nowIso }
+      draftMetaRef.current = initialMeta
+      draftCursorRef.current = null
       setWiring(ref)
+      setRecentTarget(null)
+      setDraftMeta(initialMeta)
       setSelectedId(null)
       setSelectedWireId(null)
-      return
-    }
-    if (samePin(wiring, ref)) {
-      setWiring(null)
+
+      const srcPart = stateRef.current.parts.find((p) => p.id === ref.partId)
+      emitLifecycleEvent("wire_start", {
+        draft_id: draftId,
+        source_part_id: ref.partId,
+        source_pin_id: ref.pinId,
+        source_pin_canonical: srcPart ? resolveCanonicalPin(srcPart.type, ref.pinId) : ref.pinId,
+        color: activeWireColor || "#22c55e",
+        status: "draft",
+      })
       return
     }
 
-    // Use current wire color
+    if (samePin(activeSource, ref)) {
+      cancelActiveWire("clicked_source_pin")
+      return
+    }
+
+    const validation = validateCandidateWire(stateRef.current, activeSource, ref, {
+      pressed: pressedRef.current,
+      pinStates: pinStatesRef.current,
+      running: runningRef.current,
+    })
+
+    if (!validation.placementAllowed) {
+      // Blocked (e.g., duplicate connection between these exact pins): keep draft intact and record why it could not connect
+      const rt: RecentTargetPin = {
+        partId: ref.partId,
+        pinId: ref.pinId,
+        leftAt: nowIso,
+      }
+      recentTargetRef.current = rt
+      setRecentTarget(rt)
+      if (draftMetaRef.current) {
+        draftMetaRef.current = { ...draftMetaRef.current, updatedAt: nowIso }
+      }
+      emitLifecycleEvent("target_validation", {
+        source: activeSource,
+        target: ref,
+        validation: {
+          placement_allowed: false,
+          compatibility_status: validation.compatibilityStatus,
+          is_same_pin: validation.isSamePin,
+          is_duplicate_wire: validation.isDuplicateWire,
+          is_already_same_net: validation.isAlreadySameNet,
+          reasons: validation.reasons,
+        },
+        status: "invalid",
+      })
+      return
+    }
+
     const color = activeWireColor || "#22c55e"
+    const newWireId = newId()
+    const draftId = draftMetaRef.current?.draftId ?? null
     updateState((s) => ({
       ...s,
       wires: [
         ...s.wires,
         {
-          id: newId(),
-          from: wiring,
+          id: newWireId,
+          from: activeSource,
           to: ref,
           color,
         },
       ],
     }))
-    setWiring(null)
-  }, [wiring, activeWireColor, updateState])
+    clearDraftState()
+    emitLifecycleEvent(
+      "wire_complete",
+      {
+        draft_id: draftId,
+        wire_id: newWireId,
+        from: activeSource,
+        to: ref,
+        color,
+        status: "complete",
+        compatibility_status: validation.compatibilityStatus,
+      },
+      { circuitBump: false, interactionBump: true },
+    )
+  }, [activeWireColor, updateState, cancelActiveWire, clearDraftState, emitLifecycleEvent])
 
   const interact = useCallback((id: string, mode: "down" | "up" | boolean) => {
     setPressed((prev) => {
@@ -887,6 +1195,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     onApplyCircuit: useCallback(
       (newCircuit: CircuitState, newBlocklyXml?: string) => {
         stopProgram()
+        if (wiringRef.current) cancelActiveWire("ai_proposal_applied")
         updateState(() => newCircuit)
         if (typeof newBlocklyXml === "string") {
           setBlocklyXml(newBlocklyXml)
@@ -894,7 +1203,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         }
         if (storageReady) setIsDirty(true)
       },
-      [stopProgram, updateState, storageReady],
+      [stopProgram, updateState, storageReady, cancelActiveWire],
     ),
   })
 
@@ -1722,7 +2031,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setCanvasFitVersion((version) => version + 1)
     setSelectedId(null)
     setSelectedWireId(null)
-    setWiring(null)
+    clearDraftState()
     setRunning(false)
     setIsPaused(false)
     isPausedRef.current = false
@@ -1731,13 +2040,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     pressedRef.current = new Set()
     setSerialLines([])
     setBlocklyXml(DEFAULT_XML)
+    setGeneratedCode("")
     setBlocklyDocumentVersion((value) => value + 1)
     stopAiRuntime()
     setProbeRed(null)
     setProbeBlack(null)
     setScopeProbeCH1(null)
     setScopeProbeCH2(null)
-  }, [stopProgram, stopAiRuntime, updateState])
+    rotateSession("clear_all")
+  }, [stopProgram, stopAiRuntime, updateState, clearDraftState, rotateSession])
 
   const toggleRun = useCallback(() => {
     // Do not perform start/stop side effects inside a React state updater.
@@ -1749,15 +2060,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setPressed(new Set())
       pressedRef.current = new Set()
       stopProgram()
+      emitLifecycleEvent("circuit_snapshot", { action: "simulation_stopped", running: false })
       return
     }
 
-    setWiring(null)
+    if (wiringRef.current) cancelActiveWire("simulation_started")
     setSelectedId(null)
     setSelectedWireId(null)
     setRunning(true)
     startProgram(false, true)
-  }, [startProgram, stopProgram])
+    emitLifecycleEvent("circuit_snapshot", { action: "simulation_started", running: true })
+  }, [startProgram, stopProgram, cancelActiveWire, emitLifecycleEvent])
 
   // AI Studio "Run circuit" hands control to the compact right-side
   // Pixiu Vision Runtime HUD. It must never open the separate full
@@ -1767,16 +2080,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setIsAiCameraOpen(false)
     setAiCameraCompact(true)
     setAiRuntimeEnabled(true)
+    if (wiringRef.current) cancelActiveWire("simulation_started")
     if (!runningRef.current) {
       setRunning(true)
       startProgram(false, true)
     }
-  }, [startProgram])
+  }, [startProgram, cancelActiveWire])
 
-  // AI Circuit Doctor diagnostic report
+  // AI Circuit Doctor diagnostic report (includes Blockly code pin binding checks)
   const doctorReport = useMemo(
-    () => diagnoseCircuit(state, runtime, pinStates),
-    [state, runtime, pinStates],
+    () => diagnoseCircuit(state, runtime, pinStates, { blocklyXml }),
+    [state, runtime, pinStates, blocklyXml],
   )
 
   const handleResetMcu = useCallback(() => {
@@ -2005,14 +2319,15 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setCurrentProjectName(saved.name)
     setSelectedId(null)
     setSelectedWireId(null)
-    setWiring(null)
+    clearDraftState()
     setSerialLines([])
     stopAiRuntime()
     setIsDmmOpen(false)
     setIsScopeOpen(false)
     setLastSaved(saved.savedAt)
     setIsDirty(false)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+    rotateSession("upload_project")
+  }, [projectStorageScope, stopProgram, stopAiRuntime, clearDraftState, rotateSession])
 
   const handleLoadProject = useCallback(async (project: SavedCircuit): Promise<void> => {
     stopProgram()
@@ -2025,7 +2340,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setCurrentProjectName(project.name)
     setSelectedId(null)
     setSelectedWireId(null)
-    setWiring(null)
+    clearDraftState()
     setSerialLines([])
     stopAiRuntime()
     setIsDmmOpen(false)
@@ -2036,7 +2351,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setActiveLessonId(null)
     setActiveLessonSessionId(null)
     setActiveTemplateId(null)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+    rotateSession("load_project")
+  }, [projectStorageScope, stopProgram, stopAiRuntime, clearDraftState, rotateSession])
 
   const handleNewProject = useCallback(async (): Promise<void> => {
     stopProgram()
@@ -2045,13 +2361,14 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setCanvasFitVersion((version) => version + 1)
     setView("circuit")
     setBlocklyXml(DEFAULT_XML)
+    setGeneratedCode("")
     setBlocklyDocumentVersion((value) => value + 1)
     setCurrentProjectName("Untitled Circuit")
     setLastSaved(null)
     setIsDirty(false)
     setSelectedId(null)
     setSelectedWireId(null)
-    setWiring(null)
+    clearDraftState()
     setSerialLines([])
     stopAiRuntime()
     setIsDmmOpen(false)
@@ -2060,7 +2377,8 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
     setActiveLessonId(null)
     setActiveLessonSessionId(null)
     setActiveTemplateId(null)
-  }, [projectStorageScope, stopProgram, stopAiRuntime])
+    rotateSession("new_project")
+  }, [projectStorageScope, stopProgram, stopAiRuntime, clearDraftState, rotateSession])
 
   const handleSelectLesson = useCallback((lesson: Lesson) => {
     setActiveLessonId(lesson.id)
@@ -2084,7 +2402,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setRunTime(0)
       setSelectedId(null)
       setSelectedWireId(null)
-      setWiring(null)
+      clearDraftState()
       setSerialLines([])
       setIsDmmOpen(false)
       setIsScopeOpen(false)
@@ -2093,11 +2411,12 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setActiveLessonSessionId(lesson.id)
       setActiveTemplateId(null)
       setView("circuit")
+      rotateSession("load_lesson")
     },
-    [stopProgram, updateState, stopAiRuntime],
+    [stopProgram, updateState, stopAiRuntime, clearDraftState, rotateSession],
   )
 
-  const handleAsk8SquareLesson = useCallback(
+  const handleAskXenLesson = useCallback(
     (lesson: Lesson, checkpoint?: Lesson["steps"][number]) => {
       if (!state.parts.length && !state.wires.length && blocklyXml === DEFAULT_XML && !activeLessonSessionId) {
         handleLoadLesson(lesson)
@@ -2124,7 +2443,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       if (storageReady) setIsDirty(true)
       setSelectedId(null)
       setSelectedWireId(null)
-      setWiring(null)
+      clearDraftState()
       setSerialLines([])
       // Selecting a template replaces the active program context. AI templates
       // never request camera/microphone access until the student runs the program.
@@ -2133,8 +2452,9 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
       setAiRuntimeEnabled(false)
       setAiCameraCompact(false)
       setIsAiCameraOpen(false)
+      rotateSession("select_template")
     },
-    [stopProgram, updateState, storageReady],
+    [stopProgram, updateState, storageReady, clearDraftState, rotateSession],
   )
 
   const toggleMute = useCallback(() => {
@@ -2151,19 +2471,42 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
 
       {/* PIXIU AI Circuit Copilot Chatbot Widget */}
       <CircuitCopilotChat
-        meter={{ red: probeRed, black: probeBlack }}
+        meter={{ red: probeRed, black: probeBlack, mode: multimeterTelemetry?.mode }}
+        meterTelemetry={multimeterTelemetry}
         scope={{ ch1: scopeProbeCH1, ch2: scopeProbeCH2 }}
+        scopeTelemetry={oscilloscopeTelemetry}
         key={projectStorageScope}
         userRole={userRole}
+        sessionId={sessionId}
+        circuitRevision={circuitRevision}
+        interactionRevision={interactionRevision}
         currentCircuit={state}
         currentBlocklyXml={blocklyXml}
+        generatedCode={generatedCode}
+        activeStepLabel={activeStepBlock?.label ?? null}
         running={running}
+        isPaused={isPaused}
+        runTime={runTime}
+        pressedPartIds={Array.from(pressed)}
+        serialLines={serialLines.slice(-10).map((line) => line.text)}
         activeBoard={activeBoard}
         runtime={runtime}
         pinStates={pinStates}
         copilotAction={copilotAction}
         onHighlightParts={handleHighlightParts}
         lessonContext={activeLessonContext}
+        wiring={wiring}
+        activeWireColor={activeWireColor}
+        hoverPin={hoverPin}
+        recentTarget={recentTarget}
+        hoveredPartId={hoveredPartId}
+        selectedId={selectedId}
+        selectedWireId={selectedWireId}
+        draftMeta={draftMeta}
+        getDraftCursor={() => draftCursorRef.current}
+        lastLifecycleEvent={lastLifecycleEvent}
+        lifecycleEventBatch={lifecycleEventBatch}
+        stateRevision={stateRevision}
         isOpen={isCopilotOpen}
         onToggleOpen={() => setIsCopilotOpen((prev) => !prev)}
       />
@@ -2293,7 +2636,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         copilotAction={copilotAction}
         onHighlightParts={handleHighlightParts}
         onOpenCopilot={() => setIsCopilotOpen(true)}
-        onAsk8Square={handleAsk8SquareLesson}
+        onAskXen={handleAskXenLesson}
       />
 
       <TemplateBrowser
@@ -2338,9 +2681,17 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
           circuit={state}
           xml={blocklyXml}
           onXmlChange={(xml) => {
-            setBlocklyXml(xml)
+            setBlocklyXml((prev) => {
+              if (prev !== xml) {
+                circuitRevisionRef.current += 1
+                setCircuitRevision(circuitRevisionRef.current)
+                setStateRevision(circuitRevisionRef.current + interactionRevisionRef.current)
+              }
+              return xml
+            })
             if (storageReady) setIsDirty(true)
           }}
+          onCodeChange={setGeneratedCode}
           onWorkspaceReady={(ws) => {
             visualWorkspaceRef.current = ws
           }}
@@ -2416,7 +2767,10 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
               }}
               onMovePart={movePart}
               onPinDown={handlePinDown}
-              onCancelWire={() => setWiring(null)}
+              onCancelWire={() => cancelActiveWire("cancelled_by_user")}
+              onHoverPinChange={handleHoverPinChange}
+              onHoverPartChange={handleHoverPartChange}
+              onDraftCursorMove={handleDraftCursorMove}
               onDeleteWire={deleteWire}
               onDropPart={addPart}
               onInteract={interact}
@@ -2745,6 +3099,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         activeProbeToPlace={activeProbeToPlace}
         onSetActiveProbeToPlace={setActiveProbeToPlace}
         isAiCameraOpen={isAiCameraOpen}
+        onTelemetryChange={setMultimeterTelemetry}
       />
 
       {/* Interactive Mini Oscilloscope & Logic Waveform Grapher */}
@@ -2761,6 +3116,7 @@ export function Workbench({ userRole, pixiuId, accountId }: WorkbenchProps = {})
         onSetProbeCH2={setScopeProbeCH2}
         activeProbeToPlace={activeScopeProbeToPlace}
         onSetActiveProbeToPlace={setActiveScopeProbeToPlace}
+        onTelemetryChange={setOscilloscopeTelemetry}
       />
 
       <LogicAnalyzer

@@ -10,6 +10,7 @@ interface Props {
   circuit: CircuitState
   xml?: string
   onXmlChange?: (xml: string) => void
+  onCodeChange?: (code: string) => void
   onWorkspaceReady?: (workspace: Blockly.WorkspaceSvg) => void
 }
 
@@ -192,7 +193,7 @@ const TOOLBOX = {
   ],
 }
 
-export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: Props) {
+export function BlocklyEditor({ circuit, xml, onXmlChange, onCodeChange, onWorkspaceReady }: Props) {
   const blocklyDiv = useRef<HTMLDivElement>(null)
   const workspaceRef = useRef<Blockly.WorkspaceSvg | null>(null)
   const lastWorkspaceXmlRef = useRef<string | null>(null)
@@ -291,6 +292,7 @@ export function BlocklyEditor({ circuit, xml, onXmlChange, onWorkspaceReady }: P
       try {
         const code = arduino.workspaceToCode(workspace)
         setCppCode(code)
+        onCodeChange?.(code)
 
         const dom = Blockly.Xml.workspaceToDom(workspace)
         const text = Blockly.utils.xml.domToText(dom)

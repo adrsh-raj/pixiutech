@@ -149,7 +149,7 @@ function validateRecordParent(record, canonicalById, issues) {
   return parent;
 }
 
-function validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId) {
+function validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId, legacyUnwiredHealthSnapshots = null) {
   const id = record.record_id;
   const circuit = record.target?.circuit;
   const explanation = record.target?.explanation;
@@ -210,11 +210,27 @@ function validateDiagnosis(record, parent, modules, issues, liveTopologyByCanoni
     issues.push({ code: "diagnosis_topology_metadata_mismatch", record_id: id, detail: "Stored topology metadata must be inherited from the canonical parent until a coordinated dataset migration" });
   }
   if (health) {
-    const storedHealth = explanation.match(/(?:Stored\s+)?Circuit Doctor snapshot:\s*(\d+(?:\.\d+)?)\s*\/\s*100\s*\((healthy|needs-attention|danger)\)/i);
-    if (!storedHealth ||
-        Number(storedHealth[1]) !== Number(health.score) ||
-        storedHealth[2].toLowerCase() !== String(health.status).toLowerCase()) {
-      issues.push({ code: "diagnosis_health_snapshot_mismatch", record_id: id, detail: "Explanation must match the live Circuit Doctor score and status" });
+    const isLegacyUnwiredBoardSnapshot =
+      health.score === null &&
+      String(health.status || "").toLowerCase() === "unwired" &&
+      Array.isArray(circuit.wires) &&
+      circuit.wires.length === 0 &&
+      circuit.parts.length === 1 &&
+      Boolean(modules.boards?.isBoardPart?.(circuit.parts[0]?.type)) &&
+      (health.issues || []).length === 0;
+    const legacyHealthyMatch = explanation.match(/(?:Stored\s+)?Circuit Doctor snapshot:\s*100\s*\/\s*100\s*\(healthy\)/i);
+    if (isLegacyUnwiredBoardSnapshot && legacyHealthyMatch && Array.isArray(legacyUnwiredHealthSnapshots)) {
+      legacyUnwiredHealthSnapshots.push({
+        record_id: id,
+        board_id: boardId,
+      });
+    } else {
+      const storedHealth = explanation.match(/(?:Stored\s+)?Circuit Doctor snapshot:\s*(\d+(?:\.\d+)?)\s*\/\s*100\s*\((healthy|needs-attention|danger)\)/i);
+      if (!storedHealth ||
+          Number(storedHealth[1]) !== Number(health.score) ||
+          storedHealth[2].toLowerCase() !== String(health.status).toLowerCase()) {
+        issues.push({ code: "diagnosis_health_snapshot_mismatch", record_id: id, detail: "Explanation must match the live Circuit Doctor score and status" });
+      }
     }
     const findings = explanation.match(/Circuit Doctor findings\s*\((\d+)\)/i);
     if (!findings || Number(findings[1]) !== (health.issues || []).length) {
@@ -320,6 +336,7 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
   const canonicalById = new Map();
   const liveTopologyByCanonicalId = new Map();
   const legacyTopologyHashMismatches = [];
+  const legacyUnwiredHealthSnapshots = [];
   const seenCanonicalIds = new Set();
   for (const record of Array.isArray(canonicalRecords) ? canonicalRecords : []) {
     if (!record?.record_id || seenCanonicalIds.has(record.record_id)) {
@@ -356,7 +373,7 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
     }
     seenDerivedIds.add(record.record_id);
     const parent = validateRecordParent(record, canonicalById, issues);
-    validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId);
+    validateDiagnosis(record, parent, modules, issues, liveTopologyByCanonicalId, legacyUnwiredHealthSnapshots);
   }
   for (const record of Array.isArray(blocklyRecords) ? blocklyRecords : []) {
     if (!record?.record_id || seenDerivedIds.has(record.record_id)) {
@@ -379,6 +396,14 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
       detail: "Existing canonical topology hashes differ from the current live fingerprint. They are preserved; Phase 2.5 compares derived targets against fresh parent fingerprints. A corpus hash migration is not performed by this audit.",
     });
   }
+  if (legacyUnwiredHealthSnapshots.length) {
+    warnings.push({
+      code: "legacy_unwired_board_health_snapshot",
+      record_ids: legacyUnwiredHealthSnapshots.map((item) => item.record_id),
+      count: legacyUnwiredHealthSnapshots.length,
+      detail: "Sealed Phase 2 corpus diagnosis explanations for zero-wire single-board circuits retain legacy 100/100 (healthy) snapshots while live Circuit Doctor reports score=null status=unwired.",
+    });
+  }
   return {
     audit_name: "Pixiu AI Copilot Phase 2.5 Diagnosis and Blockly Evidence Audit",
     audit_version: "1.1.0",
@@ -388,6 +413,7 @@ export function buildPhase25Audit({ canonicalRecords, diagnosisRecords, blocklyR
     metrics: {
       canonical_parents: Array.isArray(canonicalRecords) ? canonicalRecords.length : 0,
       legacy_canonical_topology_hash_mismatches: legacyTopologyHashMismatches.length,
+      legacy_unwired_board_health_snapshots: legacyUnwiredHealthSnapshots.length,
       diagnosis: { records: Array.isArray(diagnosisRecords) ? diagnosisRecords.length : 0, passed: diagnosisPassed, failures: diagnosisFailures.length },
       blockly: { records: Array.isArray(blocklyRecords) ? blocklyRecords.length : 0, passed: blocklyPassed, failures: blocklyFailures.length },
       total_findings: issues.length,

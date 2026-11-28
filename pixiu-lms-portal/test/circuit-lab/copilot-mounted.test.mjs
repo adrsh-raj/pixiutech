@@ -65,9 +65,11 @@ test('mounted StrictMode copilot launches once, renders before completion and se
     finish = true
     await until(() => document.body.textContent.includes('use a resistor.'))
     stamp("final_present_in_dom")
+    assert.ok(document.querySelector('[data-response-source="unknown"]'), 'Unattributed completion must not claim Xen')
+    assert.equal(document.querySelector('[data-response-source="xen_step_700"]'), null)
     console.log(JSON.stringify({fixture: "jsdom + mock fetch", job_id:"fixture", launch_id:"launch-1", elapsed_ms:timeline}))
     render(false)
-    await until(() => !document.querySelector('[aria-label="8square Circuit Copilot Panel"]'))
+    await until(() => !document.querySelector('[aria-label="Xen Circuit Copilot Panel"]'))
     const wire = {id:'wire',from:{partId:'uno',pinId:'d13'},to:{partId:'r',pinId:'a'},color:'red'}
     render(true,[wire])
     await until(() => document.querySelector('form'))

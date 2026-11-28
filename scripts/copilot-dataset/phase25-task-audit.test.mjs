@@ -141,3 +141,29 @@ test("Phase 2.5 reports legacy stored topology hashes without rewriting or faili
   assert.equal(audit.warnings[0]?.code, "legacy_stored_topology_hash_mismatch");
   assert.deepEqual(parent.hashes.topology_hash, "legacy-v1-hash");
 });
+
+test("Phase 2.5 emits warning for legacy zero-wire single-board snapshot when live doctor returns unwired", () => {
+  const f = fixture();
+  f.modules.doctor.diagnoseCircuit = () => ({ score: null, status: "unwired", issues: [] });
+  const audit = buildPhase25Audit({
+    canonicalRecords: [f.parent], diagnosisRecords: [f.diagnostic], blocklyRecords: [f.blockly],
+    modules: f.modules, minimumPerTask: 1,
+  });
+  assert.equal(audit.passed, true, JSON.stringify(audit.issues));
+  assert.equal(audit.metrics.legacy_unwired_board_health_snapshots, 1);
+  assert.equal(audit.warnings[0]?.code, "legacy_unwired_board_health_snapshot");
+
+  const nonHealthyClaim = {
+    ...f.diagnostic,
+    target: {
+      ...f.diagnostic.target,
+      explanation: f.diagnostic.target.explanation.replace("100/100 (healthy)", "75/100 (danger)"),
+    },
+  };
+  const failed = buildPhase25Audit({
+    canonicalRecords: [f.parent], diagnosisRecords: [nonHealthyClaim], blocklyRecords: [f.blockly],
+    modules: f.modules, minimumPerTask: 1,
+  });
+  assert.equal(failed.passed, false);
+  assert.ok(failed.issues.some((issue) => issue.code === "diagnosis_health_snapshot_mismatch"));
+});

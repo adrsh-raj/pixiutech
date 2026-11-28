@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 96" role="img" aria-labelledby="xen-logo-title">
+  <title id="xen-logo-title">Xen AI — Engineering Learning Guide</title>
+  <defs>
+    <linearGradient id="xen-ai-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#65D8EE" />
+      <stop offset=".55" stop-color="#6B9CFF" />
+      <stop offset="1" stop-color="#6CE0BD" />
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="76" height="76" rx="18" fill="#0B1727" stroke="#28415D" stroke-width="1.5" />
+  <path d="M28 28 L48 48 L28 68 M68 28 L48 48 L68 68" fill="none" stroke="url(#xen-ai-gradient)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="48" cy="48" r="5" fill="#F1F6FC" />
+  <text x="101" y="51" font-family="Arial, sans-serif" font-size="31" font-weight="700" letter-spacing="-.8" fill="#F1F6FC">Xen</text>
+  <text x="172" y="51" font-family="Arial, sans-serif" font-size="25" font-weight="700" letter-spacing=".2" fill="url(#xen-ai-gradient)">AI</text>
+  <text x="103" y="73" font-family="Arial, sans-serif" font-size="9" font-weight="600" letter-spacing="2.2" fill="#91A9C3">CYBERLAB CIRCUIT GUIDE</text>
+</svg>

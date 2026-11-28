@@ -289,7 +289,7 @@ g[display="none"],
   to { transform: rotate(-360deg); }
 }
 
-/* Scoped KaTeX styles for 8square / Xen markdown & math */
+/* Scoped KaTeX styles for Xen markdown & math */
 .xen-markdown .katex-display {
   overflow-x: auto;
   overflow-y: hidden;

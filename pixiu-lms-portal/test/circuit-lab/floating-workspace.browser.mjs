@@ -28,8 +28,8 @@ try {
       return url.origin === origin ? route.continue() : route.abort();
     });
     await page.goto(origin + '/simulation');
-    await page.getByLabel('Open 8square AI Circuit Copilot').click();
-    const panel = page.getByLabel('8square Circuit Copilot Panel');
+    await page.getByLabel('Open Xen AI Circuit Copilot').click();
+    const panel = page.getByLabel('Xen Circuit Copilot Panel');
     await panel.waitFor();
     assert.equal(new URL(page.url()).pathname, '/simulation');
     if (output) await page.screenshot({path:output + '/panel-' + width + '.png'});
@@ -41,11 +41,11 @@ try {
     const box = await panel.boundingBox();
     assert.equal(Math.round(box.x), 8);
     assert.equal(Math.round(box.y), 8);
-    await panel.getByLabel('Minimize 8square Window').click();
-    await page.getByLabel('Expand 8square Window').click();
+    await panel.getByLabel('Minimize Xen Window').click();
+    await page.getByLabel('Expand Xen Window').click();
     assert.equal(Math.round((await panel.boundingBox()).x), 8);
-    await panel.getByLabel('Close 8square Panel').click();
-    await page.getByLabel('Open 8square AI Circuit Copilot').waitFor();
+    await panel.getByLabel('Close Xen Panel').click();
+    await page.getByLabel('Open Xen AI Circuit Copilot').waitFor();
     await page.close();
   }
 } finally {

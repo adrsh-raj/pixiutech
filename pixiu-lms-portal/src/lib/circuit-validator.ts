@@ -20,10 +20,12 @@
  * Copyright (c) 2026 Pixiu Tech. All rights reserved.
  */
 
-import type { CircuitState, PlacedPart, Wire, PartType } from "./circuit-types"
+import type { CircuitState, PlacedPart, Wire, PartType, PinRef } from "./circuit-types"
+import type { ArduinoPinState } from "./simulation"
 import { PIXIU_COMPONENTS_DATASET } from "./ai/pixiu-components-dataset"
 import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
-import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
+import { getLegacyBreadboardPinMappings, normalizeBreadboardPinId } from "./breadboard-pins"
+import { solveCircuitNodalPotentials, type NodalSolution } from "./circuit-solver"
 import {
   getBoardDefinition,
   isBoardPart,
@@ -441,15 +443,13 @@ export function resolveCanonicalPin(partType: string, pinId: string): string {
     return partAliases[clean]
   }
 
-  // Breadboard coordinates: a_1, b_1 ... j_20, pos_t_1, neg_t_1, etc.
+  // Breadboard coordinates: a_1, b_1 ... j_20, pos_t_1, neg_t_1, plus legacy aliases
   if (partType === "breadboard") {
-    // Legacy top/bottom rails
-    if (clean === "pos_top" || clean === "+top" || clean === "top_+") return "pos_top"
-    if (clean === "neg_top" || clean === "-top" || clean === "top_-") return "neg_top"
-    if (clean === "pos_bot" || clean === "+bot" || clean === "bot_+") return "pos_bot"
-    if (clean === "neg_bot" || clean === "-bot" || clean === "bot_-") return "neg_bot"
-    // Column pins like a1 -> a1 or a_1
-    return clean.replace(/[-]/g, "_")
+    if (clean === "+top" || clean === "top_+") return normalizeBreadboardPinId("pos_top")
+    if (clean === "-top" || clean === "top_-") return normalizeBreadboardPinId("neg_top")
+    if (clean === "+bot" || clean === "bot_+") return normalizeBreadboardPinId("pos_bot")
+    if (clean === "-bot" || clean === "bot_-") return normalizeBreadboardPinId("neg_bot")
+    return normalizeBreadboardPinId(clean.replace(/[-]/g, "_"))
   }
 
   // Microcontrollers (Uno, ESP32, Pico, micro:bit)
@@ -839,6 +839,7 @@ export function validateProposedCircuit(
   // Validate wires & resolve aliases
   const normalizedWires: Wire[] = []
   const wireIdSet = new Set<string>()
+  const endpointPairSet = new Set<string>()
 
   for (let i = 0; i < rawCandidate.wires.length; i++) {
     const rawWire = rawCandidate.wires[i]
@@ -964,6 +965,25 @@ export function validateProposedCircuit(
       })
       continue
     }
+
+    // Duplicate undirected endpoint-pair wire check
+    const epA = `${fromPartId}:${canonicalFromPin}`.toLowerCase()
+    const epB = `${toPartId}:${canonicalToPin}`.toLowerCase()
+    const pairKey = epA < epB ? `${epA}<->${epB}` : `${epB}<->${epA}`
+    if (endpointPairSet.has(pairKey)) {
+      addNotice({
+        ruleId: `schema-duplicate-wire-${fromPartId}-${canonicalFromPin}-${toPartId}-${canonicalToPin}`,
+        severity: "critical",
+        category: "schema",
+        title: "Duplicate Wire Connection",
+        message: `Wire duplicates an existing connection between '${fromPartId}:${canonicalFromPin}' and '${toPartId}:${canonicalToPin}'.`,
+        suggestion: "Keep only a single wire between any two component pins.",
+        involvedPartIds: Array.from(new Set([fromPartId, toPartId])),
+        involvedPinIds: Array.from(new Set([canonicalFromPin, canonicalToPin])),
+      })
+      continue
+    }
+    endpointPairSet.add(pairKey)
 
     const wireId =
       w.id && typeof w.id === "string" && !wireIdSet.has(w.id)
@@ -1514,5 +1534,243 @@ export function validateProposedCircuit(
     normalizedCircuit: valid ? normalizedCircuit : undefined,
     metrics,
     revHash,
+  }
+}
+
+// ============================================================================
+// Authoritative Single-Wire Candidate Validation (Reused by Canvas & Xen)
+// ============================================================================
+
+export type CandidateCompatibilityStatus =
+  | "compatible"
+  | "redundant_same_net"
+  | "electrical_warning"
+  | "electrical_hazard"
+  | "blocked_invalid_target"
+
+export interface CandidateWireReason {
+  ruleId: string
+  severity: DiagnosticSeverity
+  title: string
+  message: string
+  suggestion: string
+}
+
+export interface CandidateWireValidation {
+  placementAllowed: boolean
+  compatibilityStatus: CandidateCompatibilityStatus
+  isSamePin: boolean
+  isDuplicateWire: boolean
+  isAlreadySameNet: boolean
+  canonicalFrom: PinRef
+  canonicalTo: PinRef
+  reasons: CandidateWireReason[]
+}
+
+/**
+ * Validating a single interactive or proposed candidate wire using the canonical
+ * alias resolver, nodal solver, and 7-layer circuit validator so Canvas UI,
+ * simulator, and Xen share one authoritative electrical truth.
+ */
+export function validateCandidateWire(
+  circuit: CircuitState,
+  from: PinRef,
+  to: PinRef,
+  options: {
+    pressed?: Set<string>
+    pinStates?: Record<string, ArduinoPinState>
+    running?: boolean
+    nodalSolution?: NodalSolution
+  } = {},
+): CandidateWireValidation {
+  const fromPart = circuit.parts.find((p) => p.id === from.partId)
+  const toPart = circuit.parts.find((p) => p.id === to.partId)
+  const canonicalFrom: PinRef = {
+    partId: from.partId,
+    pinId: fromPart ? resolveCanonicalPin(fromPart.type, from.pinId) : from.pinId.trim().toLowerCase(),
+  }
+  const canonicalTo: PinRef = {
+    partId: to.partId,
+    pinId: toPart ? resolveCanonicalPin(toPart.type, to.pinId) : to.pinId.trim().toLowerCase(),
+  }
+
+  const reasons: CandidateWireReason[] = []
+
+  if (!fromPart || !toPart) {
+    const missingId = !fromPart ? from.partId : to.partId
+    reasons.push({
+      ruleId: `identity-missing-part-${missingId}`,
+      severity: "critical",
+      title: "Component Not Found",
+      message: `Endpoint component '${missingId}' does not exist on the canvas.`,
+      suggestion: "Start and end wires on placed components.",
+    })
+    return {
+      placementAllowed: false,
+      compatibilityStatus: "blocked_invalid_target",
+      isSamePin: false,
+      isDuplicateWire: false,
+      isAlreadySameNet: false,
+      canonicalFrom,
+      canonicalTo,
+      reasons,
+    }
+  }
+
+  if (!isRegisteredPin(fromPart.type, canonicalFrom.pinId) || !isRegisteredPin(toPart.type, canonicalTo.pinId)) {
+    const badPart = !isRegisteredPin(fromPart.type, canonicalFrom.pinId) ? fromPart : toPart
+    const badPin = !isRegisteredPin(fromPart.type, canonicalFrom.pinId) ? canonicalFrom.pinId : canonicalTo.pinId
+    reasons.push({
+      ruleId: `identity-unknown-pin-${badPart.id}-${badPin}`,
+      severity: "critical",
+      title: "Unknown Component Pin",
+      message: `Pin '${badPin}' is not valid on component '${badPart.id}' (${badPart.type}).`,
+      suggestion: "Select a valid terminal pin on the component.",
+    })
+    return {
+      placementAllowed: false,
+      compatibilityStatus: "blocked_invalid_target",
+      isSamePin: false,
+      isDuplicateWire: false,
+      isAlreadySameNet: false,
+      canonicalFrom,
+      canonicalTo,
+      reasons,
+    }
+  }
+
+  const isSamePin = canonicalFrom.partId === canonicalTo.partId && canonicalFrom.pinId === canonicalTo.pinId
+  if (isSamePin) {
+    reasons.push({
+      ruleId: `safety-self-loop-wire-${canonicalFrom.partId}-${canonicalFrom.pinId}`,
+      severity: "critical",
+      title: "Same-Pin Self-Connection",
+      message: `Cannot connect ${canonicalFrom.partId}:${canonicalFrom.pinId} to itself.`,
+      suggestion: "Select a different target pin or cancel wiring.",
+    })
+    return {
+      placementAllowed: false,
+      compatibilityStatus: "blocked_invalid_target",
+      isSamePin: true,
+      isDuplicateWire: false,
+      isAlreadySameNet: true,
+      canonicalFrom,
+      canonicalTo,
+      reasons,
+    }
+  }
+
+  const partMap = new Map(circuit.parts.map((p) => [p.id, p]))
+  const isDuplicateWire = circuit.wires.some((w) => {
+    const wpFrom = partMap.get(w.from.partId)
+    const wpTo = partMap.get(w.to.partId)
+    if (!wpFrom || !wpTo) return false
+    const wfPin = resolveCanonicalPin(wpFrom.type, w.from.pinId)
+    const wtPin = resolveCanonicalPin(wpTo.type, w.to.pinId)
+    return (
+      (w.from.partId === canonicalFrom.partId && wfPin === canonicalFrom.pinId && w.to.partId === canonicalTo.partId && wtPin === canonicalTo.pinId) ||
+      (w.from.partId === canonicalTo.partId && wfPin === canonicalTo.pinId && w.to.partId === canonicalFrom.partId && wtPin === canonicalFrom.pinId)
+    )
+  })
+
+  if (isDuplicateWire) {
+    reasons.push({
+      ruleId: `wiring-duplicate-connection-${canonicalFrom.partId}-${canonicalFrom.pinId}-${canonicalTo.partId}-${canonicalTo.pinId}`,
+      severity: "warning",
+      title: "Duplicate Wire Connection",
+      message: `A wire already connects ${canonicalFrom.partId}:${canonicalFrom.pinId} and ${canonicalTo.partId}:${canonicalTo.pinId}.`,
+      suggestion: "Choose another destination pin or remove the existing wire first.",
+    })
+    return {
+      placementAllowed: false,
+      compatibilityStatus: "blocked_invalid_target",
+      isSamePin: false,
+      isDuplicateWire: true,
+      isAlreadySameNet: true,
+      canonicalFrom,
+      canonicalTo,
+      reasons,
+    }
+  }
+
+  const pressed = options.pressed ?? new Set<string>()
+  const pinStates = options.pinStates ?? {}
+  const running = options.running ?? false
+  const baseNodal = options.nodalSolution ?? solveCircuitNodalPotentials(circuit, pressed, pinStates, running)
+  const isAlreadySameNet = baseNodal.arePinsConnected(canonicalFrom, canonicalTo)
+
+  const candidateWire: Wire = {
+    id: "__candidate__",
+    from: canonicalFrom,
+    to: canonicalTo,
+    color: "#38bdf8",
+  }
+  const candidateCircuit: CircuitState = {
+    parts: circuit.parts,
+    wires: [...circuit.wires, candidateWire],
+  }
+
+  const baseValidation = validateProposedCircuit(circuit, { allowWarnings: true })
+  const nextValidation = validateProposedCircuit(candidateCircuit, { allowWarnings: true })
+  const baseRuleIds = new Set(baseValidation.notices.map((n) => n.ruleId))
+
+  for (const notice of nextValidation.notices) {
+    if (!baseRuleIds.has(notice.ruleId)) {
+      reasons.push({
+        ruleId: notice.ruleId,
+        severity: notice.severity,
+        title: notice.title,
+        message: notice.message,
+        suggestion: notice.suggestion,
+      })
+    }
+  }
+
+  // Also check nodal source conflicts introduced by this candidate wire (e.g. GPIO outputs or conflicting power rails)
+  const nextNodal = solveCircuitNodalPotentials(candidateCircuit, pressed, pinStates, running)
+  const baseDiagMsgs = new Set(baseNodal.diagnostics.map((d) => `${d.code}:${d.message}`))
+  for (const diag of nextNodal.diagnostics) {
+    const sig = `${diag.code}:${diag.message}`
+    if (!baseDiagMsgs.has(sig) && diag.code === "source-conflict") {
+      reasons.push({
+        ruleId: `safety-nodal-${diag.code}-${diag.netId ?? 0}`,
+        severity: "critical",
+        title: "Voltage Source Conflict",
+        message: diag.message,
+        suggestion: "Do not directly bridge two driven voltage sources or pins.",
+      })
+    }
+  }
+
+  if (isAlreadySameNet && reasons.length === 0) {
+    reasons.push({
+      ruleId: `wiring-redundant-same-net-${canonicalFrom.partId}-${canonicalFrom.pinId}-${canonicalTo.partId}-${canonicalTo.pinId}`,
+      severity: "advisory",
+      title: "Already Electrically Connected",
+      message: `${canonicalFrom.partId}:${canonicalFrom.pinId} and ${canonicalTo.partId}:${canonicalTo.pinId} are already on the same conductive net.`,
+      suggestion: "Connecting two points already joined by a trace or breadboard column creates a redundant wire.",
+    })
+  }
+
+  const hasCritical = reasons.some((r) => r.severity === "critical")
+  const hasWarning = reasons.some((r) => r.severity === "warning")
+
+  const compatibilityStatus: CandidateCompatibilityStatus = hasCritical
+    ? "electrical_hazard"
+    : hasWarning
+    ? "electrical_warning"
+    : isAlreadySameNet
+    ? "redundant_same_net"
+    : "compatible"
+
+  return {
+    placementAllowed: true,
+    compatibilityStatus,
+    isSamePin: false,
+    isDuplicateWire: false,
+    isAlreadySameNet,
+    canonicalFrom,
+    canonicalTo,
+    reasons,
   }
 }

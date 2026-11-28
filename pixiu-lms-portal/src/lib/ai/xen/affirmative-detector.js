@@ -1,5 +1,5 @@
 /**
- * Multi-Turn Affirmative Continuation Detector for 8square / Xen Copilot.
+ * Multi-Turn Affirmative Continuation Detector for Xen Copilot.
  *
  * Detects affirmative user responses (e.g. "yes", "yeah", "yep", "sure", "ok",
  * "okay", "do it", "haan", "kar do", "bilkul", "go ahead") across English,

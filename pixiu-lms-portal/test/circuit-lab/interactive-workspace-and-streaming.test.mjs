@@ -1,6 +1,6 @@
 /**
  * Automated Verification Suite for:
- * 1. 8square Movable, Closable, Minimizable Floating Window
+ * 1. Xen Movable, Closable, Minimizable Floating Window
  * 2. Full Lesson-Aware Tutoring & Idempotent Auto-Explanation
  * 3. Continuous Context Envelope Construction
  * 4. Incremental Streaming & Low-Latency Chunk Polling
@@ -10,7 +10,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { sanitizeClientOutput, splitXenResponse } from '../../src/lib/ai/xen/xen-sanitizer.js'
 
-test('Interactive Workspace: Viewport Clamping keeps 8square window visible on screen', () => {
+test('Interactive Workspace: Viewport Clamping keeps Xen window visible on screen', () => {
   const windowWidth = 1440
   const windowHeight = 900
   const panelWidth = 460
@@ -136,7 +136,7 @@ test('Idempotency Guard: Prevents duplicate auto-tutoring explanations in React 
 test('Streaming: Progressive token accumulation and protocol token sanitization', () => {
   const chunks = [
     { seq: 1, delta: 'Hello! ' },
-    { seq: 2, delta: 'I am 8square, ' },
+    { seq: 2, delta: 'I am Xen, ' },
     { seq: 3, delta: 'your AI tutor. ' },
     { seq: 4, delta: 'Here is your circuit check:<|im_end|>' },
   ]
@@ -146,10 +146,10 @@ test('Streaming: Progressive token accumulation and protocol token sanitization'
     accumulated += chunk.delta
   }
 
-  assert.equal(accumulated, 'Hello! I am 8square, your AI tutor. Here is your circuit check:<|im_end|>')
+  assert.equal(accumulated, 'Hello! I am Xen, your AI tutor. Here is your circuit check:<|im_end|>')
 
   const cleaned = sanitizeClientOutput(accumulated)
-  assert.equal(cleaned, 'Hello! I am 8square, your AI tutor. Here is your circuit check:')
+  assert.equal(cleaned, 'Hello! I am Xen, your AI tutor. Here is your circuit check:')
   assert.ok(!cleaned.includes('<|im_end|>'), 'Leaked special token must be pruned')
 })
 

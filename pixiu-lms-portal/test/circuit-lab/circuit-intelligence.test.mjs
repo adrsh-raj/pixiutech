@@ -1,5 +1,5 @@
 /**
- * PIXIU TECH CYBERLAB — 8SQUARE CIRCUIT INTELLIGENCE & REPAIR VERIFICATION SUITE
+ * PIXIU TECH CYBERLAB — XEN CIRCUIT INTELLIGENCE & REPAIR VERIFICATION SUITE
  * 
  * Executes all 10 Phase 6 circuit test scenarios and Phase 7 Hinglish reasoning queries
  * against real MNA simulation, fault diagnosis, and atomic repair verification.
@@ -40,6 +40,9 @@ const {
   generateCircuitRepairProposal,
   verifyCircuitWithSimulator,
   processCircuitCopilotQuery,
+  extractCodePinBindings,
+  buildEndpointNetLookup,
+  analyzeCrossLayerLedDiagnostics,
 } = intelMod
 
 const { solveCircuitNodalPotentials } = solverMod
@@ -345,7 +348,8 @@ test("Phase 7.1: Hinglish Query — 'LED glow nahi ho rahi, check karo' returns 
   const context = serializeCircuitContext(circuit, { running: true })
   const res = processCircuitCopilotQuery("LED glow nahi ho rahi, check karo", context)
 
-  assert.ok(res.reply.includes("8square AI"), "Must identify as 8square")
+  assert.ok(res.reply.includes("Local Circuit Guidance"), "Must label deterministic output as Local Circuit Guidance")
+  assert.doesNotMatch(res.reply, /\*\*Xen Local Circuit Diagnostics/i)
   assert.ok(res.reply.includes("Samasya"), "Must respond in Hinglish")
   assert.ok(res.proposal, "Must produce proposal")
   assert.equal(res.verification?.verified, true, "Must verify with simulator")
@@ -372,3 +376,189 @@ test("Phase 7.2: English Query — 'Find the mistake in this circuit' identifies
   assert.ok(res.reply.includes("Anode (+) is connected to Ground"))
   assert.ok(res.highlightPartIds.includes("led1"))
 })
+
+test("Phase 1 Regression: empty and unwired circuits never return 100/100, 100%, or 'connections intact'", () => {
+  const emptyCircuit = { parts: [], wires: [] }
+  const emptyContext = serializeCircuitContext(emptyCircuit, { running: false })
+  assert.equal(emptyContext.healthReport.score, null)
+  assert.equal(emptyContext.healthReport.status, "empty")
+  assert.equal(emptyContext.healthReport.isEmpty, true)
+
+  const emptyReplyEn = processCircuitCopilotQuery("Is my circuit working?", emptyContext)
+  assert.match(emptyReplyEn.reply, /Empty/i)
+  assert.match(emptyReplyEn.reply, /N\/A/)
+  assert.doesNotMatch(emptyReplyEn.reply, /100\/100|100%|connections.*intact|8square/i)
+
+  const emptyReplyHi = processCircuitCopilotQuery("Mera circuit check karo bhai", emptyContext)
+  assert.match(emptyReplyHi.reply, /Empty/i)
+  assert.doesNotMatch(emptyReplyHi.reply, /100\/100|100%|connections.*intact|8square/i)
+
+  const singlePartUnwired = {
+    parts: [{ id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} }],
+    wires: [],
+  }
+  const singleCtx = serializeCircuitContext(singlePartUnwired, { running: false })
+  assert.equal(singleCtx.healthReport.score, null)
+  assert.equal(singleCtx.healthReport.status, "unwired")
+  const singleReply = processCircuitCopilotQuery("Check my circuit", singleCtx)
+  assert.match(singleReply.reply, /Not Wired/i)
+  assert.match(singleReply.reply, /N\/A/)
+  assert.doesNotMatch(singleReply.reply, /100\/100|100%|connections.*intact|8square/i)
+
+  const multiPartUnwired = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+      { id: "led1", type: "led", x: 120, y: 80, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [],
+  }
+  const multiCtx = serializeCircuitContext(multiPartUnwired, { running: false })
+  assert.equal(multiCtx.healthReport.score, null)
+  assert.equal(multiCtx.healthReport.status, "unwired")
+  const multiReply = processCircuitCopilotQuery("Is my LED wired properly?", multiCtx)
+  assert.match(multiReply.reply, /Not Wired/i)
+  assert.match(multiReply.reply, /N\/A/)
+  assert.doesNotMatch(multiReply.reply, /100\/100|100%|connections.*intact|8square/i)
+})
+
+test("Phase 2: Normalized Blockly/C++ pin bindings, resistor terminal A/B lookup, and 6-layer LED diagnostics", () => {
+  // 1. Numeric Blockly <field name="PIN">5</field> and Arduino C++ normalize cleanly to "d5" / "d13"
+  const blocklyXml = '<xml><block type="arduino_digital_write"><field name="PIN">5</field></block></xml>'
+  const cpp = 'const int ledPin = 9; void loop() { digitalWrite(ledPin, HIGH); digitalWrite(LED_BUILTIN, HIGH); }'
+  const bindings = extractCodePinBindings(blocklyXml, cpp, "arduino-uno")
+  const pins = bindings.map((b) => b.pinId)
+  assert.ok(pins.includes("d5"), "Numeric Blockly '5' must normalize to 'd5'")
+  assert.ok(pins.includes("d9"), "C++ const ledPin=9 must normalize to 'd9'")
+  assert.ok(pins.includes("d13"), "C++ LED_BUILTIN must normalize to 'd13'")
+
+  // 2. Deliberately mismatched circuit: physical LED on D9, Blockly targets numeric '5' (D5), plus button on D2
+  const ledOnD9Circuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
+      { id: "btn1", type: "pushbutton", x: 140, y: 40, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 110, rotation: 0, props: { resistance: 220 } },
+      { id: "led1", type: "led", x: 340, y: 110, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [
+      { id: "w_btn", from: { partId: "uno", pinId: "d2" }, to: { partId: "btn1", pinId: "1a" }, color: "blue" },
+      { id: "w_btn_gnd", from: { partId: "btn1", pinId: "2a" }, to: { partId: "uno", pinId: "gnd" }, color: "black" },
+      { id: "w1", from: { partId: "uno", pinId: "d9" }, to: { partId: "r1", pinId: "a" }, color: "green" },
+      { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "green" },
+      { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "black" },
+    ],
+  }
+
+  // Stopped simulation with D5 code vs D9 physical wiring (arbitrary pin test too below!)
+  const ctxStopped = serializeCircuitContext(ledOnD9Circuit, {
+    blocklyXml,
+    generatedCode: 'void loop() { digitalWrite(5, HIGH); }',
+    running: false,
+  })
+  assert.equal(ctxStopped.resistorTerminals?.length, 1)
+  const rTerm = ctxStopped.resistorTerminals[0]
+  assert.deepEqual(rTerm.terminalA.directPeers, ["uno:d9"])
+  assert.deepEqual(rTerm.terminalB.directPeers, ["led1:anode"])
+  assert.ok(ctxStopped.endpointLookup["r1:a"].sameNetBoardPins.includes("uno:d9"))
+  assert.ok(!ctxStopped.endpointLookup["r1:b"].sameNetBoardPins.includes("uno:d9"))
+
+  const faults = diagnoseCircuitIntelligence(ctxStopped)
+  const pinFault = faults.find((f) => f.classification === "CODE_PIN_MISMATCH")
+  assert.ok(pinFault, "Must detect CODE_PIN_MISMATCH when numeric Blockly '5' differs from physical D9")
+  assert.equal(pinFault.affectedPinId, "d5")
+  assert.ok(pinFault.evidence.includes("D5") && pinFault.evidence.includes("D9"), "Must identify LED driver D9 rather than button D2")
+
+  assert.equal(ctxStopped.crossLayerLedDiagnostics?.length, 1)
+  const ledDiag = ctxStopped.crossLayerLedDiagnostics[0]
+  assert.equal(ledDiag.layerA_electricalTopology.topologyOk, true)
+  assert.equal(ledDiag.layerB_safetyConstraints.safetyOk, true)
+  assert.deepEqual(ledDiag.layerC_controllerPinCompatibility.physicalBoardPins, ["d9"])
+  assert.deepEqual(ledDiag.layerD_programMapping.codePins, ["d5"])
+  assert.equal(ledDiag.layerD_programMapping.matchesPhysicalPin, false)
+  assert.equal(ledDiag.layerE_simulatorExecution.running, false)
+  assert.equal(ledDiag.layerF_observedOutput.state, "stopped_not_running")
+
+  // Verify local guidance explicitly notes simulation is stopped
+  const localStopped = processCircuitCopilotQuery("Is it blinking?", serializeCircuitContext(ledOnD9Circuit, {
+    blocklyXml: '<xml><block type="arduino_digital_write"><field name="PIN">9</field></block></xml>',
+    running: false,
+  }))
+  assert.match(localStopped.reply, /Simulation is not running yet/i)
+
+  // Verify general arbitrary pin pair (D4 wiring + numeric '8' code) and running illuminated state
+  const arbitraryCircuit = {
+    parts: [
+      { id: "uno", type: "arduino-uno", x: 40, y: 110, rotation: 0, props: {} },
+      { id: "r1", type: "resistor", x: 220, y: 110, rotation: 0, props: { resistance: 220 } },
+      { id: "led1", type: "led", x: 340, y: 110, rotation: 0, props: { color: "red" } },
+    ],
+    wires: [
+      { id: "w1", from: { partId: "uno", pinId: "d4" }, to: { partId: "r1", pinId: "a" }, color: "red" },
+      { id: "w2", from: { partId: "r1", pinId: "b" }, to: { partId: "led1", pinId: "anode" }, color: "red" },
+      { id: "w3", from: { partId: "led1", pinId: "cathode" }, to: { partId: "uno", pinId: "gnd" }, color: "black" },
+    ],
+  }
+  const arbCtx = serializeCircuitContext(arbitraryCircuit, {
+    blocklyXml: '<xml><block type="arduino_digital_write"><field name="PIN">8</field></block></xml>',
+    running: true,
+    pinStates: { d4: { state: "HIGH", outputMode: "digital" } },
+  })
+  assert.deepEqual(arbCtx.crossLayerLedDiagnostics[0].layerC_controllerPinCompatibility.physicalBoardPins, ["d4"])
+  assert.equal(arbCtx.crossLayerLedDiagnostics[0].layerF_observedOutput.state, "off_code_mismatch")
+
+  const arbMatchedRunning = serializeCircuitContext(arbitraryCircuit, {
+    blocklyXml: '<xml><block type="arduino_digital_write"><field name="PIN">4</field></block></xml>',
+    running: true,
+    pinStates: { d4: { state: "HIGH", outputMode: "digital" } },
+    runtime: { led1: { level: 1.0, currentMa: 13.6, burnt: false } },
+  })
+  assert.equal(arbMatchedRunning.crossLayerLedDiagnostics[0].layerD_programMapping.matchesPhysicalPin, true)
+  assert.equal(arbMatchedRunning.crossLayerLedDiagnostics[0].layerF_observedOutput.state, "illuminated")
+})
+
+test("Copilot instrument readings do not promote missing probes or invalid pins to simulated zero", () => {
+  const circuit = { parts: [{ id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} }], wires: [] };
+  const pin = pinId => ({ partId: "uno", pinId });
+  const look = opts => serializeCircuitContext(circuit, opts).measurements;
+  assert.equal(look({})[0].state, "unavailable");
+  assert.equal(look({})[0].value, undefined);
+  assert.equal(look({ multimeterProbes: { red: pin("missing"), black: pin("gnd") } })[0].value, undefined);
+  const measurements = look({
+    multimeterProbes: { red: pin("5v"), black: pin("gnd") },
+    oscilloscopeProbes: { ch1: pin("5v"), ch2: null },
+  });
+  assert.equal(measurements[0].state, "available");
+  assert.equal(measurements[0].value, 5);
+  assert.equal(measurements[1].state, "available");
+  assert.equal(measurements[1].value, 5);
+  assert.equal(measurements[1].probeA, "uno:5v");
+  assert.equal(measurements[2].state, "not_configured");
+  assert.equal(measurements[2].value, undefined);
+});
+
+test("Copilot answers pin lookup from the snapshot and keeps resistor branches distinct", () => {
+  const parts = [
+    { id: "uno", type: "arduino-uno", x: 0, y: 0, rotation: 0, props: {} },
+    { id: "r1", type: "resistor", x: 0, y: 0, rotation: 0, props: { resistance: 220 } },
+    { id: "led1", type: "led", x: 0, y: 0, rotation: 0, props: {} },
+  ];
+  const wire = (id, partId, pinId, toPart, toPin) => ({
+    id, from: { partId, pinId }, to: { partId: toPart, pinId: toPin }, color: "red",
+  });
+  for (const pin of ["d5", "d9"]) {
+    const circuit = { parts, wires: [wire("a", "uno", pin, "r1", "a"), wire("b", "r1", "b", "led1", "anode")] };
+    const context = serializeCircuitContext(circuit, {});
+    const direct = intelMod.describeCircuitTopology("Which Arduino pin is resistor R1 connected to?", context);
+    assert.match(direct, new RegExp(`direct wire to uno:${pin}`, "i"));
+    assert.doesNotMatch(direct, new RegExp(`uno:${pin === "d5" ? "d9" : "d5"}`, "i"));
+    const indirect = intelMod.describeCircuitTopology("Where is the LED anode connected?", context);
+    assert.match(indirect, /direct wire to r1:/i);
+    assert.match(indirect, new RegExp(`branch path: uno:${pin} through r1`, "i"));
+    assert.doesNotMatch(indirect, /direct wire to uno:/i);
+    assert.match(intelMod.describeCircuitTopology("Is the LED cathode connected to GND?", context), /no completed connection/i);
+  }
+  const empty = processCircuitCopilotQuery("done", serializeCircuitContext({ parts: [], wires: [] }, {}));
+  assert.equal(empty.state, "EMPTY_CANVAS");
+  assert.equal(empty.proposal, undefined);
+  const board = processCircuitCopilotQuery("is it correct?", serializeCircuitContext({ parts: parts.slice(0, 1), wires: [] }, {}));
+  assert.equal(board.state, "INCOMPLETE_CIRCUIT");
+});

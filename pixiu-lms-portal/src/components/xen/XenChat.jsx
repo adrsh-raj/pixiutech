@@ -10,10 +10,20 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: "Hello! I'm 8square, your AI tutor for computational thinking, STEM and programming. I'm powered by Xen. What would you like to explore today?",
+      content: "Hello! I'm Xen, your AI tutor for computational thinking, STEM and programming, powered by Xen Step-700. What would you like to explore today?",
       isComplete: true,
       displayAstValid: true,
       tested: false,
+      provenance: {
+        response_source: 'local_fallback',
+        job_id: null,
+        worker_id: null,
+        session_id: null,
+        circuit_revision: null,
+        context_schema_version: null,
+        response_status: 'static_welcome',
+        fallback_reason: 'initial_ui_greeting',
+      },
     },
   ]);
   const [inputPrompt, setInputPrompt] = useState('');
@@ -24,7 +34,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedIndex, setCopiedIndex] = useState(null);
   const [stickyFormatPreference, setStickyFormatPreference] = useState(null);
-  const [workerStatus, setWorkerStatus] = useState({ online: true, activeWorkers: 0, checked: false });
+  const [workerStatus, setWorkerStatus] = useState({ online: false, activeWorkers: 0, checked: false, statusError: false });
   const [queueInfo, setQueueInfo] = useState({ status: '', queuePosition: 0, workerAvailable: true });
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -48,11 +58,20 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     let isMounted = true;
     async function checkStatus() {
       const res = await fetchXenStatus();
-      if (isMounted && res.success) {
+      if (!isMounted) return;
+      if (res.success) {
         setWorkerStatus({
           online: Boolean(res.workerOnline),
           activeWorkers: res.activeWorkerCount || 0,
           checked: true,
+          statusError: false,
+        });
+      } else {
+        setWorkerStatus({
+          online: false,
+          activeWorkers: 0,
+          checked: true,
+          statusError: true,
         });
       }
     }
@@ -71,12 +90,27 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
   const buildCleanHistory = (list) => {
     const cleaned = [];
     for (const msg of list.slice(1)) {
-      if (msg.isCancelled || msg.partialId) continue;
-      if (msg.role === 'user' && cleaned.length > 0 && cleaned[cleaned.length - 1].role === 'user') {
-        // Replace unanswered user turn cleanly to prevent consecutive user turns
-        cleaned[cleaned.length - 1] = { role: 'user', content: msg.content };
+      if (msg.isCancelled || msg.partialId || !msg.content) continue;
+      if (msg.provenance?.response_source === 'error' || msg.provenance?.response_status === 'static_welcome') continue;
+      if (msg.role === 'assistant' && msg.groundingVerified === false) continue;
+
+      if (msg.role === 'user') {
+        if (cleaned.length > 0 && cleaned[cleaned.length - 1].role === 'user') {
+          // Replace unanswered user turn cleanly to prevent consecutive user turns
+          cleaned[cleaned.length - 1] = { role: 'user', content: msg.content };
+        } else {
+          cleaned.push({ role: 'user', content: msg.content });
+        }
       } else {
-        cleaned.push({ role: msg.role, content: msg.content });
+        const entry = { role: msg.role, content: msg.content };
+        if (msg.provenance) {
+          entry.provenance = {
+            response_source: msg.provenance.response_source || 'xen_step700',
+            circuit_revision: msg.provenance.circuit_revision ?? null,
+            grounding_verified: msg.groundingVerified ?? true,
+          };
+        }
+        cleaned.push(entry);
       }
     }
     return cleaned.slice(-10);
@@ -115,7 +149,21 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     const result = await streamXenChat({
       ...attempt,
       onChunk: (_, content) => setMessages(prev => {
-        const partial = { role: 'assistant', content, partialId };
+        const partial = {
+          role: 'assistant',
+          content,
+          partialId,
+          provenance: {
+            response_source: 'xen_step700',
+            job_id: null,
+            worker_id: null,
+            session_id: null,
+            circuit_revision: null,
+            context_schema_version: null,
+            response_status: 'streaming',
+            fallback_reason: null,
+          },
+        };
         return [...prev.filter(message => message.partialId !== partialId), partial];
       }),
       onStatusUpdate: (info) => setQueueInfo(info),
@@ -132,6 +180,16 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
           content: 'Generation cancelled by user.',
           isComplete: false,
           isCancelled: true,
+          provenance: {
+            response_source: 'error',
+            job_id: result?.provenance?.job_id || null,
+            worker_id: result?.provenance?.worker_id || null,
+            session_id: result?.provenance?.session_id || null,
+            circuit_revision: result?.provenance?.circuit_revision ?? null,
+            context_schema_version: result?.provenance?.context_schema_version || null,
+            response_status: 'cancelled',
+            fallback_reason: 'CANCELLED',
+          },
         },
       ]);
       return;
@@ -140,7 +198,8 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
     if (!result.success) {
       setStatus('error');
       const traceSuffix = result.error?.requestId ? ` (Ref: ${result.error.requestId})` : '';
-      setErrorMessage(`${result.error?.message || 'Failed to communicate with Xen AI.'}${traceSuffix}`);
+      const offlinePrefix = result.error?.code === 'WORKER_OFFLINE' ? 'Xen inference unavailable: ' : '';
+      setErrorMessage(`${offlinePrefix}${result.error?.message || 'Failed to communicate with Xen AI.'}${traceSuffix}`);
       return;
     }
 
@@ -167,6 +226,18 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         formatMode: resolvedFormatMode,
         formatValid: resp.format_valid,
         requestId: result.requestId,
+        groundingVerified: result.groundingVerification?.verified ?? true,
+        unsupportedClaims: result.groundingVerification?.unsupported_claims ?? [],
+        provenance: result.provenance || {
+          response_source: 'xen_step700',
+          job_id: null,
+          worker_id: null,
+          session_id: null,
+          circuit_revision: null,
+          context_schema_version: null,
+          response_status: 'completed',
+          fallback_reason: null,
+        },
       },
     ]);
     setStatus('idle');
@@ -186,6 +257,16 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
         isComplete: true,
         displayAstValid: true,
         tested: false,
+        provenance: {
+          response_source: 'local_fallback',
+          job_id: null,
+          worker_id: null,
+          session_id: null,
+          circuit_revision: null,
+          context_schema_version: null,
+          response_status: 'static_welcome',
+          fallback_reason: 'conversation_cleared',
+        },
       },
     ]);
     setStatus('idle');
@@ -285,7 +366,7 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
           </div>
           <div>
             <h2 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
-              8square
+              Xen
               <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
                 Xen Step-700
               </span>
@@ -339,7 +420,11 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
       {workerStatus.checked && !workerStatus.online && (
         <div className="flex items-center gap-2 px-4 py-2 bg-amber-950/40 border-b border-amber-800/40 text-amber-300 text-xs">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-          <span>GPU Worker Offline: Prompts will be queued until a Kaggle GPU worker session is active.</span>
+          <span>
+            {workerStatus.statusError
+              ? 'Xen inference status unavailable: Unable to verify GPU worker vitality from backend.'
+              : 'GPU Worker Offline: Xen inference is currently unavailable. Prompts will remain queued until the GPU worker session is active.'}
+          </span>
         </div>
       )}
 
@@ -351,6 +436,8 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
             className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
+              data-response-source={m.role === 'assistant' ? m.provenance?.response_source : undefined}
+              data-job-id={m.role === 'assistant' && m.provenance?.job_id ? m.provenance.job_id : undefined}
               className={`max-w-[85%] rounded-2xl px-4 py-3 ${
                 m.role === 'user'
                   ? 'bg-cyan-600 text-white rounded-br-sm'
@@ -360,7 +447,10 @@ export function XenChat({ userRole = 'student', isA05Qualified = false }) {
               {renderMessageContent(m, idx)}
             </div>
             <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-1 px-1">
-              <span>{m.role === 'user' ? 'You' : '8square'}</span>
+              <span>{m.role === 'user' ? 'You' : 'Xen'}</span>
+              {m.role === 'assistant' && m.provenance?.response_source === 'cache' && (
+                <span className="rounded bg-indigo-950/70 px-1.5 py-0.2 text-indigo-300 border border-indigo-800/50">Cached</span>
+              )}
               {m.requestId && (
                 <span className="font-mono text-slate-600">[{m.requestId}]</span>
               )}

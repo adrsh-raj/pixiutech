@@ -59,7 +59,7 @@ interface Props {
   copilotAction?: UseCircuitCopilotActionResult
   onHighlightParts?: (partIds: string[]) => void
   onOpenCopilot?: () => void
-  onAsk8Square?: (lesson: Lesson, checkpoint?: Lesson["steps"][number]) => void
+  onAskXen?: (lesson: Lesson, checkpoint?: Lesson["steps"][number]) => void
   missionLoaded?: boolean
 }
 
@@ -146,7 +146,7 @@ export function LessonBrowser({
   copilotAction,
   onHighlightParts,
   onOpenCopilot,
-  onAsk8Square,
+  onAskXen,
   missionLoaded = false,
 }: Props) {
   const normalizedRole = String(userRole || "").toLowerCase()
@@ -829,20 +829,20 @@ export function LessonBrowser({
 
               <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
                 {nextStep && (
-                  <section aria-labelledby="eight-square-guide-title" className="mb-4 overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/20">
+                  <section aria-labelledby="xen-guide-title" className="mb-4 overflow-hidden rounded-2xl border border-cyan-400/20 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/20">
                     <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-800 px-4 py-3">
                       <div>
                         <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-cyan-300">Circuit-aware mission support</p>
-                        <h3 id="eight-square-guide-title" className="mt-1 text-sm font-semibold text-white">8 Square Guide</h3>
+                        <h3 id="xen-guide-title" className="mt-1 text-sm font-semibold text-white">Xen Guide</h3>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={() => setShowCircuitCheck((visible) => !visible)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-[10px] font-semibold text-slate-200 transition hover:border-cyan-400/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Activity size={13} />{showCircuitCheck ? "Hide diagnosis" : "Circuit diagnosis"}</button>
-                        {(onAsk8Square || onOpenCopilot) && (
+                        {(onAskXen || onOpenCopilot) && (
                           <button
                             type="button"
                             onClick={() => {
-                              if (onAsk8Square && activeLesson) {
-                                onAsk8Square(activeLesson, nextStep ?? undefined)
+                              if (onAskXen && activeLesson) {
+                                onAskXen(activeLesson, nextStep ?? undefined)
                               } else if (onOpenCopilot) {
                                 onOpenCopilot()
                               }
@@ -850,7 +850,7 @@ export function LessonBrowser({
                             className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-950/40 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-900/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
                           >
                             <Sparkles size={12} className="text-cyan-300" />
-                            <span>Ask 8 Square</span>
+                            <span>Ask Xen</span>
                           </button>
                         )}
                          {!missionComplete && <button type="button" onClick={() => setHintLevels((current) => ({ ...current, [nextStepKey]: Math.min(3, (current[nextStepKey] || 0) + 1) }))} disabled={guideLevel >= 3} className="inline-flex items-center gap-1.5 rounded-lg bg-cyan-400/10 px-3 py-2 text-[10px] font-semibold text-cyan-200 transition hover:bg-cyan-400/15 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"><Lightbulb size={13} />{guideLevel === 0 ? "Get a hint" : guideLevel < 3 ? "Next hint" : "All hints shown"}</button>}

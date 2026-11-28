@@ -1,9 +1,11 @@
 import type { CircuitState, PlacedPart } from "./circuit-types"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { ArduinoPinState } from "./simulation"
-import { getBoardForPart, isBoardPart } from "./board-registry"
+import { getBoardForPart, isBoardPart, type BoardDefinition } from "./board-registry"
 import { BREADBOARD_COLUMNS, CATALOG } from "./components-catalog"
 import { getLegacyBreadboardPinMappings } from "./breadboard-pins"
+import { resolveCanonicalPin } from "./circuit-validator"
+import { extractCodePinBindings, type CodePinBinding } from "./code-pin-bindings"
 
 export type DiagnosticSeverity = "critical" | "warning" | "tip" | "success"
 
@@ -19,19 +21,41 @@ export interface DiagnosticIssue {
 }
 
 export interface CircuitHealthReport {
-  score: number
-  status: "healthy" | "needs-attention" | "danger"
+  score: number | null
+  status: "empty" | "unwired" | "healthy" | "needs-attention" | "danger"
   issues: DiagnosticIssue[]
   criticalCount: number
   warningCount: number
   tipCount: number
+  isEmpty?: boolean
 }
+
+export interface CircuitDoctorOptions {
+  blocklyXml?: string
+  generatedCode?: string
+  codePinBindings?: CodePinBinding[]
+}
+
+const PASSIVE_SERIES_TYPES = new Set(["resistor", "pushbutton", "switch", "slide-switch"])
 
 export function diagnoseCircuit(
   state: CircuitState,
   runtime: Record<string, PartRuntime> = {},
   _pinStates: Record<string, ArduinoPinState> = {},
+  options: CircuitDoctorOptions = {},
 ): CircuitHealthReport {
+  if (state.parts.length === 0) {
+    return {
+      score: null,
+      status: "empty",
+      issues: [],
+      criticalCount: 0,
+      warningCount: 0,
+      tipCount: 0,
+      isEmpty: true,
+    }
+  }
+
   const issues: DiagnosticIssue[] = []
 
   const partMap = new Map<string, PlacedPart>()
@@ -39,11 +63,15 @@ export function diagnoseCircuit(
     partMap.set(p.id, p)
   }
 
-  // Build connected pins set and wire graph
+  // Build connected pins set and wire graph (canonicalizing legacy pin aliases)
   const pinWires = new Map<string, string[]>()
   for (const w of state.wires) {
-    const k1 = `${w.from.partId}:${w.from.pinId}`
-    const k2 = `${w.to.partId}:${w.to.pinId}`
+    const p1 = partMap.get(w.from.partId)
+    const p2 = partMap.get(w.to.partId)
+    const pin1 = p1 ? resolveCanonicalPin(p1.type, w.from.pinId) : w.from.pinId.toLowerCase()
+    const pin2 = p2 ? resolveCanonicalPin(p2.type, w.to.pinId) : w.to.pinId.toLowerCase()
+    const k1 = `${w.from.partId}:${pin1}`
+    const k2 = `${w.to.partId}:${pin2}`
     if (!pinWires.has(k1)) pinWires.set(k1, [])
     if (!pinWires.has(k2)) pinWires.set(k2, [])
     pinWires.get(k1)!.push(k2)
@@ -117,10 +145,73 @@ export function diagnoseCircuit(
     return false
   }
 
-  // 1. Check for Overcurrent Burnout on LEDs
+  const traceLedLegReach = (startKey: string) => {
+    const visited = new Set<string>()
+    const queue = [startKey]
+    const resistors = new Set<PlacedPart>()
+    const boardGpioPins = new Set<string>()
+    let hasGround = false
+    let hasPower = false
+
+    for (let idx = 0; idx < queue.length; idx++) {
+      const current = queue[idx]
+      if (visited.has(current)) continue
+      visited.add(current)
+
+      if (groundSources.has(current)) hasGround = true
+      if (supplySources.has(current)) hasPower = true
+
+      const [cPartId, cPinId] = current.split(":")
+      const cPart = partMap.get(cPartId)
+      if (cPart && isBoardPart(cPart.type)) {
+        const bDef = getBoardForPart(cPart)
+        const bPin = bDef?.pins.find((p) => p.id.toLowerCase() === cPinId?.toLowerCase())
+        if (bPin && (bPin.kind === "digital" || bPin.kind === "analog")) {
+          boardGpioPins.add(current)
+        }
+      }
+
+      if (cPart?.type === "resistor") {
+        resistors.add(cPart)
+      }
+
+      for (const n of pinWires.get(current) ?? []) {
+        if (!visited.has(n)) queue.push(n)
+      }
+      for (const n of breadboardLinks.get(current) ?? []) {
+        if (!visited.has(n)) queue.push(n)
+      }
+
+      // Traverse internally across opposite terminals of passive series parts (e.g. resistor on cathode/GND or anode leg)
+      if (cPart && PASSIVE_SERIES_TYPES.has(cPart.type)) {
+        const cDef = CATALOG[cPart.type]
+        for (const pDef of cDef?.pins ?? []) {
+          const sibKey = `${cPart.id}:${pDef.id}`
+          if (sibKey !== current && !visited.has(sibKey) && (pinWires.has(sibKey) || breadboardLinks.has(sibKey))) {
+            queue.push(sibKey)
+          }
+        }
+      }
+    }
+
+    return {
+      resistors: Array.from(resistors),
+      boardGpioPins: Array.from(boardGpioPins),
+      hasGround,
+      hasPower,
+    }
+  }
+
+  // 1. Check Overcurrent Burnout & Static Electrical Polarity/Ground/Safety on LEDs
   for (const part of state.parts) {
     if (part.type === "led") {
       const rt = runtime[part.id]
+      const anodeKey = `${part.id}:anode`
+      const cathodeKey = `${part.id}:cathode`
+      const anodeWired = (pinWires.get(anodeKey)?.length ?? 0) > 0
+      const cathodeWired = (pinWires.get(cathodeKey)?.length ?? 0) > 0
+      let staticRevDetected = false
+
       if (rt?.burnt) {
         issues.push({
           id: `led-burnout-${part.id}`,
@@ -132,10 +223,77 @@ export function diagnoseCircuit(
           involvedPinIds: ["anode", "cathode"],
           category: "safety",
         })
-      } else if (rt?.warning?.includes("Reverse Polarity")) {
+      } else if (state.wires.length > 0 && (anodeWired || cathodeWired)) {
+        if (!anodeWired || !cathodeWired) {
+          const missingPin = !cathodeWired ? "cathode" : "anode"
+          issues.push({
+            id: `led-open-circuit-${part.id}`,
+            severity: "critical",
+            title: missingPin === "cathode" ? "Missing Ground Return on LED" : "Open LED Anode Connection",
+            message: `LED '${part.id}' ${missingPin} (${missingPin === "cathode" ? "-" : "+"}) is disconnected, leaving an open circuit with no closed current loop.`,
+            suggestion:
+              missingPin === "cathode"
+                ? `Connect ${part.id} Cathode (-) to Ground (GND).`
+                : `Connect ${part.id} Anode (+) through a 220Ω series resistor to a GPIO signal or power rail.`,
+            involvedPartIds: [part.id],
+            involvedPinIds: [missingPin],
+            category: "wiring",
+          })
+        } else {
+          const anodeReach = traceLedLegReach(anodeKey)
+          const cathodeReach = traceLedLegReach(cathodeKey)
+          const isStaticReverse =
+            anodeReach.hasGround &&
+            !anodeReach.hasPower &&
+            anodeReach.boardGpioPins.length === 0 &&
+            (cathodeReach.hasPower || cathodeReach.boardGpioPins.length > 0)
+
+          if (isStaticReverse || rt?.warning?.includes("Reverse Polarity")) {
+            staticRevDetected = true
+            issues.push({
+              id: `led-rev-pol-${part.id}`,
+              severity: "critical",
+              title: "LED Reverse Polarity",
+              message: "The LED Anode (+) is wired toward Ground while Cathode (-) faces the voltage/signal source. Diodes only conduct in forward bias (and a series resistor does not protect against reverse polarity).",
+              suggestion: "Swap the LED connections: wire Anode (+) toward the resistor/positive signal and Cathode (-) toward Ground.",
+              involvedPartIds: [part.id],
+              involvedPinIds: ["anode", "cathode"],
+              category: "wiring",
+            })
+          } else if (!cathodeReach.hasGround) {
+            issues.push({
+              id: `led-missing-gnd-${part.id}`,
+              severity: "critical",
+              title: "Missing Ground Return on LED",
+              message: `LED '${part.id}' Cathode (-) does not reach a valid Ground (GND) return path.`,
+              suggestion: `Route ${part.id} Cathode (-) to a board or battery Ground (GND) pin.`,
+              involvedPartIds: [part.id],
+              involvedPinIds: ["cathode"],
+              category: "wiring",
+            })
+          } else if (
+            (anodeReach.hasPower || anodeReach.boardGpioPins.length > 0) &&
+            anodeReach.resistors.length === 0 &&
+            cathodeReach.resistors.length === 0
+          ) {
+            issues.push({
+              id: `led-no-resistor-${part.id}`,
+              severity: "critical",
+              title: "Missing Series Current-Limiting Resistor",
+              message: `LED '${part.id}' is in a closed drive path to GND without a series current-limiting resistor, risking overcurrent burnout.`,
+              suggestion: `Insert a 220Ω–330Ω resistor in series with ${part.id}.`,
+              involvedPartIds: [part.id],
+              involvedPinIds: ["anode", "cathode"],
+              category: "safety",
+            })
+          }
+        }
+      }
+
+      if (!staticRevDetected && rt?.warning?.includes("Reverse Polarity") && !rt?.burnt) {
         issues.push({
           id: `led-rev-pol-${part.id}`,
-          severity: "warning",
+          severity: "critical",
           title: "LED Reverse Polarity",
           message: "The LED Anode (+) is wired to Ground while Cathode (-) is wired to Power. Diodes only conduct in forward bias.",
           suggestion: "Flip the LED: connect Anode (+) to the positive voltage signal and Cathode (-) to Ground.",
@@ -384,6 +542,44 @@ export function diagnoseCircuit(
     }
   }
 
+  // 7. Check Code-to-Wiring Pin Mismatch when Blockly XML / C++ code bindings are supplied
+  if (boardDef && boardPart && state.wires.length > 0 && (options.blocklyXml || options.generatedCode || (options.codePinBindings && options.codePinBindings.length > 0))) {
+    const codeBindings =
+      options.codePinBindings ??
+      extractCodePinBindings(options.blocklyXml, options.generatedCode, boardPart.type)
+
+    if (codeBindings.length > 0) {
+      const codePinSet = new Set(codeBindings.map((b) => b.pinId.toLowerCase()))
+      const wiredDigitalPins: string[] = []
+      for (const pin of boardDef.pins) {
+        if (pin.kind === "digital" && (pinWires.get(`${boardPart.id}:${pin.id.toLowerCase()}`)?.length ?? 0) > 0) {
+          wiredDigitalPins.push(pin.id.toLowerCase())
+        }
+      }
+      const unreferencedDigital = wiredDigitalPins.filter((p) => !codePinSet.has(p))
+      for (const binding of codeBindings) {
+        if (binding.configuredMode !== "OUTPUT" && binding.configuredMode !== "PWM" && binding.configuredMode !== "SERVO") {
+          continue
+        }
+        const codePin = binding.pinId.toLowerCase()
+        const isCodePinWired = (pinWires.get(`${boardPart.id}:${codePin}`)?.length ?? 0) > 0
+        if (!isCodePinWired && unreferencedDigital.length > 0) {
+          const actualList = unreferencedDigital.map((p) => p.toUpperCase()).join(", ")
+          issues.push({
+            id: `code-pin-mismatch-${codePin}`,
+            severity: "critical",
+            title: `Code / Hardware Pin Mismatch (${codePin.toUpperCase()} vs ${actualList})`,
+            message: `Program outputs to pin ${codePin.toUpperCase()}, whereas hardware is physically wired to pin ${actualList}. The driven signal will not reach the external load.`,
+            suggestion: `Move the physical wire from ${actualList} to ${codePin.toUpperCase()} (or update the code block pin to match ${actualList}).`,
+            involvedPartIds: [boardPart.id],
+            involvedPinIds: [codePin, ...unreferencedDigital],
+            category: "pinout",
+          })
+        }
+      }
+    }
+  }
+
   // Deduplicate issues by ID
   const uniqueIssues = Array.from(new Map(issues.map((i) => [i.id, i])).values())
 
@@ -391,13 +587,25 @@ export function diagnoseCircuit(
   const warningCount = uniqueIssues.filter((i) => i.severity === "warning").length
   const tipCount = uniqueIssues.filter((i) => i.severity === "tip").length
 
+  if (state.wires.length === 0) {
+    return {
+      score: null,
+      status: "unwired",
+      issues: uniqueIssues,
+      criticalCount,
+      warningCount,
+      tipCount,
+      isEmpty: false,
+    }
+  }
+
   const deductions = criticalCount * 35 + warningCount * 15 + tipCount * 5
   const score = Math.max(0, 100 - deductions)
 
   const status: CircuitHealthReport["status"] =
     criticalCount > 0 ? "danger" : warningCount > 0 ? "needs-attention" : "healthy"
 
-  if (uniqueIssues.length === 0 && state.parts.length > 1) {
+  if (uniqueIssues.length === 0 && state.parts.length > 1 && state.wires.length > 0) {
     uniqueIssues.push({
       id: "circuit-perfect",
       severity: "success",
@@ -416,5 +624,6 @@ export function diagnoseCircuit(
     criticalCount,
     warningCount,
     tipCount,
+    isEmpty: false,
   }
 }

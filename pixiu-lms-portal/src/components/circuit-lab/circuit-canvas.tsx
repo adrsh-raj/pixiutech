@@ -55,6 +55,9 @@ interface Props {
   activeWireColor?: string
   stagedPreview?: StagedPreview | null
   fitRequestKey?: string | number
+  onHoverPinChange?: (pin: PinRef | null) => void
+  onHoverPartChange?: (partId: string | null) => void
+  onDraftCursorMove?: (cursor: { x: number; y: number } | null) => void
 }
 
 function getPinDisplayInfo(type: PartType, pinId: string): { label: string; kind: PinKind; details?: string } {
@@ -125,13 +128,26 @@ export function CircuitCanvas(props: Props) {
     activeWireColor = "#22c55e",
     stagedPreview,
     fitRequestKey,
+    onHoverPinChange,
+    onHoverPartChange,
+    onDraftCursorMove,
   } = props
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const [view, setView] = useState<View>({ scale: 1, tx: 120, ty: 90 })
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null)
   const [hoverPin, setHoverPin] = useState<string | null>(null)
+  const hoverPinRef = useRef<string | null>(null)
+  const hoverPartRef = useRef<string | null>(null)
+  const lastCursorReportRef = useRef<number>(0)
   const fitRequestKeyRef = useRef(fitRequestKey)
+
+  useEffect(() => {
+    if (!wiring) {
+      setCursor(null)
+      onDraftCursorMove?.(null)
+    }
+  }, [wiring, onDraftCursorMove])
 
   const dragRef = useRef<{ id: string; offX: number; offY: number } | null>(null)
   const panRef = useRef<{ sx: number; sy: number; tx: number; ty: number } | null>(null)
@@ -361,7 +377,16 @@ export function CircuitCanvas(props: Props) {
     }
 
     const w = toWorld(e.clientX, e.clientY)
-    if (wiring) setCursor(w)
+    if (wiring) {
+      setCursor(w)
+      if (onDraftCursorMove) {
+        const now = Date.now()
+        if (now - lastCursorReportRef.current >= 120) {
+          lastCursorReportRef.current = now
+          onDraftCursorMove(w)
+        }
+      }
+    }
 
     if (dragRef.current) {
       const d = dragRef.current
@@ -454,7 +479,18 @@ export function CircuitCanvas(props: Props) {
         onPointerDown={onSvgPointerDown}
         onPointerMove={onSvgPointerMove}
         onPointerUp={endInteraction}
-        onPointerLeave={endInteraction}
+        onPointerLeave={(e) => {
+          endInteraction(e)
+          if (hoverPinRef.current !== null) {
+            hoverPinRef.current = null
+            setHoverPin(null)
+            onHoverPinChange?.(null)
+          }
+          if (hoverPartRef.current !== null) {
+            hoverPartRef.current = null
+            onHoverPartChange?.(null)
+          }
+        }}
       >
         <defs>
           <pattern id="grid" width={24} height={24} patternUnits="userSpaceOnUse">
@@ -510,6 +546,18 @@ export function CircuitCanvas(props: Props) {
               <g
                 key={part.id}
                 transform={`translate(${part.x} ${part.y})`}
+                onPointerEnter={() => {
+                  if (hoverPartRef.current !== part.id) {
+                    hoverPartRef.current = part.id
+                    onHoverPartChange?.(part.id)
+                  }
+                }}
+                onPointerLeave={() => {
+                  if (hoverPartRef.current === part.id) {
+                    hoverPartRef.current = null
+                    onHoverPartChange?.(null)
+                  }
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
@@ -1459,8 +1507,20 @@ export function CircuitCanvas(props: Props) {
                           fill="transparent"
                           className={running ? "" : "cursor-crosshair"}
                           onPointerDown={(e) => onPinPointerDown(e, { partId: part.id, pinId: pin.id })}
-                          onPointerEnter={() => setHoverPin(key)}
-                          onPointerLeave={() => setHoverPin((h) => (h === key ? null : h))}
+                          onPointerEnter={() => {
+                            if (hoverPinRef.current !== key) {
+                              hoverPinRef.current = key
+                              setHoverPin(key)
+                              onHoverPinChange?.({ partId: part.id, pinId: pin.id })
+                            }
+                          }}
+                          onPointerLeave={() => {
+                            if (hoverPinRef.current === key) {
+                              hoverPinRef.current = null
+                              setHoverPin(null)
+                              onHoverPinChange?.(null)
+                            }
+                          }}
                         >
                           <title>{`${def.name} · ${pin.label}`}</title>
                         </circle>

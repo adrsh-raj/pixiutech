@@ -8,6 +8,7 @@ import { CATALOG } from "@/lib/components-catalog"
 import { samplePinVoltage, computeChannelMetrics, type WaveformPoint } from "@/lib/waveform-sampler"
 import { solveCircuitNodalPotentials, type NodalSolution } from "@/lib/circuit-solver"
 import { isBoardPart } from "@/lib/board-registry"
+import type { LiveOscilloscopeTelemetry } from "@/lib/live-circuit-types"
 
 interface SimulationSnapshot {
   state: CircuitState
@@ -33,6 +34,7 @@ interface Props {
   onSetProbeCH2: (ref: PinRef | null) => void
   activeProbeToPlace: "ch1" | "ch2" | null
   onSetActiveProbeToPlace: (ch: "ch1" | "ch2" | null) => void
+  onTelemetryChange?: (telemetry: LiveOscilloscopeTelemetry) => void
 }
 
 const TIMEBASE_OPTIONS = [
@@ -56,6 +58,7 @@ export const Oscilloscope = memo(function Oscilloscope({
   onSetProbeCH2,
   activeProbeToPlace,
   onSetActiveProbeToPlace,
+  onTelemetryChange,
 }: Props) {
   const [isHold, setIsHold] = useState(false)
   const [minimized, setMinimized] = useState(false)
@@ -176,6 +179,28 @@ export const Oscilloscope = memo(function Oscilloscope({
     () => computeChannelMetrics(historyRef.current, "v2", Boolean(probeCH2)),
     [renderTick, probeCH2]
   )
+
+  const lastScopeEmitRef = useRef<{ sig: string; metaSig: string; at: number }>({ sig: "", metaSig: "", at: 0 })
+  useEffect(() => {
+    if (!onTelemetryChange) return
+    const tb = TIMEBASE_OPTIONS[timebaseIndex]
+    const next: LiveOscilloscopeTelemetry = {
+      isOpen,
+      isHold,
+      timebaseLabel: tb.label,
+      windowMs: tb.windowMs,
+      ch1: probeCH1 ? metricsCH1 : null,
+      ch2: probeCH2 ? metricsCH2 : null,
+    }
+    const metaSig = `${isOpen}|${isHold}|${timebaseIndex}|${Boolean(probeCH1)}|${Boolean(probeCH2)}`
+    const fullSig = JSON.stringify(next)
+    const now = Date.now()
+    const metaChanged = lastScopeEmitRef.current.metaSig !== metaSig
+    if (fullSig !== lastScopeEmitRef.current.sig && (metaChanged || now - lastScopeEmitRef.current.at >= 250)) {
+      lastScopeEmitRef.current = { sig: fullSig, metaSig, at: now }
+      onTelemetryChange(next)
+    }
+  }, [isOpen, isHold, timebaseIndex, probeCH1, probeCH2, metricsCH1, metricsCH2, onTelemetryChange])
 
   // Drag handlers: position the fixed panel directly in the DOM. React only
   // toggles the positioning mode once per drag, avoiding pointer-move re-renders.

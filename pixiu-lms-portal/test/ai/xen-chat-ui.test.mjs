@@ -75,6 +75,7 @@ test('XenChat - student role initializes valid select option matching rendered o
     const optionValues = Array.from(select.querySelectorAll('option')).map((o) => o.value);
     assert.equal(optionValues.includes('TEACHING'), true, `Expected TEACHING option, got [${optionValues}]`);
     assert.equal(select.value, 'TEACHING');
+    assert.ok(document.querySelector('[data-response-source="local_fallback"]'), 'Initial greeting records local_fallback provenance');
   } finally {
     root.unmount();
     globalThis.fetch = origFetch;
@@ -104,6 +105,7 @@ test('XenChat - Retry after Cancel clears cancelled placeholder and keeps histor
         status: 'completed',
         intent: 'TEACHING',
         format_mode: 'DEFAULT_EDUCATIONAL',
+        provenance: { response_source: 'xen_step700', response_status: 'completed' },
         response: { text: 'Retried tutor answer.', is_complete: true, syntax_valid: true, display_ast_valid: true, tested: false },
       });
     }
@@ -132,6 +134,7 @@ test('XenChat - Retry after Cancel clears cancelled placeholder and keeps histor
     Array.from(document.querySelectorAll('button')).find((b) => b.textContent.includes('Retry')).click();
     await until(() => document.body.textContent.includes('Retried tutor answer.'));
     assert.equal(document.body.textContent.includes('Generation cancelled by user.'), false);
+    assert.ok(document.querySelector('[data-response-source="xen_step700"]'));
 
     // Send a second question and check history has single user+assistant pair (not duplicated cancelled user turns)
     setter.call(ta, 'Give example');
@@ -223,19 +226,19 @@ test('XenMarkdown - typography renders bold font-bold, em italic, u/ins underlin
   document.body.innerHTML = '<div id="root"></div>';
   const root = createRoot(document.getElementById('root'));
   try {
-    const welcome = "Hello! I am **8square**, your AI *Circuit Copilot* powered by **Xen Step-700**.\n\n<u>Underline</u> and <ins>Ins</ins> and ~~strikethrough~~ with $V=IR$.";
+    const welcome = "Hello! I am **Xen**, your AI *Circuit Copilot* powered by **Xen Step-700**.\n\n<u>Underline</u> and <ins>Ins</ins> and ~~strikethrough~~ with $V=IR$.";
     root.render(h(XenMarkdown, { content: welcome }));
     await until(() => document.querySelector('.xen-markdown strong'));
 
     // strong: font-bold text-white
     const strongs = Array.from(document.querySelectorAll('strong'));
     assert.equal(strongs.length, 2);
-    assert.equal(strongs[0].textContent, '8square');
+    assert.equal(strongs[0].textContent, 'Xen');
     assert.equal(strongs[0].className.includes('font-bold'), true);
     assert.equal(strongs[0].className.includes('text-white'), true);
     assert.equal(strongs[1].textContent, 'Xen Step-700');
     assert.equal(strongs[1].className.includes('font-bold'), true);
-    assert.equal(document.body.innerHTML.includes('**8square**'), false);
+    assert.equal(document.body.innerHTML.includes('**Xen**'), false);
 
     // em: italic text-slate-200
     const em = document.querySelector('em');
@@ -429,7 +432,8 @@ test('CircuitCopilotChat - builds rich typed live circuit snapshot in context_en
     // 6. Metadata
     assert.ok(env.circuit.revision);
     assert.equal(typeof env.circuit.timestamp, 'number');
-    assert.equal(env.circuit.partial, false);
+    assert.equal(env.circuit.partial, true);
+    assert.ok(env.circuit.omitted_fields.includes('circuit.netlist'));
   } finally {
     root.unmount();
     globalThis.fetch = origFetch;

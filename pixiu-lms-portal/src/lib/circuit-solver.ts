@@ -18,6 +18,19 @@ export interface PinPotentialInfo {
   digitalPinName?: string
 }
 
+export interface CanonicalNet {
+  netId: number
+  name: string
+  isPowerRail: boolean
+  isGroundRail: boolean
+  isFloating: boolean
+  isConflicted: boolean
+  nominalVoltage?: number
+  solvedVoltage?: number
+  sourceLabel?: string
+  pinKeys: string[]
+}
+
 export interface CircuitSolverDiagnostic {
   code: "source-conflict" | "diode-non-convergence"
   severity: "error" | "warning"
@@ -29,9 +42,12 @@ export interface CircuitSolverDiagnostic {
 export interface NodalSolution {
   pinPotentials: Map<string, PinPotentialInfo>
   netVoltages: Map<number, number>
+  /** Authoritative deduplicated netlist derived directly from DSU/solver state. */
+  nets: CanonicalNet[]
   /** Signed solved DC branch current in mA; positive is pinA -> pinB. */
   branchCurrents: Map<string, number>
   diagnostics: CircuitSolverDiagnostic[]
+  arePinsConnected: (refA: PinRef | null, refB: PinRef | null) => boolean
   getBranchCurrent: (partId: string, pinA: string, pinB: string) => number
   /** Algebraic sum of solved branch currents leaving the given net (mA). */
   getNetCurrent: (netId: number) => number
@@ -138,13 +154,16 @@ export function solveCircuitNodalPotentials(
 ): NodalSolution {
   // 1. Gather all pins across all placed components
   const allPins = new Set<string>()
+  const canonicalPins = new Set<string>()
+  const partMap = new Map(state.parts.map((part) => [part.id, part]))
   const breadboardIds = new Set(state.parts.filter((part) => part.type === "breadboard").map((part) => part.id))
   const wirePinKey = (partId: string, pinId: string) =>
-    pinKey(partId, breadboardIds.has(partId) ? normalizeBreadboardPinId(pinId) : pinId)
+    pinKey(partId, breadboardIds.has(partId) ? normalizeBreadboardPinId(pinId) : pinId.trim().toLowerCase())
   for (const part of state.parts) {
     const board = getBoardForPart(part)
     if (board) {
       for (const pin of board.pins) {
+        canonicalPins.add(pinKey(part.id, pin.id))
         allPins.add(pinKey(part.id, pin.id))
         allPins.add(pinKey(part.id, pin.id.toLowerCase()))
         allPins.add(pinKey(part.id, pin.label.toLowerCase()))
@@ -158,8 +177,20 @@ export function solveCircuitNodalPotentials(
       }
       for (const g of board.powerPins.gnd) {
         allPins.add(pinKey(part.id, g))
+        if (!board.pins.some((p) => p.id.toLowerCase() === g.toLowerCase())) {
+          canonicalPins.add(pinKey(part.id, g))
+        }
       }
       continue
+    }
+
+    if (part.type !== "breadboard") {
+      const catDef = CATALOG[part.type]
+      if (catDef?.pins) {
+        for (const p of catDef.pins) {
+          canonicalPins.add(pinKey(part.id, p.id))
+        }
+      }
     }
 
     switch (part.type) {
@@ -258,8 +289,12 @@ export function solveCircuitNodalPotentials(
   }
 
   for (const w of state.wires) {
-    allPins.add(wirePinKey(w.from.partId, w.from.pinId))
-    allPins.add(wirePinKey(w.to.partId, w.to.pinId))
+    const kFrom = wirePinKey(w.from.partId, w.from.pinId)
+    const kTo = wirePinKey(w.to.partId, w.to.pinId)
+    allPins.add(kFrom)
+    allPins.add(kTo)
+    if (partMap.has(w.from.partId)) canonicalPins.add(kFrom)
+    if (partMap.has(w.to.partId)) canonicalPins.add(kTo)
   }
 
   // 2. Disjoint Set Union (DSU) to group directly wired pins into equipotential Nets
@@ -349,11 +384,21 @@ export function solveCircuitNodalPotentials(
           union(k(v5s[0]), k(v5s[i]))
           union(k(v5s[i]), k("5v"))
         }
+        // Track alias ownership across non-rail pins so ambiguous aliases never bridge distinct GPIO/ADC pins
+        const nonRailAliasCount = new Map<string, number>()
+        for (const bp of board.pins) {
+          if (bp.kind === "ground" || bp.kind === "power") continue
+          for (const alt of bp.alternateNames ?? []) {
+            const al = alt.toLowerCase()
+            nonRailAliasCount.set(al, (nonRailAliasCount.get(al) ?? 0) + 1)
+          }
+        }
         // Union all pin aliases
         for (const bp of board.pins) {
           allPins.add(k(bp.id))
-          const stripped = bp.id.replace(/^(gpio|gp|d|p)/i, "")
-          if (stripped) {
+          const numMatch = bp.id.match(/^(?:gpio|gp|d|p)(\d+)$/i)
+          if (numMatch) {
+            const stripped = numMatch[1]
             allPins.add(k(stripped))
             allPins.add(k(`d${stripped}`))
             allPins.add(k(`gpio${stripped}`))
@@ -366,8 +411,12 @@ export function solveCircuitNodalPotentials(
             union(k(bp.id), k(`p${stripped}`))
           }
           for (const alt of bp.alternateNames ?? []) {
-            allPins.add(k(alt.toLowerCase()))
-            union(k(bp.id), k(alt.toLowerCase()))
+            const al = alt.toLowerCase()
+            if (bp.kind !== "ground" && bp.kind !== "power" && (nonRailAliasCount.get(al) ?? 0) > 1) {
+              continue
+            }
+            allPins.add(k(al))
+            union(k(bp.id), k(al))
           }
         }
       }
@@ -1645,11 +1694,106 @@ export function solveCircuitNodalPotentials(
     }
   }
 
+  const arePinsConnected = (refA: PinRef | null, refB: PinRef | null): boolean => {
+    if (!refA || !refB) return false
+    const keyA = wirePinKey(refA.partId, refA.pinId)
+    const keyB = wirePinKey(refB.partId, refB.pinId)
+    if (!allPins.has(keyA) || !allPins.has(keyB)) return false
+    return find(keyA) === find(keyB)
+  }
+
+  // Build deduplicated canonical netlist directly from solver union-find state
+  const netPinGroups = new Map<number, string[]>()
+  for (const cPin of canonicalPins) {
+    const colonIdx = cPin.indexOf(":")
+    if (colonIdx <= 0) continue
+    const pId = cPin.slice(0, colonIdx)
+    const pinId = cPin.slice(colonIdx + 1)
+    const netId = pinToNetId(pId, pinId)
+    if (!netPinGroups.has(netId)) netPinGroups.set(netId, [])
+    netPinGroups.get(netId)!.push(cPin)
+  }
+
+  const nets: CanonicalNet[] = []
+  for (const [netId, pinKeysList] of netPinGroups.entries()) {
+    let isPowerRail = false
+    let isGroundRail = false
+    let nominalVoltage: number | undefined
+
+    for (const cPin of pinKeysList) {
+      const colonIdx = cPin.indexOf(":")
+      const pId = cPin.slice(0, colonIdx)
+      const pinId = cPin.slice(colonIdx + 1).toLowerCase()
+      const part = partMap.get(pId)
+      if (!part) continue
+      const b = getBoardForPart(part)
+      if (b) {
+        if (b.powerPins.v5?.some((p) => p.toLowerCase() === pinId)) {
+          isPowerRail = true
+          if (nominalVoltage === undefined) nominalVoltage = 5.0
+        }
+        if (b.powerPins.v33?.some((p) => p.toLowerCase() === pinId)) {
+          isPowerRail = true
+          if (nominalVoltage === undefined) nominalVoltage = 3.3
+        }
+        if (b.powerPins.gnd.some((p) => p.toLowerCase() === pinId) || pinId === "gnd") {
+          isGroundRail = true
+          if (nominalVoltage === undefined) nominalVoltage = 0.0
+        }
+      } else if (part.type === "battery") {
+        if (pinId === "pos") {
+          isPowerRail = true
+          if (nominalVoltage === undefined) nominalVoltage = Number(part.props.voltage ?? 9)
+        } else if (pinId === "neg") {
+          isGroundRail = true
+          if (nominalVoltage === undefined) nominalVoltage = 0.0
+        }
+      }
+    }
+
+    const isConflicted = invalidNets.has(netId)
+    const isFloating = floatingNets.has(netId)
+    const fixedInfo = fixedNets.get(netId)
+    const solvedV = isFloating || isConflicted ? undefined : Number((netVoltages.get(netId) ?? 0).toFixed(3))
+    const name = isConflicted
+      ? `SHORT_CONFLICT_${netId}`
+      : isGroundRail && !isPowerRail
+      ? "GND"
+      : isPowerRail && nominalVoltage !== undefined
+      ? `${nominalVoltage}V`
+      : fixedInfo?.digitalPinName
+      ? fixedInfo.digitalPinName.toUpperCase()
+      : `NET_${netId + 1}`
+
+    nets.push({
+      netId,
+      name,
+      isPowerRail,
+      isGroundRail,
+      isFloating,
+      isConflicted,
+      nominalVoltage,
+      solvedVoltage: solvedV,
+      sourceLabel: fixedInfo?.label,
+      pinKeys: pinKeysList,
+    })
+  }
+
+  nets.sort((a, b) => {
+    const score = (n: CanonicalNet) =>
+      (n.isConflicted ? 8 : 0) +
+      (n.pinKeys.length > 1 ? 4 : 0) +
+      (n.isPowerRail || n.isGroundRail ? 2 : 0)
+    return score(b) - score(a) || a.netId - b.netId
+  })
+
   return {
     pinPotentials,
     netVoltages,
+    nets,
     branchCurrents,
     diagnostics,
+    arePinsConnected,
     getBranchCurrent,
     getNetCurrent,
     getPinVoltage,

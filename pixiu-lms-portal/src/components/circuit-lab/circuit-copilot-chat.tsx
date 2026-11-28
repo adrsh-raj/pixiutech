@@ -1,7 +1,7 @@
 /**
- * PIXIU TECH CYBERLAB — 8SQUARE AI CIRCUIT COPILOT CHAT & AUTONOMOUS REPAIR DRAWER
+ * PIXIU TECH CYBERLAB — XEN AI CIRCUIT COPILOT CHAT & AUTONOMOUS REPAIR DRAWER
  *
- * Interactive in-situ movable circuit assistant powered by 8square AI (Xen Step-700).
+ * Interactive in-situ movable circuit assistant powered by Xen (Xen Step-700).
  * Inspects live canvas state, pin potentials, component runtimes, and Blockly code.
  * Diagnoses electrical fault categories, proposes atomic repair actions,
  * computes visual diffs, and executes simulator-in-the-loop verification.
@@ -34,7 +34,7 @@ import {
   Maximize2,
   BookOpen,
 } from "lucide-react"
-import type { CircuitState } from "@/lib/circuit-types"
+import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { ArduinoPinState } from "@/lib/simulation"
 import type { PartRuntime } from "@/components/circuit-lab/part-art"
 import type { UseCircuitCopilotActionResult, CircuitCopilotProposal } from "./use-circuit-copilot-action"
@@ -43,22 +43,34 @@ import {
   serializeCircuitContext,
   verifyCircuitWithSimulator,
   processCircuitCopilotQuery,
+  describeCircuitTopology,
   type CircuitFault,
   type StructuredRepairProposal,
   type SimulatorVerificationResult,
   type CircuitDiagnosisContext,
+  type CopilotDiagnosticState,
 } from "@/lib/circuit-intelligence"
 import { CATALOG } from "@/lib/components-catalog"
-import { getBoardDefinition } from "@/lib/board-registry"
+import { getBoardDefinition, isBoardPart } from "@/lib/board-registry"
 import { detectAffirmativeContinuation } from "@/lib/ai/xen/affirmative-detector.js"
-import { isCircuitSpecificQuery } from "@/lib/ai/xen/circuit-query-classifier.js"
-import { splitXenResponse } from "@/lib/ai/xen/xen-sanitizer.js"
+import { classifyCopilotIntent } from "@/lib/ai/xen/circuit-query-classifier.js"
+import { sanitizeClientOutput, splitXenResponse } from "@/lib/ai/xen/xen-sanitizer.js"
 import { XenMarkdown } from "../xen/XenMarkdown.jsx"
-import { streamXenChat } from "@/lib/ai/xen/xen-client.js"
+import { copilotCompletionSource, streamXenChat, syncCyberLabContext } from "@/lib/ai/xen/xen-client.js"
+import {
+  buildCanonicalCircuitContextV3,
+  LiveCircuitContextBridge,
+} from "@/lib/live-circuit-bridge"
+import type {
+  LiveLifecycleEvent,
+  LiveMultimeterTelemetry,
+  LiveOscilloscopeTelemetry,
+  RecentTargetPin,
+} from "@/lib/live-circuit-types"
 
 import { loadLessonProgress, type Lesson } from "@/lib/lesson-engine"
 
-const EIGHT_SQUARE_LOGO = "/img/8square-logo.svg"
+const XEN_LOGO = "/img/xen-logo.svg"
 
 export interface LessonContextData {
   id: string
@@ -85,16 +97,57 @@ export interface CircuitCopilotChatProps {
   meter?: NonNullable<Parameters<typeof serializeCircuitContext>[1]>["multimeterProbes"]
   scope?: NonNullable<Parameters<typeof serializeCircuitContext>[1]>["oscilloscopeProbes"]
   userRole?: string
-  activeBoard?: string
+  activeBoard?: string | null
+  sessionId?: string
+  circuitRevision?: number
+  interactionRevision?: number
+  meterTelemetry?: LiveMultimeterTelemetry | null
+  scopeTelemetry?: LiveOscilloscopeTelemetry | null
+  generatedCode?: string
+  activeStepLabel?: string | null
+  isPaused?: boolean
+  runTime?: number
+  pressedPartIds?: string[]
+  serialLines?: string[]
+  activeWireColor?: string
+  recentTarget?: RecentTargetPin | null
+  hoveredPartId?: string | null
+  draftMeta?: { draftId: string; startedAt: string; updatedAt: string } | null
+  getDraftCursor?: () => { x: number; y: number } | null
+  lastLifecycleEvent?: LiveLifecycleEvent | null
+  lifecycleEventBatch?: LiveLifecycleEvent[]
   runtime?: Record<string, PartRuntime>
   pinStates?: Record<string, ArduinoPinState>
   copilotAction?: UseCircuitCopilotActionResult
   onHighlightParts?: (partIds: string[]) => void
   lessonContext?: LessonContextData | null
+  wiring?: PinRef | null
+  hoverPin?: PinRef | null
+  selectedId?: string | null
+  selectedWireId?: string | null
+  stateRevision?: number
   isOpen?: boolean
   onToggleOpen?: () => void
   offlineTimeoutMs?: number
   [key: string]: unknown
+}
+
+interface ResponseProvenance {
+  response_source: "xen_step700" | "xen_step_700" | "local_fallback" | "local_circuit_engine" | "local_educational_fallback" | "unknown" | "cache" | "error"
+  model?: string | null
+  assistant?: string | null
+  request_id?: string | null
+  worker_available?: boolean | null
+  remotely_generated?: boolean | null
+  local_diagnosis?: boolean
+  substituted_after_failure?: boolean
+  job_id: string | null
+  worker_id: string | null
+  session_id: string | null
+  circuit_revision: number | null
+  context_schema_version: string | null
+  response_status: string
+  fallback_reason: string | null
 }
 
 interface ChatMessage {
@@ -102,12 +155,71 @@ interface ChatMessage {
   role: "user" | "assistant"
   text: string
   baseRevisionHash?: string
+  baseCircuitRev?: number
+  baseInteractionRev?: number
+  wasCircuitQuery?: boolean
+  diagnosticState?: CopilotDiagnosticState
   proposal?: StructuredRepairProposal
   verification?: SimulatorVerificationResult
   faults?: CircuitFault[]
   timestamp: number
   applied?: boolean
   isStreaming?: boolean
+  source?: "xen" | "local_guidance" | "offline_unavailable"
+  provenance?: ResponseProvenance
+  groundingVerified?: boolean
+  unsupportedClaims?: string[]
+}
+
+export function buildCleanCopilotHistory(
+  msgs: ChatMessage[]
+): Array<{
+  role: "user" | "assistant"
+  content: string
+  provenance?: {
+    response_source: string
+    circuit_revision: number | null
+    grounding_verified: boolean
+  }
+}> {
+  const cleaned: Array<{
+    role: "user" | "assistant"
+    content: string
+    provenance?: {
+      response_source: string
+      circuit_revision: number | null
+      grounding_verified: boolean
+    }
+  }> = []
+  for (const m of msgs) {
+    if (m.id === "welcome_1" || m.isStreaming || !m.text?.trim()) continue
+    if (m.source === "offline_unavailable" || m.provenance?.response_source === "error") continue
+    if (m.role === "assistant" && m.groundingVerified === false) continue
+
+    if (m.role === "user") {
+      const content = m.text.slice(0, 1000)
+      if (cleaned.length > 0 && cleaned[cleaned.length - 1].role === "user") {
+        cleaned[cleaned.length - 1] = { role: "user", content }
+      } else {
+        cleaned.push({ role: "user", content })
+      }
+    } else {
+      cleaned.push({
+        role: "assistant",
+        content: m.text.slice(0, 1000),
+        provenance: {
+          response_source:
+            m.provenance?.response_source === "xen_step_700" ? "xen_step700" :
+            m.provenance?.response_source === "local_circuit_engine" || m.provenance?.response_source === "local_educational_fallback"
+              ? "local_fallback" : m.provenance?.response_source ||
+            (m.source === "local_guidance" ? "local_fallback" : "unknown"),
+          circuit_revision: m.provenance?.circuit_revision ?? m.baseCircuitRev ?? null,
+          grounding_verified: m.groundingVerified ?? true,
+        },
+      })
+    }
+  }
+  return cleaned.slice(-8)
 }
 
 export function CircuitCopilotChat({
@@ -116,12 +228,36 @@ export function CircuitCopilotChat({
   running = false,
   activeBoard,
   userRole,
-  meter, scope,
+  sessionId,
+  circuitRevision = 0,
+  interactionRevision = 0,
+  meter,
+  meterTelemetry = null,
+  scope,
+  scopeTelemetry = null,
+  generatedCode = "",
+  activeStepLabel = null,
+  isPaused = false,
+  runTime = 0,
+  pressedPartIds = [],
+  serialLines = [],
   runtime = {},
   pinStates = {},
   copilotAction,
   onHighlightParts,
   lessonContext = null,
+  wiring = null,
+  activeWireColor = "#22c55e",
+  hoverPin = null,
+  recentTarget = null,
+  hoveredPartId = null,
+  selectedId = null,
+  selectedWireId = null,
+  draftMeta = null,
+  getDraftCursor,
+  lastLifecycleEvent = null,
+  lifecycleEventBatch,
+  stateRevision,
   isOpen: externalIsOpen,
   onToggleOpen: externalOnToggleOpen,
   offlineTimeoutMs = 4000,
@@ -143,12 +279,24 @@ export function CircuitCopilotChat({
   const panelRef = useRef<HTMLElement>(null)
 
   const [inputMessage, setInputMessage] = useState("")
+  const effectiveSessionId = sessionId || "cyberlab-local-session"
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome_1",
       role: "assistant",
-      text: "Hello! I am **8square**, your AI Circuit Copilot powered by **Xen Step-700**.\n\nI can inspect your live virtual circuit, identify wiring mistakes, explain electrical flow, and repair faults directly on your canvas. What are you building today?",
+      text: "Hi! I’m **Xen**, your Circuit Copilot. Ask me to check a pin, explain an electrical concept, or preview a wiring fix. What are you building?",
       timestamp: Date.now(),
+      source: "local_guidance",
+      provenance: {
+        response_source: "local_educational_fallback",
+        job_id: null,
+        worker_id: null,
+        session_id: effectiveSessionId,
+        circuit_revision: null,
+        context_schema_version: null,
+        response_status: "static_welcome",
+        fallback_reason: "initial_ui_greeting",
+      },
     },
   ])
 
@@ -261,39 +409,152 @@ export function CircuitCopilotChat({
   const circuitContext: CircuitDiagnosisContext = useMemo(() => {
     return serializeCircuitContext(currentCircuit, {
       blocklyXml: currentBlocklyXml,
-      multimeterProbes: meter, oscilloscopeProbes: scope,
+      generatedCode,
+      multimeterProbes: meter,
+      oscilloscopeProbes: scope,
+      pressed: new Set(pressedPartIds),
       runtime,
       pinStates,
       running,
+      isPaused,
+      runTime,
     })
-  }, [currentCircuit, currentBlocklyXml, runtime, pinStates, running, meter, scope])
+  }, [currentCircuit, currentBlocklyXml, generatedCode, runtime, pinStates, running, isPaused, runTime, meter, scope, pressedPartIds])
 
   const healthScore = circuitContext.healthReport.score
+  const healthBadgeLabel =
+    healthScore !== null
+      ? `${healthScore}%`
+      : circuitContext.healthReport.status === "unwired" || currentCircuit.parts.length > 0
+      ? "Not Wired"
+      : "Empty"
   const hasCritical = circuitContext.healthReport.criticalCount > 0
   const hasWarning = circuitContext.healthReport.warningCount > 0
+
+  const bridgeRef = useRef<LiveCircuitContextBridge | null>(null)
+  const getBridge = useCallback(() => {
+    if (!bridgeRef.current) {
+      bridgeRef.current = new LiveCircuitContextBridge((payload) => syncCyberLabContext(payload))
+    }
+    return bridgeRef.current
+  }, [])
+  useEffect(() => {
+    const b = getBridge()
+    return () => b.dispose()
+  }, [getBridge])
+
+  const buildV3Snapshot = useCallback(
+    (event?: LiveLifecycleEvent | null) =>
+      buildCanonicalCircuitContextV3({
+        circuit: currentCircuit,
+        circuitContext,
+        sessionId: effectiveSessionId,
+        circuitRevision,
+        interactionRevision,
+        eventSeq: event?.event_seq ?? 0,
+        eventId: event?.event_id,
+        activeBoard,
+        blocklyXml: currentBlocklyXml,
+        generatedCode,
+        activeStepLabel,
+        running,
+        isPaused,
+        runTime,
+        pressedPartIds,
+        serialLines,
+        runtime,
+        pinStates,
+        wiring,
+        activeWireColor,
+        draftMeta,
+        cursor: getDraftCursor?.() ?? null,
+        hoverPin,
+        recentTarget,
+        hoveredPartId,
+        selectedId,
+        selectedWireId,
+        meter,
+        meterTelemetry,
+        scope,
+        scopeTelemetry,
+        lastEvent: event ?? lastLifecycleEvent,
+      }),
+    [
+      currentCircuit,
+      circuitContext,
+      effectiveSessionId,
+      circuitRevision,
+      interactionRevision,
+      activeBoard,
+      currentBlocklyXml,
+      generatedCode,
+      activeStepLabel,
+      running,
+      isPaused,
+      runTime,
+      pressedPartIds,
+      serialLines,
+      runtime,
+      pinStates,
+      wiring,
+      activeWireColor,
+      draftMeta,
+      getDraftCursor,
+      hoverPin,
+      recentTarget,
+      hoveredPartId,
+      selectedId,
+      selectedWireId,
+      meter,
+      meterTelemetry,
+      scope,
+      scopeTelemetry,
+      lastLifecycleEvent,
+    ],
+  )
+
+  const dispatchedEventIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    if (!sessionId) return
+    const events =
+      lifecycleEventBatch && lifecycleEventBatch.length > 0
+        ? lifecycleEventBatch
+        : lastLifecycleEvent
+        ? [lastLifecycleEvent]
+        : []
+    if (events.length === 0) return
+    for (const evt of events) {
+      if (!evt || dispatchedEventIdsRef.current.has(evt.event_id)) continue
+      if (dispatchedEventIdsRef.current.size > 200) {
+        dispatchedEventIdsRef.current.clear()
+      }
+      dispatchedEventIdsRef.current.add(evt.event_id)
+      const snapshot = buildV3Snapshot(evt)
+      getBridge().enqueueLifecycleEvent(evt, snapshot)
+    }
+  }, [sessionId, lifecycleEventBatch, lastLifecycleEvent, buildV3Snapshot, getBridge])
 
   // Build context envelope for prompt grounding
   const buildContextEnvelope = useCallback((affirmativeAction?: ReturnType<typeof detectAffirmativeContinuation>) => {
     const progress = lessonContext?.progressScope ? loadLessonProgress(lessonContext.progressScope)[lessonContext.id] : undefined
     const checkpoint = progress ? lessonContext?.steps?.find(step => !progress.completedStepIds.includes(step.id)) : lessonContext?.checkpoint
 
-    const boardDef = activeBoard ? getBoardDefinition(activeBoard) : undefined
-    const boardId = activeBoard || boardDef?.id || circuitContext.board?.id || "arduino-uno"
-    const boardName = boardDef?.name || circuitContext.board?.name || "Arduino Uno R3"
-    const logicVoltage = boardDef?.logicVoltage ?? circuitContext.board?.logicVoltage ?? 5.0
+    const snapshotV3 = buildV3Snapshot(lastLifecycleEvent)
+    const authoritativeV3 = getBridge().prepareAuthoritativeChatEnvelope(snapshotV3)
 
-    const powerPins = boardDef?.powerPins || {
-      v5: ["5v"],
-      v33: ["3v3"],
-      gnd: ["gnd", "gnd_pwr"],
-      vin: ["vin"],
-    }
-    const powerPinIds = [
-      ...(powerPins.v5 || []),
-      ...(powerPins.v33 || []),
-      ...(powerPins.vin || []),
-    ]
-    const groundPinIds = powerPins.gnd || ["gnd", "gnd_pwr"]
+    const placedBoard =
+      (activeBoard ? currentCircuit.parts.find((p) => p.type === activeBoard && isBoardPart(p.type)) : undefined) ??
+      currentCircuit.parts.find((p) => isBoardPart(p.type))
+    const boardDef = placedBoard ? getBoardDefinition(placedBoard.type) : undefined
+    const boardId = boardDef?.id ?? null
+    const boardName = boardDef?.name ?? null
+    const logicVoltage = boardDef?.logicVoltage ?? null
+
+    const powerPins = boardDef?.powerPins ?? null
+    const powerPinIds = powerPins
+      ? [...(powerPins.v5 || []), ...(powerPins.v33 || []), ...(powerPins.vin || [])]
+      : []
+    const groundPinIds = powerPins?.gnd || []
 
     // Components (Parts) with human-readable names and safe properties
     const components = currentCircuit.parts.slice(0, 48).map((part) => {
@@ -320,7 +581,7 @@ export function CircuitCopilotChat({
       }
     })
 
-    // Connections (Wires) with net and pin labels
+    // Connections (Wires) with net and pin labels (strictly completed wires)
     const connections = currentCircuit.wires.slice(0, 48).map((wire, idx) => {
       const fromPart = currentCircuit.parts.find((p) => p.id === wire.from.partId)
       const fromCat = fromPart ? CATALOG[fromPart.type as keyof typeof CATALOG] : undefined
@@ -351,6 +612,8 @@ export function CircuitCopilotChat({
           pinId: wire.to.pinId,
           label: toLabel,
         },
+        color: wire.color,
+        status: "complete" as const,
         netId: matchedNet?.id ?? null,
         electricalNetId: matchedNet?.id ?? null,
         netNominalVoltage: matchedNet?.nominalVoltage ?? null,
@@ -382,7 +645,15 @@ export function CircuitCopilotChat({
       return acc
     }, {})
 
-    // Multimeter and oscilloscope simulated readings
+    const omittedFields = [
+      ...(currentCircuit.parts.length > 32 ? ["circuit.parts"] : []),
+      ...(currentCircuit.wires.length > 32 ? ["circuit.wires"] : []),
+      ...(circuitContext.nets.length > 16 || circuitContext.nets.some(net => net.pinKeys.length > 12)
+        ? ["circuit.netlist"] : []),
+      ...(generatedCode && generatedCode.length > 1200 ? ["blockly.code"] : []),
+    ]
+
+    // Instrument state controls whether a numerical value can be presented.
     const simulatedReadings = (circuitContext.measurements || []).map((m) => ({
       instrument: m.instrument,
       value: m.value,
@@ -390,19 +661,25 @@ export function CircuitCopilotChat({
       probeA: m.probeA,
       probeB: m.probeB,
       mode: m.mode,
-      source: "simulated" as const,
+      state: m.state,
+      notes: m.notes,
+      source: m.state === "available" ? "simulated" : "unknown",
     }))
 
     // Health report
     const healthReport = {
       score: circuitContext.healthReport.score,
+      status: circuitContext.healthReport.status,
       criticalCount: circuitContext.healthReport.criticalCount,
       warningCount: circuitContext.healthReport.warningCount,
       issues: (circuitContext.healthReport.issues || []).map((issue) => ({
         ruleId: issue.id,
         severity: issue.severity,
+        category: issue.category,
         title: issue.title,
         message: issue.message,
+        suggestion: issue.suggestion,
+        involvedPartIds: issue.involvedPartIds,
       })),
     }
 
@@ -416,7 +693,13 @@ export function CircuitCopilotChat({
 
     const blocklyPinBindings = circuitContext.code.pinBindings || []
 
+    const netlistSummary = authoritativeV3.netlist.slice(0, 16).map(({ pin_keys, ...net }) => ({
+      ...net,
+      pins: pin_keys.slice(0, 12),
+    }))
+
     return {
+      ...authoritativeV3,
       lesson: lessonContext
         ? {
             id: lessonContext.id,
@@ -439,21 +722,21 @@ export function CircuitCopilotChat({
           }
         : undefined,
       circuit: {
-        // Board
-        board: {
-          id: boardId,
-          name: boardName,
-          logicVoltage,
-          logic_voltage: logicVoltage,
-          powerPins,
-          power_pins: powerPins,
-          powerPinIds,
-          power_pin_ids: powerPinIds,
-          groundPinIds,
-          ground_pin_ids: groundPinIds,
-        },
-
-        // Components
+        board: boardId
+          ? {
+              id: boardId,
+              partId: placedBoard?.id,
+              name: boardName,
+              logicVoltage,
+              logic_voltage: logicVoltage,
+              powerPins,
+              power_pins: powerPins,
+              powerPinIds,
+              power_pin_ids: powerPinIds,
+              groundPinIds,
+              ground_pin_ids: groundPinIds,
+            }
+          : null,
         components,
         parts: currentCircuit.parts.slice(0, 32).map(({ id, type, props }) => {
           const cat = CATALOG[type as keyof typeof CATALOG]
@@ -474,14 +757,10 @@ export function CircuitCopilotChat({
           }
         }),
         parts_count: currentCircuit.parts.length,
-
-        // Connections
         connections,
         wires: currentCircuit.wires.slice(0, 32).map(({ from, to }) => ({ from, to })),
         wires_count: currentCircuit.wires.length,
         summary: `${currentCircuit.parts.length} components, ${currentCircuit.wires.length} wires`,
-
-        // Simulation
         simulation: {
           running,
           pinStates: pinStatesSummary,
@@ -496,43 +775,64 @@ export function CircuitCopilotChat({
         issues: circuitContext.healthReport.issues.map((issue) => issue.title).slice(0, 6).join("; "),
         source: "static circuit checks",
         health_score: healthReport.score,
-
-        // Code
         code: {
           blocks: blockTypes,
           block_types: blockTypes,
           blockTypes,
           pinBindings: blocklyPinBindings,
           pin_bindings: blocklyPinBindings,
+          generated_code: authoritativeV3.blockly_context.code,
         },
-
-        // Metadata
+        endpoint_net_lookup: authoritativeV3.endpoint_net_lookup,
+        resistor_terminals: authoritativeV3.resistor_terminals,
+        cross_layer_led: authoritativeV3.cross_layer_led,
+        in_progress_connection: authoritativeV3.in_progress_connection,
+        hovered_pin: authoritativeV3.hovered_pin,
+        recent_target_pin: authoritativeV3.recent_target_pin,
+        hovered_component: authoritativeV3.hovered_component,
+        selected_component: authoritativeV3.selected_component,
+        netlist: netlistSummary,
+        schema_version: authoritativeV3.schema_version,
+        session_id: authoritativeV3.session_id,
+        circuit_revision: authoritativeV3.circuit_revision,
+        interaction_revision: authoritativeV3.interaction_revision,
+        state_revision: authoritativeV3.state_revision,
         metadata: {
           revision,
           timestamp: Date.now(),
-          partial: false,
+          partial: omittedFields.length > 0,
+          omitted_fields: omittedFields,
         },
         revision,
         timestamp: Date.now(),
-        partial: false,
+        partial: omittedFields.length > 0,
+        omitted_fields: omittedFields,
       },
       blockly: {
-        blocks: typeof DOMParser !== "undefined" && currentBlocklyXml
-          ? Array.from(new DOMParser().parseFromString(currentBlocklyXml, "application/xml").querySelectorAll("block"))
-              .slice(0, 20)
-              .map((block) => {
-                const pin = block.querySelector(':scope > field[name="PIN"]')?.textContent
-                return [block.getAttribute("type"), pin].filter(Boolean).join(" ")
-              })
-          : [],
+        blocks: blockTypes,
         has_code: Boolean(currentBlocklyXml && currentBlocklyXml.length > 40),
+        code: generatedCode ? generatedCode.slice(0, 1200) : undefined,
         summary: currentBlocklyXml ? "Blockly blocks placed on workspace" : "No code blocks placed",
         pin_bindings: blocklyPinBindings,
       },
       affirmativeAction: affirmativeAction || undefined,
       affirmative_action: affirmativeAction || undefined,
     }
-  }, [lessonContext, revision, circuitContext, currentCircuit, running, activeBoard, healthScore, currentBlocklyXml, pinStates, runtime])
+  }, [
+    lessonContext,
+    buildV3Snapshot,
+    lastLifecycleEvent,
+    activeBoard,
+    currentCircuit,
+    circuitContext,
+    pinStates,
+    runtime,
+    currentBlocklyXml,
+    generatedCode,
+    running,
+    revision,
+    getBridge,
+  ])
 
   // Execute diagnostic action / AI tutoring with streaming
   const handleRunDiagnosis = useCallback(
@@ -559,18 +859,45 @@ export function CircuitCopilotChat({
       }
 
       const streamMsgId = `asst_${Date.now()}`
-      const isCircuitQuery = isCircuitSpecificQuery(query, messages)
-      setStreamingStatus(isCircuitQuery ? "8square is analyzing circuit & preparing guidance..." : "8square is thinking...")
+      const intentResolution = classifyCopilotIntent(query, messages, { inCyberLab: true })
+      const isCircuitQuery = intentResolution.inspect
+      if (intentResolution.intent === "topology") {
+        const previous = /^which arduino pin[.!?]*$/i.test(query.trim())
+          ? [...messages].reverse().find(m => m.role === "user" && classifyCopilotIntent(m.text).inspect)?.text
+          : ""
+        const text = isCircuitQuery
+          ? describeCircuitTopology(previous ? `${query} ${previous}` : query, circuitContext)
+          : "Which part or pin should I check on the canvas?"
+        setMessages(prev => [...prev, {
+          id: streamMsgId, role: "assistant", text, timestamp: Date.now(),
+          wasCircuitQuery: isCircuitQuery, baseRevisionHash: revision,
+          baseCircuitRev: circuitRevision, baseInteractionRev: interactionRevision, source: "local_guidance",
+          provenance: {
+            response_source: isCircuitQuery ? "local_circuit_engine" : "local_educational_fallback",
+            job_id: null, worker_id: null, session_id: effectiveSessionId, circuit_revision: circuitRevision,
+            context_schema_version: null, response_status: "completed", fallback_reason: null,
+            remotely_generated: false, local_diagnosis: isCircuitQuery, substituted_after_failure: false,
+          },
+        }])
+        requestRef.current = null
+        setIsDiagnosing(false)
+        return
+      }
+      setStreamingStatus(isCircuitQuery ? "Xen is analyzing circuit & preparing guidance..." : "Xen is thinking...")
 
       // Pre-calculate simulator-in-the-loop repair proposal only for circuit-specific queries
       const localResult = isCircuitQuery
         ? processCircuitCopilotQuery(query, circuitContext)
-        : { reply: "", highlightPartIds: [], proposal: undefined, verification: undefined }
+        : { reply: "", state: undefined, highlightPartIds: [], proposal: undefined, verification: undefined }
       if (localResult.highlightPartIds && localResult.highlightPartIds.length > 0 && onHighlightParts) {
         onHighlightParts(localResult.highlightPartIds)
       }
 
-      // Add placeholder assistant message
+      // Add placeholder assistant message with explicit pending provenance
+      const baseCircuitRev = circuitRevision
+      const baseInteractionRev = interactionRevision
+      const contextEnvelope = isCircuitQuery ? buildContextEnvelope(affirmativeAction) : null
+      const schemaVersion = (contextEnvelope?.schema_version as string | undefined) ?? null
       setMessages((prev) => [
         ...prev,
         {
@@ -578,18 +905,33 @@ export function CircuitCopilotChat({
           role: "assistant",
           text: "",
           baseRevisionHash: revision,
+          baseCircuitRev,
+          baseInteractionRev,
+          wasCircuitQuery: isCircuitQuery,
+          diagnosticState: localResult.state,
           proposal: localResult.proposal,
           verification: localResult.verification,
           faults: localResult.proposal?.faults,
           timestamp: Date.now(),
           applied: false,
           isStreaming: true,
+          provenance: {
+            response_source: "unknown",
+            job_id: null,
+            worker_id: null,
+            session_id: effectiveSessionId,
+            circuit_revision: baseCircuitRev,
+            context_schema_version: schemaVersion,
+            response_status: "pending",
+            fallback_reason: null,
+          },
         },
       ])
 
-      const contextEnvelope = isCircuitQuery ? buildContextEnvelope(affirmativeAction) : null
       let streamSucceeded = false
       let fallbackReason = "GPU response unavailable"
+      let fallbackCode = "WORKER_UNAVAILABLE"
+      let lastRemoteProvenance: ResponseProvenance | undefined
 
       try {
         const streamResult = await streamXenChat({
@@ -598,82 +940,162 @@ export function CircuitCopilotChat({
           intent: userRole?.toLowerCase() === "admin" ? "TEACHING_REVIEW" : isLessonKickoff ? "LAB_TEACHING" : "TEACHING",
           contextEnvelope,
           offlineTimeoutMs,
-          history: messages.filter(m => m.id !== "welcome_1" && !m.isStreaming && m.text)
-            .slice(-6).map(m => ({ role: m.role, content: m.text.slice(0, 1000) })),
+          history: buildCleanCopilotHistory(messages),
           idempotencyKey: isLessonKickoff ? lessonContext?.launchId : undefined,
           onStatusUpdate: (info) => {
             if (info.workerAvailable === false) {
-              setStreamingStatus("GPU worker offline — switching to local diagnosis...")
+              setStreamingStatus("GPU worker offline — waiting briefly before local circuit check...")
             } else if (info.status === "queued") {
-              setStreamingStatus(`8square queued (position ${info.queuePosition || 1})...`)
+              setStreamingStatus(`Xen queued (position ${info.queuePosition || 1})...`)
             } else if (info.status === "running") {
-              setStreamingStatus("8square is thinking...")
+              setStreamingStatus("Xen is thinking...")
             } else if (info.status === "streaming") {
-              setStreamingStatus("8square is writing response...")
+              setStreamingStatus("Xen is writing response...")
             }
           },
           onChunk: (delta, fullText) => {
+            if (isCircuitQuery && !isLessonKickoff) return
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === streamMsgId
-                  ? { ...m, text: fullText, isStreaming: true }
+                  ? {
+                      ...m,
+                      text: fullText,
+                      isStreaming: true,
+                      source: "xen",
+                      provenance: {
+                        ...(m.provenance || {
+                          job_id: null,
+                          worker_id: null,
+                          session_id: effectiveSessionId,
+                          circuit_revision: baseCircuitRev,
+                          context_schema_version: schemaVersion,
+                          fallback_reason: null,
+                        }),
+                        response_source: "unknown",
+                        response_status: "streaming",
+                      },
+                    }
                   : m
               )
             )
           },
         })
 
-        if (streamResult.success && streamResult.response?.text) {
+        lastRemoteProvenance = (streamResult as { provenance?: ResponseProvenance })?.provenance
+
+        if (isCircuitQuery && streamResult.success && lastRemoteProvenance?.circuit_revision != null &&
+            lastRemoteProvenance.circuit_revision !== baseCircuitRev) {
+          fallbackReason = "Xen answered from a different circuit revision"
+          fallbackCode = "SNAPSHOT_MISMATCH"
+        } else if (streamResult.success && streamResult.response?.text?.trim()) {
           streamSucceeded = true
+          const gv = streamResult.groundingVerification
+          const source = copilotCompletionSource(lastRemoteProvenance, gv)
+          const resolvedProv: ResponseProvenance = {
+            response_source: source,
+            model: streamResult.model ?? null,
+            assistant: streamResult.assistant ?? null,
+            request_id: streamResult.requestId ?? null,
+            worker_available: streamResult.workerAvailable ?? null,
+            remotely_generated: source === "xen_step_700" ? true : source === "local_circuit_engine" ? false : null,
+            local_diagnosis: source === "local_circuit_engine",
+            substituted_after_failure: source === "local_circuit_engine",
+            job_id: lastRemoteProvenance?.job_id ?? null,
+            worker_id: lastRemoteProvenance?.worker_id ?? null,
+            session_id: lastRemoteProvenance?.session_id ?? effectiveSessionId,
+            circuit_revision: lastRemoteProvenance?.circuit_revision ?? baseCircuitRev,
+            context_schema_version: lastRemoteProvenance?.context_schema_version ?? schemaVersion,
+            response_status: lastRemoteProvenance?.response_status || "completed",
+            fallback_reason: lastRemoteProvenance?.fallback_reason ?? null,
+          }
           setMessages((prev) =>
             prev.map((m) =>
               m.id === streamMsgId
                 ? {
                     ...m,
-                    text: streamResult.response.text,
+                    text: sanitizeClientOutput(streamResult.response.text),
                     isStreaming: false,
+                    source: resolvedProv.response_source === "local_circuit_engine" ? "local_guidance"
+                      : resolvedProv.response_source === "xen_step_700" ? "xen" : undefined,
+                    provenance: resolvedProv,
+                    groundingVerified: gv?.verified,
+                    unsupportedClaims: gv?.unsupported_claims,
                   }
                 : m
             )
           )
         } else if (streamResult?.error?.code === "WORKER_OFFLINE") {
           fallbackReason = "GPU worker offline"
+          fallbackCode = "WORKER_OFFLINE"
+        } else if (streamResult?.error?.code === "TIMEOUT") {
+          fallbackReason = "Xen inference request timed out"
+          fallbackCode = "TIMEOUT"
+        } else if (streamResult?.error?.message) {
+          fallbackReason = streamResult.error.message
+          fallbackCode = streamResult.error.code || "UPSTREAM_ERROR"
+        } else if (streamResult.success && !streamResult.response?.text?.trim()) {
+          fallbackReason = "Empty response returned by inference endpoint"
+          fallbackCode = "EMPTY_MODEL_RESPONSE"
         }
       } catch {
-        // Fallback gracefully to local Circuit Intelligence engine
+        // Handle unreachable backend / worker without masquerading as live Xen output
         streamSucceeded = false
+        fallbackReason = "Backend request failed"
+        fallbackCode = "BACKEND_ERROR"
       }
 
-      // If streaming didn't return text, use local pedagogical reply
+      // If live Xen inference did not succeed, never masquerade offline text as a Xen model response
       if (!streamSucceeded) {
-        let fallbackText = localResult.reply
-        if (!isCircuitQuery) {
-          if (/kinetic|enerf|kitnetic/i.test(query)) {
-            fallbackText = "**Kinetic Energy**\n\n$$\\mathrm{KE} = \\frac{1}{2}mv^2$$\n\nwhere:\n- $m$ = mass of the object\n- $v$ = velocity of the object"
-          } else if (/newton/i.test(query)) {
-            fallbackText = "**Newton's Second Law of Motion**\n\n$$\\vec{F} = m\\vec{a}$$\n\nwhere:\n- $\\vec{F}$ is net force applied\n- $m$ is mass of the object\n- $\\vec{a}$ is acceleration produced"
-          } else {
-            fallbackText = "I am ready to assist you with Physics, STEM concepts, formulas, or your CyberLab circuit."
-          }
-        } else if (affirmativeAction?.detected) {
-          if (affirmativeAction.actionType === "latex_formatting") {
-            fallbackText = "Here is the mathematical formula in LaTeX:\n\n$$V = I \\times R$$\n\nWhere:\n- $V$ is Voltage (Volts, $\\text{V}$)\n- $I$ is Current (Amperes, $\\text{A}$)\n- $R$ is Resistance (Ohms, $\\Omega$)"
-          } else if (affirmativeAction.actionType === "circuit_diagnosis") {
-            fallbackText = localResult.reply || "Let us inspect the circuit wiring and verify every pin connection."
-          } else if (affirmativeAction.actionType === "code_generation") {
-            fallbackText = "Here is the code for your circuit:\n\n```cpp\nvoid setup() {\n  pinMode(13, OUTPUT);\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);\n  delay(1000);\n  digitalWrite(13, LOW);\n  delay(1000);\n}\n```"
-          }
+        let finalText = ""
+        let messageSource: ChatMessage["source"] = "local_guidance"
+        let provSource: ResponseProvenance["response_source"] = "local_circuit_engine"
+        let provStatus = "local_fallback"
+
+        if (!isCircuitQuery && !isLessonKickoff) {
+          provSource = "local_educational_fallback"
+          const educational = /kinetic|kitnetic|kenetic|gatij/i.test(query)
+            ? "Kinetic energy is the energy of motion. $KE = (1/2)mv^2$, where $m$ is mass and $v$ is speed. At the same mass, doubling speed gives four times the kinetic energy."
+            : intentResolution.intent === "greeting" || intentResolution.intent === "conversation"
+              ? "Hi! I can still check circuit wiring or pin connections while Xen is unavailable."
+              : "I can check your circuit locally. For this broader question, try Xen again when the worker is available."
+          finalText = `Xen is unavailable right now (${fallbackReason}).\n\n${educational}`
         } else if (isLessonKickoff && lessonContext) {
-          fallbackText =
-            `Welcome to **${lessonContext.title}**!\n\n` +
-            `**Mission Objective:** ${lessonContext.description || "Build and test this circuit safely."}\n\n` +
-            `**Key Concepts:** ${(lessonContext.concepts || []).join(", ")}.\n\n` +
+          messageSource = "local_guidance"
+          provSource = "local_educational_fallback"
+          provStatus = "local_fallback"
+          const missionOverview =
+            `Mission overview for **${lessonContext.title}** — ${lessonContext.description || "Build and test this circuit safely."}` +
+            (lessonContext.concepts?.length ? `\n\n**Key Concepts:** ${lessonContext.concepts.join(", ")}.` : "") +
             (lessonContext.checkpoint
-              ? `**Current checkpoint:** ${lessonContext.checkpoint.title}\n${lessonContext.checkpoint.instructions}`
-              : "Let's inspect your breadboard and start wiring!")
+              ? `\n\n**Current checkpoint:** ${lessonContext.checkpoint.title}\n${lessonContext.checkpoint.instructions}`
+              : "")
+          finalText = `Local circuit guidance (${fallbackReason} — Xen model is unavailable; showing local mission notes only):\n\n${missionOverview}`
+        } else {
+          messageSource = "local_guidance"
+          provSource = "local_circuit_engine"
+          provStatus = "local_fallback"
+          const deterministicReply = localResult.reply
+            ? localResult.reply
+            : "Local deterministic checks inspect placed CyberLab components, wires, nets, and fault rules."
+          finalText = `Local circuit guidance (${fallbackReason} — Xen model is unavailable; deterministic CyberLab checks only):\n\n${deterministicReply}`
         }
 
-        const finalText = isCircuitQuery ? `Local circuit guidance (${fallbackReason})\n\n${fallbackText}` : fallbackText
+        const offlineProv: ResponseProvenance = {
+          response_source: provSource,
+          remotely_generated: false,
+          worker_available: fallbackCode === "WORKER_OFFLINE" ? false : null,
+          local_diagnosis: provSource === "local_circuit_engine",
+          substituted_after_failure: true,
+          job_id: lastRemoteProvenance?.job_id ?? null,
+          worker_id: lastRemoteProvenance?.worker_id ?? null,
+          session_id: lastRemoteProvenance?.session_id ?? effectiveSessionId,
+          circuit_revision: baseCircuitRev,
+          context_schema_version: schemaVersion,
+          response_status: provStatus,
+          fallback_reason: fallbackCode,
+        }
+
         setMessages((prev) =>
           prev.map((m) =>
             m.id === streamMsgId
@@ -681,6 +1103,8 @@ export function CircuitCopilotChat({
                   ...m,
                   text: finalText,
                   isStreaming: false,
+                  source: messageSource,
+                  provenance: offlineProv,
                 }
               : m
           )
@@ -691,7 +1115,7 @@ export function CircuitCopilotChat({
       setIsDiagnosing(false)
       setStreamingStatus(null)
     },
-    [userRole, revision, circuitContext, onHighlightParts, buildContextEnvelope, lessonContext, messages, offlineTimeoutMs]
+    [userRole, effectiveSessionId, revision, circuitRevision, interactionRevision, circuitContext, onHighlightParts, buildContextEnvelope, lessonContext, messages, offlineTimeoutMs]
   )
 
   // Lesson-aware auto-tutoring effect (idempotent against StrictMode)
@@ -718,38 +1142,53 @@ export function CircuitCopilotChat({
     }
   }, [isOpen, lessonContext, handleRunDiagnosis])
 
-  // Handle Apply Fix action
+  // Handle Apply Fix action (verifies simulator + validator + post-apply state before marking applied)
   const handleApplyFix = useCallback(
-    (messageId: string, proposal: StructuredRepairProposal, baseRevisionHash: string) => {
-      if (!copilotAction) return
+    (messageId: string, proposal: StructuredRepairProposal, baseRevisionHash: string, baseCircuitRev?: number) => {
+      if (!copilotAction || baseRevisionHash !== revision || baseCircuitRev !== circuitRevision) return
+
+      const effectiveXml = proposal.repairedBlocklyXml || currentBlocklyXml
+      const preApplyVerification = verifyCircuitWithSimulator(
+        currentCircuit,
+        proposal.repairedCircuit,
+        pinStates,
+        effectiveXml
+      )
+      if (!preApplyVerification.verified) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? {
+                  ...m,
+                  applied: false,
+                  verification: preApplyVerification,
+                }
+              : m
+          )
+        )
+        return
+      }
 
       const actionProposal: CircuitCopilotProposal = {
         id: `repair_${Date.now()}`,
-        title: "8square Circuit Repair",
+        title: "Circuit Repair Preview",
         rationale: proposal.diagnosis,
         baseRevisionHash,
         circuit: proposal.repairedCircuit,
-        blocklyXml: proposal.repairedBlocklyXml || currentBlocklyXml,
+        blocklyXml: effectiveXml,
       }
 
       const stageResult = copilotAction.proposeAction(actionProposal)
       if (stageResult.valid) {
         const applied = copilotAction.applyProposal(actionProposal)
         if (applied) {
-          const liveVerification = verifyCircuitWithSimulator(
-            currentCircuit,
-            proposal.repairedCircuit,
-            pinStates,
-            proposal.repairedBlocklyXml || currentBlocklyXml
-          )
-
           setMessages((prev) =>
             prev.map((m) =>
               m.id === messageId
                 ? {
                     ...m,
                     applied: true,
-                    verification: liveVerification,
+                    verification: preApplyVerification,
                   }
                 : m
             )
@@ -757,14 +1196,14 @@ export function CircuitCopilotChat({
         }
       }
     },
-    [copilotAction, currentCircuit, currentBlocklyXml, pinStates]
+    [copilotAction, currentCircuit, currentBlocklyXml, pinStates, revision, circuitRevision]
   )
 
-  // Handle Undo Fix action
+  // Handle Undo Fix action (restores exact prior topology via undoAction)
   const handleUndoFix = useCallback(
     (messageId: string) => {
       if (!copilotAction || !copilotAction.canUndo) return
-      const undone = copilotAction.undoProposal()
+      const undone = copilotAction.undoAction()
       if (undone) {
         setMessages((prev) =>
           prev.map((m) => (m.id === messageId ? { ...m, applied: false } : m))
@@ -794,11 +1233,11 @@ export function CircuitCopilotChat({
             toggle()
           }}
           className="fixed bottom-20 right-24 md:bottom-6 md:right-36 z-[78] inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-[#091122]/95 px-4 py-2 text-xs font-black text-white shadow-xl shadow-cyan-900/40 backdrop-blur-md transition hover:border-cyan-300 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-300"
-          aria-label="Open 8square AI Circuit Copilot"
-          title="Open 8square AI · Circuit Intelligence & Autonomous Repair"
+          aria-label="Open Xen AI Circuit Copilot"
+          title="Open Xen AI · Circuit Intelligence & Autonomous Repair"
         >
-          <img src={EIGHT_SQUARE_LOGO} alt="" className="h-5 w-5 object-contain" />
-          <span className="font-extrabold tracking-wide">8square AI</span>
+          <img src={XEN_LOGO} alt="" className="h-5 w-5 object-contain" />
+          <span className="font-extrabold tracking-wide">Xen AI</span>
           <Sparkles size={13} className="text-cyan-300 animate-pulse" />
 
           {/* Real-time Health Badge */}
@@ -808,10 +1247,12 @@ export function CircuitCopilotChat({
                 ? "bg-red-500/20 text-red-300 border border-red-500/30"
                 : hasWarning
                 ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                : healthScore === null
+                ? "bg-slate-800/90 text-slate-300 border border-slate-700"
                 : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
             }`}
           >
-            {healthScore}%
+            {healthBadgeLabel}
           </span>
         </button>
       )}
@@ -822,11 +1263,11 @@ export function CircuitCopilotChat({
           role="region"
           tabIndex={-1}
           ref={dockRef}
-          aria-label="8square Minimized Pill"
+          aria-label="Xen Minimized Pill"
           className="fixed bottom-6 right-6 md:right-10 z-[85] flex items-center gap-2.5 rounded-full border border-cyan-400/50 bg-[#070d19]/95 px-4 py-2 text-xs font-bold text-white shadow-2xl shadow-cyan-950/60 backdrop-blur-xl animate-in fade-in zoom-in-95"
         >
-          <img src={EIGHT_SQUARE_LOGO} alt="" className="h-5 w-5 object-contain" />
-          <span className="font-extrabold text-cyan-200">8square AI</span>
+          <img src={XEN_LOGO} alt="" className="h-5 w-5 object-contain" />
+          <span className="font-extrabold text-cyan-200">Xen AI</span>
 
           {lessonContext && (
             <span className="flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-950/80 px-2 py-0.5 text-[10px] text-cyan-300 max-w-[150px] truncate">
@@ -840,8 +1281,8 @@ export function CircuitCopilotChat({
               type="button"
               onClick={() => setIsMinimized(false)}
               className="rounded-full p-1 text-slate-300 hover:bg-slate-800 hover:text-white transition"
-              title="Expand 8square Window"
-              aria-label="Expand 8square Window"
+              title="Expand Xen Window"
+              aria-label="Expand Xen Window"
             >
               <Maximize2 size={13} />
             </button>
@@ -849,8 +1290,8 @@ export function CircuitCopilotChat({
               type="button"
               onClick={toggle}
               className="rounded-full p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-              title="Close 8square"
-              aria-label="Close 8square"
+              title="Close Xen"
+              aria-label="Close Xen"
             >
               <X size={13} />
             </button>
@@ -863,7 +1304,7 @@ export function CircuitCopilotChat({
         <aside
           tabIndex={-1}
           ref={panelRef}
-          aria-label="8square Circuit Copilot Panel"
+          aria-label="Xen Circuit Copilot Panel"
           style={{
             transform: position ? `translate3d(${position.x}px, ${position.y}px, 0)` : undefined,
             position: "fixed",
@@ -885,12 +1326,12 @@ export function CircuitCopilotChat({
           >
             <div className="flex items-center gap-2.5">
               <GripHorizontal size={16} className="text-slate-500 shrink-0" />
-              <img src={EIGHT_SQUARE_LOGO} alt="8square AI" className="h-6 w-6 object-contain pointer-events-none" />
+              <img src={XEN_LOGO} alt="Xen AI" className="h-6 w-6 object-contain pointer-events-none" />
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-xs font-black text-white">8square AI</h3>
+                  <h3 className="text-xs font-black text-white">Xen</h3>
                   <span className="rounded bg-cyan-950 px-1.5 py-0.5 text-[9px] font-semibold text-cyan-400 border border-cyan-800/50">
-                    Xen Step-700
+                    Configured model: Xen Step-700
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-400">Interactive Circuit Copilot & Tutor</p>
@@ -904,6 +1345,8 @@ export function CircuitCopilotChat({
                     ? "bg-red-950/80 text-red-400 border border-red-700/50"
                     : hasWarning
                     ? "bg-amber-950/80 text-amber-300 border border-amber-700/50"
+                    : healthScore === null
+                    ? "bg-slate-800/90 text-slate-300 border border-slate-700"
                     : "bg-emerald-950/80 text-emerald-400 border border-emerald-700/50"
                 }`}
               >
@@ -911,10 +1354,12 @@ export function CircuitCopilotChat({
                   <AlertOctagon size={11} />
                 ) : hasWarning ? (
                   <AlertTriangle size={11} />
+                ) : healthScore === null ? (
+                  <Activity size={11} />
                 ) : (
                   <CheckCircle2 size={11} />
                 )}
-                <span>{healthScore}%</span>
+                <span>{healthBadgeLabel}</span>
               </span>
 
               {/* Minimize Button */}
@@ -923,7 +1368,7 @@ export function CircuitCopilotChat({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => setIsMinimized(true)}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-                aria-label="Minimize 8square Window"
+                aria-label="Minimize Xen Window"
                 title="Minimize Window"
               >
                 <Minus size={15} />
@@ -935,7 +1380,7 @@ export function CircuitCopilotChat({
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={toggle}
                 className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-                aria-label="Close 8square Panel"
+                aria-label="Close Xen Panel"
                 title="Close Panel"
               >
                 <X size={15} />
@@ -998,12 +1443,38 @@ export function CircuitCopilotChat({
                 }`}
               >
                 <div
+                  data-response-source={msg.role === "assistant" ? msg.provenance?.response_source : undefined}
+                  data-diagnostic-state={msg.role === "assistant" ? msg.diagnosticState : undefined}
+                  data-model-id={msg.role === "assistant" ? msg.provenance?.model ?? undefined : undefined}
+                  data-job-id={msg.role === "assistant" && msg.provenance?.job_id ? msg.provenance.job_id : undefined}
                   className={`max-w-[92%] rounded-2xl p-3.5 shadow-md ${
                     msg.role === "user"
                       ? "bg-cyan-600 text-white rounded-tr-none font-medium"
                       : "bg-slate-900/90 border border-slate-800 text-slate-200 rounded-tl-none space-y-3"
                   }`}
                 >
+                  {msg.role === "assistant" && msg.id !== "welcome_1" && !msg.isStreaming && (msg.provenance || msg.source) && (
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold">
+                      {msg.provenance?.response_source === "cache" ? (
+                        <span className="rounded bg-indigo-950/80 px-1.5 py-0.5 text-indigo-300 border border-indigo-800/60">
+                          Cached response
+                        </span>
+                      ) : ["xen_step700", "xen_step_700"].includes(msg.provenance?.response_source ?? "") ? (
+                        <span className="rounded bg-cyan-950/80 px-1.5 py-0.5 text-cyan-300 border border-cyan-800/60">
+                          Xen Step-700
+                        </span>
+                      ) : msg.provenance?.response_source === "error" || msg.source === "offline_unavailable" ? (
+                        <span className="rounded bg-rose-950/80 px-1.5 py-0.5 text-rose-300 border border-rose-800/60">
+                          Xen Inference Unavailable
+                        </span>
+                      ) : (
+                        <span className="rounded bg-amber-950/80 px-1.5 py-0.5 text-amber-300 border border-amber-800/60">
+                          {msg.provenance?.response_source === "local_circuit_engine" ? "Local Circuit Engine"
+                            : msg.provenance?.response_source === "local_educational_fallback" ? "Local Educational Fallback" : "Unknown source"}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {/* Markdown / Formatted Text */}
                   <div className="leading-relaxed">
                     {msg.text ? splitXenResponse(msg.text).map((section, index) =>
@@ -1012,6 +1483,19 @@ export function CircuitCopilotChat({
                         : <XenMarkdown key={index} content={section.content} isUser={msg.role === "user"} />
                     ) : (msg.isStreaming ? "..." : "")}
                   </div>
+
+                  {/* Stale Context Warning for Text-Only Circuit Replies */}
+                  {msg.role === "assistant" &&
+                    msg.id !== "welcome_1" &&
+                    !msg.isStreaming &&
+                    msg.wasCircuitQuery &&
+                    !(msg.proposal && msg.proposal.actions.length > 0) &&
+                    (msg.baseRevisionHash !== revision ||
+                      (msg.baseInteractionRev !== undefined && msg.baseInteractionRev !== interactionRevision)) && (
+                      <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-2.5 py-1 text-[10px] text-amber-300">
+                        Canvas or live wiring state changed after this reply — ask Xen again to inspect the latest revision.
+                      </p>
+                    )}
 
                   {/* Structured Repair Proposal Card */}
                   {msg.proposal && msg.proposal.actions.length > 0 && (
@@ -1081,7 +1565,7 @@ export function CircuitCopilotChat({
                             />
                             <span className="font-semibold">
                               {msg.verification.status === "VERIFIED_WORKING"
-                                ? "Simulator Verified (MNA Valid)"
+                                ? "Solver and electrical checks passed"
                                 : "Simulation checks failed"}
                             </span>
                           </div>
@@ -1092,9 +1576,9 @@ export function CircuitCopilotChat({
                       )}
 
                       {/* Stale Revision Notice */}
-                      {!msg.applied && msg.baseRevisionHash !== revision && (
+                      {!msg.applied && (msg.baseRevisionHash !== revision || msg.baseCircuitRev !== circuitRevision) && (
                         <p className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-2.5 py-1 text-[10px] text-amber-300">
-                          Canvas changed since this diagnosis — ask 8square again to refresh this repair.
+                          Canvas changed since this diagnosis — ask Xen again to refresh this repair.
                         </p>
                       )}
 
@@ -1103,9 +1587,9 @@ export function CircuitCopilotChat({
                         {!msg.applied ? (
                           <button
                             type="button"
-                            disabled={msg.baseRevisionHash !== revision}
-                            title={msg.baseRevisionHash !== revision ? "Circuit changed. Request a fresh diagnosis." : undefined}
-                            onClick={() => handleApplyFix(msg.id, msg.proposal!, msg.baseRevisionHash!)}
+                            disabled={msg.baseRevisionHash !== revision || msg.baseCircuitRev !== circuitRevision}
+                            title={msg.baseRevisionHash !== revision || msg.baseCircuitRev !== circuitRevision ? "Circuit changed. Request a fresh diagnosis." : undefined}
+                            onClick={() => handleApplyFix(msg.id, msg.proposal!, msg.baseRevisionHash!, msg.baseCircuitRev)}
                             className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-bold text-white shadow-lg shadow-cyan-900/30 hover:bg-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-cyan-600 transition"
                           >
                             <CheckCircle2 size={13} />
@@ -1132,7 +1616,7 @@ export function CircuitCopilotChat({
             {isDiagnosing && (
               <div className="flex items-center gap-2 text-cyan-400 text-xs py-2 animate-pulse">
                 <Activity size={14} className="animate-spin" />
-                <span>{streamingStatus || "8square is analyzing circuit equations..."}</span>
+                <span>{streamingStatus || "Xen is analyzing circuit equations..."}</span>
               </div>
             )}
             <div ref={messagesEndRef} />

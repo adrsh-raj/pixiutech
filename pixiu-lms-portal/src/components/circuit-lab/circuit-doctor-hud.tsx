@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { AlertTriangle, CheckCircle, Info, Sparkles, X, ChevronRight, Eye, ShieldAlert, Cpu } from "lucide-react"
+import { Activity, AlertTriangle, CheckCircle, Info, Sparkles, X, ChevronRight, Eye, ShieldAlert, Cpu } from "lucide-react"
 import type { CircuitHealthReport, DiagnosticIssue } from "@/lib/circuit-doctor"
 
 interface CircuitDoctorHudProps {
@@ -84,12 +84,20 @@ export function CircuitDoctorHud({
             <div className="text-[11px] font-medium text-slate-400">Circuit Integrity Score</div>
             <div className="flex items-center gap-2 mt-0.5">
               <span className={`text-2xl font-black font-mono tracking-tight ${
-                report.score >= 90 ? "text-emerald-400" : report.score >= 60 ? "text-amber-400" : "text-rose-400"
+                report.score === null ? "text-slate-400" : report.score >= 90 ? "text-emerald-400" : report.score >= 60 ? "text-amber-400" : "text-rose-400"
               }`}>
-                {report.score}%
+                {report.score === null ? "—" : `${report.score}%`}
               </span>
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">
-                {report.status === "healthy" ? "All Clear" : report.status === "needs-attention" ? "Action Needed" : "Safety Alert"}
+                {report.status === "empty"
+                  ? "Empty Canvas"
+                  : report.status === "unwired"
+                  ? "Not Wired"
+                  : report.status === "healthy"
+                  ? "All Clear"
+                  : report.status === "needs-attention"
+                  ? "Action Needed"
+                  : "Safety Alert"}
               </span>
             </div>
           </div>
@@ -133,9 +141,23 @@ export function CircuitDoctorHud({
         {/* Issues List */}
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
           {filteredIssues.length === 0 ? (
-            <div className="p-6 text-center text-slate-500 text-xs flex flex-col items-center gap-2">
-              <CheckCircle className="w-8 h-8 text-emerald-500/50" />
-              <span>No {activeTab !== "all" ? activeTab : ""} issues found in current circuit!</span>
+            <div className="p-6 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
+              {report.status === "empty" ? (
+                <>
+                  <Activity className="w-8 h-8 text-slate-500" />
+                  <span>Canvas is empty (0 components, 0 wires) — health score N/A. Place components to inspect electrical safety.</span>
+                </>
+              ) : report.status === "unwired" ? (
+                <>
+                  <Activity className="w-8 h-8 text-slate-500" />
+                  <span>Components are not wired yet (0 wires) — health score N/A until pins are connected.</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-8 h-8 text-emerald-500/50" />
+                  <span>No {activeTab !== "all" ? activeTab : ""} issues found in current circuit!</span>
+                </>
+              )}
             </div>
           ) : (
             filteredIssues.map((issue) => {

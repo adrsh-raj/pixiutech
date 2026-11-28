@@ -48,7 +48,7 @@ interface Props {
   onToggleSchematic?: () => void
   isDoctorOpen?: boolean
   onToggleDoctor?: () => void
-  doctorScore?: number
+  doctorScore?: number | null
   onDownloadIno?: () => void
   onToggleCopilot?: () => void
   userRole?: string
@@ -294,15 +294,15 @@ export function Toolbar({
             className={`pixiu-toolbar-action-doctor flex items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1.5 text-xs font-bold transition cursor-pointer shadow-sm ${
               isDoctorOpen
                 ? "border-cyan-400 bg-cyan-500/20 text-cyan-200"
-                : doctorScore !== undefined && doctorScore < 90
+                : typeof doctorScore === "number" && doctorScore < 90
                 ? "border-amber-500/50 bg-amber-500/20 text-amber-200 animate-pulse"
                 : "border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary"
             }`}
             title="Open AI Circuit Doctor: Real-time electrical safety analysis"
           >
-            <ShieldAlert size={14} className={doctorScore !== undefined && doctorScore < 90 ? "text-amber-400" : "text-cyan-400"} />
+            <ShieldAlert size={14} className={typeof doctorScore === "number" && doctorScore < 90 ? "text-amber-400" : "text-cyan-400"} />
             <span className="hidden sm:inline">Doctor</span>
-            {doctorScore !== undefined && (
+            {typeof doctorScore === "number" && (
               <span className={`text-[10px] font-mono px-1 rounded ${
                 doctorScore >= 90 ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" : "bg-amber-950 text-amber-300 border border-amber-500/30"
               }`}>

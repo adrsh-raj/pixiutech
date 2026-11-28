@@ -3,6 +3,7 @@ import { Gauge, X, Volume2, HelpCircle, Sparkles, CheckCircle2, RotateCcw, Alert
 import type { CircuitState, PinRef } from "@/lib/circuit-types"
 import type { PartRuntime } from "./part-art"
 import type { ArduinoPinState } from "@/lib/simulation"
+import type { LiveMultimeterTelemetry } from "@/lib/live-circuit-types"
 import { audioEngine } from "@/lib/audio-engine"
 import { solveCircuitNodalPotentials } from "@/lib/circuit-solver"
 import { getBoardForPart, isBoardPart } from "@/lib/board-registry"
@@ -31,6 +32,7 @@ interface Props {
   activeProbeToPlace: "red" | "black" | null
   onSetActiveProbeToPlace: (color: "red" | "black" | null) => void
   isAiCameraOpen?: boolean
+  onTelemetryChange?: (telemetry: LiveMultimeterTelemetry) => void
 }
 
 export function Multimeter({
@@ -48,6 +50,7 @@ export function Multimeter({
   activeProbeToPlace,
   onSetActiveProbeToPlace,
   isAiCameraOpen = false,
+  onTelemetryChange,
 }: Props) {
   const [mode, setMode] = useState<DmmMode>("voltage")
   const [minimized, setMinimized] = useState(false)
@@ -301,6 +304,24 @@ export function Multimeter({
       }
     }
   }, [isOpen, mode, reading.isContinuityBeep])
+
+  const lastTelemetryJsonRef = useRef<string>("")
+  useEffect(() => {
+    if (!onTelemetryChange) return
+    const nextTelemetry: LiveMultimeterTelemetry = {
+      isOpen,
+      mode,
+      value: reading.value,
+      unit: reading.unit,
+      explanation: reading.explanation,
+      isContinuityBeep: reading.isContinuityBeep,
+    }
+    const sig = JSON.stringify(nextTelemetry)
+    if (sig !== lastTelemetryJsonRef.current) {
+      lastTelemetryJsonRef.current = sig
+      onTelemetryChange(nextTelemetry)
+    }
+  }, [isOpen, mode, reading.value, reading.unit, reading.explanation, reading.isContinuityBeep, onTelemetryChange])
 
   const boardPart = state.parts.find((p) => isBoardPart(p.type))
   const boardDef = boardPart ? getBoardForPart(boardPart) : undefined
@@ -611,8 +632,14 @@ export function Multimeter({
               <div>
                 <h3 className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                   <span>Digital Multimeter</span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-mono font-normal">
-                    Physics MNA
+                  <span
+                    className={`text-[9px] px-1.5 py-0.5 rounded-full font-mono font-normal ${
+                      running && nodalSolution
+                        ? "bg-emerald-500/20 text-emerald-300"
+                        : "bg-slate-800 text-slate-300 border border-slate-700"
+                    }`}
+                  >
+                    {running ? (nodalSolution ? "MNA · Live" : "Running · Idle") : nodalSolution ? "MNA · Stopped" : "Stopped · Idle"}
                   </span>
                 </h3>
                 <span className="text-[9px] text-slate-400 font-mono flex items-center gap-1">

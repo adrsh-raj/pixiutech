@@ -16,7 +16,7 @@ const { outputFiles } = await build({
   format: 'esm',
   define: { 'import.meta.env': '{}' },
 });
-const { createXenRequestLifecycle, sanitizeClientOutput, sendXenChat, streamXenChat, fetchXenStatus, clearAuthStorage } = await import(
+const { createXenRequestLifecycle, sanitizeClientOutput, sendXenChat, streamXenChat, fetchXenStatus, clearAuthStorage, copilotCompletionSource } = await import(
   `data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString('base64')}`
 );
 
@@ -60,7 +60,7 @@ test('Xen Client - AST badge and tested truthfulness mapping', () => {
   const mockServerResponse = {
     status: 'ok',
     model: 'xen-step-700',
-    assistant: '8square',
+    assistant: 'Xen',
     response: {
       text: 'def test():\n    pass',
       is_complete: false,
@@ -183,7 +183,7 @@ test('Xen Client - fetchXenStatus reports operational worker vitality', async (t
           queued_jobs: 2,
           running_jobs: 1,
           model: 'xen-step-700',
-          assistant: '8square',
+          assistant: 'Xen',
         });
       }
       return Response.json({}, { status: 404 });
@@ -244,7 +244,7 @@ test('Xen Client - sendXenChat handles HTTP 202 job queue and polls until comple
           status: 'completed',
           job_id: 'job-uuid-456',
           model: 'xen-step-700',
-          assistant: '8square',
+          assistant: 'Xen',
           response: {
             text: '```python\nprint("Kaggle GPU result")\n```',
             is_complete: true,
@@ -324,7 +324,7 @@ test('Xen Client - stream displays a delta before completion after two empty rea
           status: 'completed',
           job_id: 'job-uuid-456',
           model: 'xen-step-700',
-          assistant: '8square',
+          assistant: 'Xen',
           response: {
             text: '```python\nprint("Kaggle GPU result")\n```',
             is_complete: true,
@@ -455,8 +455,207 @@ test('Xen Client - streamXenChat aborts fast with WORKER_OFFLINE when offlineTim
 
     assert.equal(result.success, false);
     assert.equal(result.error.code, 'WORKER_OFFLINE');
+    assert.equal(result.provenance.response_source, 'error');
+    assert.equal(result.provenance.job_id, 'job-offline-1');
+    assert.equal(result.provenance.response_status, 'worker_offline');
+    assert.equal(result.provenance.fallback_reason, 'WORKER_OFFLINE');
     assert.equal(elapsed < 2000, true);
   } finally {
     globalThis.window = previousWindow;
   }
+});
+
+test('Xen Client - streamXenChat preserves structured provenance across xen_step700 and cache hits', async (t) => {
+  const session = new Map([['pixiu_session_role', 'trainer']]);
+  const browser = Object.assign(new EventTarget(), {
+    setTimeout, clearTimeout,
+    sessionStorage: {
+      getItem: (key) => session.get(key),
+      removeItem: (key) => session.delete(key),
+    },
+    localStorage: { removeItem() {} },
+  });
+  const previousWindow = globalThis.window;
+  globalThis.window = browser;
+
+  try {
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'test-csrf' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'test-access-token' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json({
+          status: 'queued',
+          job_id: 'job-prov-1',
+          worker_available: true,
+          queue_position: 1,
+        }, { status: 202 });
+      }
+      if (path.includes('/xen/jobs/job-prov-1/chunks')) {
+        return Response.json({
+          job_id: 'job-prov-1',
+          worker_id: 'kaggle-t4-live-1',
+          status: 'completed',
+          is_complete: true,
+          intent: 'TEACHING',
+          format_mode: 'DEFAULT_EDUCATIONAL',
+          worker_available: true,
+          provenance: {
+            response_source: 'xen_step700',
+            job_id: 'job-prov-1',
+            worker_id: 'kaggle-t4-live-1',
+            session_id: 'sess-client-1',
+            circuit_revision: 3,
+            context_schema_version: '3.0',
+            response_status: 'completed',
+            fallback_reason: null,
+          },
+          grounding_verification: {
+            verified: true,
+            model_verified: true,
+            retry_attempted: false,
+            fallback_applied: false,
+            circuit_revision: 3,
+            unsupported_claims: [],
+          },
+          response: { text: 'Verified live answer', is_complete: true, syntax_valid: true, display_ast_valid: true, tested: false },
+        });
+      }
+      return Response.json({}, { status: 404 });
+    });
+
+    const liveRes = await streamXenChat({
+      prompt: 'Check wiring',
+      contextEnvelope: { session_id: 'sess-client-1', circuit_revision: 3, schema_version: '3.0' },
+    });
+    assert.equal(liveRes.success, true);
+    assert.deepEqual(liveRes.provenance, {
+      response_source: 'xen_step700',
+      job_id: 'job-prov-1',
+      worker_id: 'kaggle-t4-live-1',
+      session_id: 'sess-client-1',
+      circuit_revision: 3,
+      context_schema_version: '3.0',
+      response_status: 'completed',
+      fallback_reason: null,
+    });
+    assert.equal(liveRes.groundingVerification?.circuit_revision, 3);
+    assert.equal(liveRes.groundingVerification?.model_verified, true);
+
+    // Cached synchronous response from idempotency hit
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'test-csrf' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'test-access-token' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json({
+          status: 'completed',
+          job_id: 'job-prov-1',
+          worker_id: 'kaggle-t4-live-1',
+          cached: true,
+          provenance: {
+            response_source: 'cache',
+            job_id: 'job-prov-1',
+            worker_id: 'kaggle-t4-live-1',
+            session_id: 'sess-client-1',
+            circuit_revision: 3,
+            context_schema_version: '3.0',
+            response_status: 'cached',
+            fallback_reason: null,
+          },
+          response: { text: 'Cached answer', is_complete: true, syntax_valid: true, display_ast_valid: true, tested: false },
+        });
+      }
+      return Response.json({}, { status: 404 });
+    });
+
+    const cacheRes = await streamXenChat({
+      prompt: 'Check wiring',
+      contextEnvelope: { session_id: 'sess-client-1', circuit_revision: 3, schema_version: '3.0' },
+    });
+    assert.equal(cacheRes.success, true);
+    assert.equal(cacheRes.provenance.response_source, 'cache');
+    assert.equal(cacheRes.provenance.response_status, 'cached');
+    assert.equal(cacheRes.provenance.worker_id, 'kaggle-t4-live-1');
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test('Xen Client - streamXenChat sanitizes Markdown escapes, entities, and think boundaries across chunks', async (t) => {
+  const session = new Map([['pixiu_session_role', 'trainer']]);
+  const browser = Object.assign(new EventTarget(), {
+    setTimeout, clearTimeout,
+    sessionStorage: {
+      getItem: (key) => session.get(key),
+      removeItem: (key) => session.delete(key),
+    },
+    localStorage: { removeItem() {} },
+  });
+  const previousWindow = globalThis.window;
+  globalThis.window = browser;
+  const emitted = [];
+
+  try {
+    let pollStep = 0;
+    t.mock.method(globalThis, 'fetch', async (url) => {
+      const path = new URL(url, 'https://portal.example').pathname;
+      if (path.endsWith('/auth/csrf/')) return Response.json({ csrfToken: 'c' });
+      if (path.endsWith('/auth/refresh/')) return Response.json({ access: 'tok' });
+      if (path.endsWith('/xen/chat')) {
+        return Response.json({ status: 'queued', job_id: 'job-stream-md', attempt: 1 }, { status: 202 });
+      }
+      if (path.endsWith('/xen/jobs/job-stream-md/chunks')) {
+        pollStep++;
+        if (pollStep === 1) {
+          return Response.json({
+            status: 'running',
+            attempt: 1,
+            is_complete: false,
+            chunks: [
+              { seq: 1, delta: '<think>reasoning</thin' },
+              { seq: 2, delta: 'k>\n\n\\#\\# Ohm' },
+            ],
+          });
+        }
+        return Response.json({
+          status: 'completed',
+          attempt: 1,
+          is_complete: true,
+          chunks: [
+            { seq: 3, delta: '&#x20;Law\n\n\\*\\*V = I \\times R\\*\\*<|im_end|>' },
+          ],
+          response: {
+            text: "## Ohm's&#x20;Law\n\n**Formula:** $V = I \\times R$",
+            is_complete: true,
+          },
+        });
+      }
+      return Response.json({}, { status: 404 });
+    });
+
+    const res = await streamXenChat({
+      prompt: "Explain Ohm's Law",
+      onChunk: (_d, fullText) => emitted.push(fullText),
+    });
+    assert.equal(res.success, true);
+    assert.equal(emitted.some((t) => t.includes('<think>') || t.includes('reasoning') || t.includes('<|im_end|>')), false);
+    assert.equal(emitted.some((t) => t.includes('&#x20;')), false);
+    assert.equal(res.response.text, "## Ohm's Law\n\n**Formula:** $V = I \\times R$");
+  } finally {
+    globalThis.window = previousWindow;
+  }
+});
+
+test('Copilot attributes only the explicit circuit grounding fallback to the local engine', () => {
+  const proof = { fallback_applied: true, final_output_source: 'deterministic_grounded_fallback' };
+  const source = { response_source: 'local_fallback', response_status: 'grounding_fallback',
+    fallback_reason: 'GROUNDING_VERIFICATION_FAILED' };
+  assert.equal(copilotCompletionSource(source, proof), 'local_circuit_engine');
+  assert.equal(copilotCompletionSource(source, null), 'unknown');
+  assert.equal(copilotCompletionSource({ response_source: 'local_fallback' }, proof), 'unknown');
+  assert.equal(copilotCompletionSource(source, { ...proof, final_output_source: 'education' }), 'unknown');
+  assert.equal(copilotCompletionSource({ response_source: 'xen_step700' }), 'xen_step_700');
+  assert.equal(copilotCompletionSource({ response_source: 'cache' }, proof), 'cache');
+  assert.equal(copilotCompletionSource(undefined, proof), 'unknown');
 });

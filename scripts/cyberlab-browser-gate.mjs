@@ -68,22 +68,22 @@ try {
 
   await page.goto(baseUrl + "/simulation", { waitUntil: "networkidle" })
   if (!(await page.title()).includes("PIXIU CYBERLAB")) throw new Error("Virtual Lab route did not load")
-  // Verify the live interactive 8square Copilot entry point from welcome dialog,
+  // Verify the live interactive Xen Copilot entry point from welcome dialog,
   // verify minimize/expand/close controls, and verify top-bar Tools dropdown still opens above it.
   const welcomeDialog = page.getByRole("dialog", { name: "Build it. Run it. Find out why." })
   await welcomeDialog.waitFor({ state: "visible", timeout: 10_000 }).catch(async () => {
     const startup = await page.locator("body").innerText().catch(() => "")
     throw new Error("First-run welcome dialog is not visible; startup text: " + startup.slice(0, 1200))
   })
-  const welcomeGuide = welcomeDialog.getByRole("button").filter({ hasText: "Open 8 Square" })
+  const welcomeGuide = welcomeDialog.getByRole("button").filter({ hasText: "Open Xen" })
   await welcomeGuide.waitFor({ state: "visible", timeout: 10_000 }).catch(async () => {
     const buttons = await welcomeDialog.locator("button").evaluateAll((items) =>
       items.map((button) => ({ text: button.innerText, aria: button.getAttribute("aria-label"), title: button.title })),
     )
-    throw new Error("First-run welcome screen does not expose Open 8 Square; buttons: " + JSON.stringify(buttons))
+    throw new Error("First-run welcome screen does not expose Open Xen; buttons: " + JSON.stringify(buttons))
   })
   await welcomeGuide.click()
-  const copilotPanel = page.getByLabel("8square Circuit Copilot Panel")
+  const copilotPanel = page.getByLabel("Xen Circuit Copilot Panel")
   await copilotPanel.waitFor({ state: "visible", timeout: 10_000 })
 
   // Regression guard: top toolbar dropdown menus must stay clickable even while Copilot panel is open.
@@ -92,11 +92,11 @@ try {
   await page.getByRole("button", { name: "Tools", exact: true }).click()
 
   // Verify minimize, expand, and close controls before proceeding with workspace template checks.
-  await copilotPanel.getByLabel("Minimize 8square Window").click()
-  await page.getByLabel("Expand 8square Window").click()
+  await copilotPanel.getByLabel("Minimize Xen Window").click()
+  await page.getByLabel("Expand Xen Window").click()
   await copilotPanel.waitFor({ state: "visible", timeout: 5000 })
-  await copilotPanel.getByLabel("Close 8square Panel").click()
-  await page.getByLabel("Open 8square AI Circuit Copilot").waitFor({ state: "visible", timeout: 5000 })
+  await copilotPanel.getByLabel("Close Xen Panel").click()
+  await page.getByLabel("Open Xen AI Circuit Copilot").waitFor({ state: "visible", timeout: 5000 })
 
   const welcomeClose = page.getByRole("button", { name: "Close lab home" })
   if (await welcomeClose.isVisible().catch(() => false)) {

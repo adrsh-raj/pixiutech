@@ -15,7 +15,7 @@ export default function XenTutor() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  if (typeof document !== 'undefined') document.title = '8square AI Workspace';
+  if (typeof document !== 'undefined') document.title = 'Xen AI Workspace';
 
   const userRole = user?.role || 'student';
   const isA05 = Boolean(user?.is_a05_qualified || user?.trainer_profile?.xen_identity?.is_a05_qualified);
@@ -23,8 +23,8 @@ export default function XenTutor() {
   if (!['admin', 'superadmin', 'trainer', 'student'].includes(userRole)) {
     const title = userRole === 'school' ? 'School Access Restricted' : 'Role Access Restricted';
     const description = userRole === 'school'
-      ? 'School accounts are not included in the 8square pilot. Student tester, Trainer and Admin accounts are admitted only when explicitly allowlisted by the portal team.'
-      : 'This account role is not included in the 8square pilot.';
+      ? 'School accounts are not included in the Xen pilot. Student tester, Trainer and Admin accounts are admitted only when explicitly allowlisted by the portal team.'
+      : 'This account role is not included in the Xen pilot.';
     const errorPolicy = userRole === 'school' ? 'HTTP 403 SCHOOL_ACCESS_DISABLED' : 'HTTP 403 ROLE_ACCESS_DISABLED';
 
     return (
@@ -50,7 +50,7 @@ export default function XenTutor() {
       <div className="w-full max-w-4xl mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-            8square AI Workspace
+            Xen AI Workspace
           </h1>
           <p className="text-xs text-slate-400">
             Powered by frozen Xen Step-700 checkpoint (LoRA adapter + Qwen3-14B base)

@@ -136,8 +136,22 @@ export function computeWireCurrents(
       }
 
       // Alias labels and duplicate supply/ground headers are the same physical node.
+      const nonRailAliasCounts = new Map<string, number>()
       for (const pin of board.pins) {
-        for (const alias of pin.alternateNames ?? []) addInternal(part.id, pin.id, alias.toLowerCase())
+        if (pin.kind === "ground" || pin.kind === "power") continue
+        for (const alias of pin.alternateNames ?? []) {
+          const al = alias.toLowerCase()
+          nonRailAliasCounts.set(al, (nonRailAliasCounts.get(al) ?? 0) + 1)
+        }
+      }
+      for (const pin of board.pins) {
+        for (const alias of pin.alternateNames ?? []) {
+          const al = alias.toLowerCase()
+          if (pin.kind !== "ground" && pin.kind !== "power" && (nonRailAliasCounts.get(al) ?? 0) > 1) {
+            continue
+          }
+          addInternal(part.id, pin.id, al)
+        }
       }
       const commonGroups = [
         board.powerPins.v5 ?? [],
