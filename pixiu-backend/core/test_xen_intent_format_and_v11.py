@@ -263,7 +263,7 @@ class XenIntentFormatModeAndVersion11Tests(TestCase):
             "metadata": {
                 "gpu": "Dual NVIDIA Tesla T4 (29.12 GiB VRAM)",
                 "model": "Xen-Step-700",
-                "assistant": "8square",
+                "assistant": "Xen",
                 "uptime_seconds": 3600,
                 "jobs_completed": 0,
             },

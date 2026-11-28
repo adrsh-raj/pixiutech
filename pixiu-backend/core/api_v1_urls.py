@@ -37,7 +37,7 @@ from .xen_views import (
     XenChatView, XenHealthView, XenAttestationView,
     XenJobCreateView, XenJobDetailView, XenStatusView,
     XenWorkerClaimView, XenWorkerHeartbeatView, XenWorkerCompleteView, XenWorkerFailView,
-    XenWorkerChunkView, XenJobChunksView,
+    XenWorkerChunkView, XenJobChunksView, XenCyberLabContextView,
 )
 from .scoped_curriculum import ScopedCurriculumViewSet
 from .strict_learning_scope_views import SafeScopedAttendanceViewSet, SafeScopedClassViewSet, SafeScopedContentViewSet, SafeScopedEvidenceViewSet, SafeScopedProjectViewSet, SafeScopedQuizAssignmentViewSet, SafeScopedQuizAttemptViewSet, SafeScopedQuizQuestionViewSet, SafeScopedQuizViewSet, SafeScopedSessionActivityViewSet, SafeScopedTrainerSchoolAssignmentViewSet, SafeScopedSchoolViewSet, SafeScopedTrainerViewSet
@@ -91,6 +91,7 @@ urlpatterns = [
     path('xen/jobs/<uuid:job_id>', XenJobDetailView.as_view(), name='v1-xen-job-detail'),
     path('xen/jobs/<uuid:job_id>/chunks', XenJobChunksView.as_view(), name='v1-xen-job-chunks'),
     path('xen/status', XenStatusView.as_view(), name='v1-xen-status'),
+    path('xen/cyberlab/context', XenCyberLabContextView.as_view(), name='v1-xen-cyberlab-context'),
     path('xen/worker/claim', XenWorkerClaimView.as_view(), name='v1-xen-worker-claim'),
     path('xen/worker/jobs/<uuid:job_id>/heartbeat', XenWorkerHeartbeatView.as_view(), name='v1-xen-worker-heartbeat'),
     path('xen/worker/jobs/<uuid:job_id>/chunk', XenWorkerChunkView.as_view(), name='v1-xen-worker-chunk'),

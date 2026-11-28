@@ -414,7 +414,8 @@ class ExpandedContextEnvelopeAndDirectivesTests(unittest.TestCase):
             }
         }
         directive = get_cyberlab_grounding_directive(env_with_circuit)
-        self.assertIn("You are 8square, embedded inside Pixiu CyberLab", directive)
+        self.assertIn("You are Xen, embedded inside Pixiu CyberLab", directive)
+        self.assertIn("LIVE WIRING AWARENESS", directive)
         self.assertIn("Do not claim that you cannot see the circuit", directive)
         self.assertIn("Distinguish simulator-computed values from hardware measurements", directive)
         self.assertIn("Can you see my screen?", directive)
@@ -621,6 +622,196 @@ class ExpandedContextEnvelopeAndDirectivesTests(unittest.TestCase):
         self.assertIn("CYBERLAB GROUNDING", eff_empty)
         self.assertIn("canvas currently has 0 components and 0 wires", eff_empty)
 
+    def test_sanitize_and_format_v2_live_wiring_awareness(self):
+        """v2.0 Schema: In-progress wiring, hovered pin, selected component, and netlist are cleanly sanitized and formatted."""
+        from core.xen_intent import sanitize_context_envelope, format_context_envelope
+
+        raw_envelope = {
+            "schema_version": "2.0",
+            "state_revision": 42,
+            "circuit": {
+                "board": {"id": "arduino-uno", "name": "Arduino Uno R3"},
+                "parts": [
+                    {"id": "led_1", "type": "led", "name": "Red LED", "props": {"color": "red"}},
+                    {"id": "res_1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+                ],
+                "wires": [
+                    {"from": {"partId": "arduino-uno", "pinId": "gnd"}, "to": {"partId": "led_1", "pinId": "cathode"}},
+                ],
+                "in_progress_connection": {
+                    "active": True,
+                    "source": {
+                        "part_id": "arduino-uno",
+                        "part_name": "Arduino Uno R3",
+                        "pin_id": "d9",
+                        "pin_label": "D9",
+                        "pin_kind": "digital",
+                    },
+                    "candidate_target": {
+                        "part_id": "res_1",
+                        "part_name": "220Ω Resistor",
+                        "pin_id": "pin1",
+                        "pin_label": "Pin 1",
+                        "pin_kind": "terminal",
+                    },
+                    "validation_status": "VALID",
+                    "validation_message": "Connecting D9 to Resistor Pin 1 will complete the current-limiting branch.",
+                    "color": "#22c55e",
+                },
+                "hovered_pin": {
+                    "part_id": "res_1",
+                    "pin_id": "pin1",
+                    "pin_label": "Pin 1",
+                    "pin_kind": "terminal",
+                },
+                "selected_component": {
+                    "kind": "part",
+                    "id": "res_1",
+                    "type": "resistor",
+                },
+                "netlist": [
+                    {"net_id": 1, "nominal_voltage": 0.0, "pins": ["arduino-uno:gnd", "led_1:cathode"], "is_ground": True},
+                    {"net_id": 2, "nominal_voltage": 5.0, "pins": ["arduino-uno:5v"], "is_power": True},
+                ],
+            },
+        }
+
+        sanitized = sanitize_context_envelope(raw_envelope)
+        self.assertEqual(sanitized["schema_version"], "2.0")
+        self.assertEqual(sanitized["state_revision"], 42)
+
+        circuit = sanitized["circuit"]
+        self.assertIn("in_progress_connection", circuit)
+        ipc = circuit["in_progress_connection"]
+        self.assertTrue(ipc["active"])
+        self.assertEqual(ipc["source"]["part_id"], "arduino-uno")
+        self.assertEqual(ipc["source"]["pin_id"], "d9")
+        self.assertEqual(ipc["candidate_target"]["part_id"], "res_1")
+        self.assertEqual(ipc["candidate_target"]["pin_id"], "pin1")
+        self.assertEqual(ipc["validation_status"], "VALID")
+
+        self.assertIn("hovered_pin", circuit)
+        self.assertEqual(circuit["hovered_pin"]["pin_id"], "pin1")
+
+        self.assertIn("selected_component", circuit)
+        self.assertEqual(circuit["selected_component"]["id"], "res_1")
+
+        self.assertIn("netlist", circuit)
+        self.assertEqual(len(circuit["netlist"]), 2)
+        self.assertTrue(circuit["netlist"][0]["is_ground"])
+
+        # Format into prompt prefix
+        formatted = format_context_envelope(sanitized)
+        self.assertIn("[MISSION CONTEXT]", formatted)
+        self.assertIn("in_progress_connection", formatted)
+        self.assertIn("res_1", formatted)
+        self.assertIn("d9", formatted)
+
+    def test_in_progress_wiring_not_treated_as_empty_canvas(self):
+        """When an in-progress wire is active, the directive must guide on live wiring, NOT empty canvas."""
+        from core.xen_intent import get_cyberlab_grounding_directive
+
+        envelope_draft = {
+            "circuit": {
+                "board": {"id": "arduino-uno", "name": "Arduino Uno R3"},
+                "parts": [],
+                "wires": [],
+                "parts_count": 0,
+                "wires_count": 0,
+                "in_progress_connection": {
+                    "active": True,
+                    "source": {"part_id": "arduino-uno", "pin_id": "d9"},
+                    "candidate_target": {"part_id": "led1", "pin_id": "anode"},
+                    "validation_status": "VALID",
+                },
+            }
+        }
+        directive = get_cyberlab_grounding_directive(envelope_draft)
+        self.assertIn("LIVE WIRING AWARENESS", directive)
+        self.assertNotIn("canvas currently has 0 components and 0 wires", directive)
+
+    def test_query_classification_live_wire_and_hover_tokens(self):
+        """Questions about current wire drawing and cursor position must classify as circuit queries."""
+        from core.xen_intent import is_circuit_specific_query
+
+        self.assertTrue(is_circuit_specific_query("Which pin am I connecting?"))
+        self.assertTrue(is_circuit_specific_query("What am I currently connecting?"))
+        self.assertTrue(is_circuit_specific_query("Why is this wire not connecting?"))
+        self.assertTrue(is_circuit_specific_query("What pin am I pointing at?"))
+        self.assertTrue(is_circuit_specific_query("What is under my cursor right now?"))
+        self.assertTrue(is_circuit_specific_query("What is hovered?"))
+        self.assertTrue(is_circuit_specific_query("Is this connection okay?"))
+
+        # Academic queries still must NOT classify as circuit queries
+        self.assertFalse(is_circuit_specific_query("What is kinetic energy?"))
+        self.assertFalse(is_circuit_specific_query("Define Newton's third law"))
+
+    def test_priority_truncation_drops_netlist_before_in_progress_connection(self):
+        """When budget is constrained, netlist is dropped before in-progress connection."""
+        from core.xen_intent import format_context_envelope
+
+        envelope = {
+            "circuit": {
+                "board": {"id": "arduino-uno", "name": "Arduino Uno R3"},
+                "parts": [{"id": f"p_{i}", "type": "resistor"} for i in range(12)],
+                "wires": [{"from": {"partId": f"p_{i}", "pinId": "1"}, "to": {"partId": f"p_{i+1}", "pinId": "2"}} for i in range(10)],
+                "netlist": [{"net_id": i, "pins": [f"p_{i}:1", f"p_{i+1}:2"]} for i in range(10)],
+                "in_progress_connection": {
+                    "active": True,
+                    "source": {"part_id": "arduino-uno", "pin_id": "d9"},
+                    "candidate_target": {"part_id": "p_0", "pin_id": "1"},
+                    "validation_status": "VALID",
+                },
+            }
+        }
+        # Force tight budget
+        formatted = format_context_envelope(envelope, max_chars=800)
+        self.assertIn('"in_progress_connection":', formatted)
+        self.assertNotIn('"netlist":', formatted)
+        self.assertIn('"circuit.netlist"', formatted)
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CopilotMeasurementBoundaryTests(unittest.TestCase):
+    def test_missing_and_invalid_reading_never_becomes_a_simulated_zero(self):
+        from core.xen_intent import sanitize_context_envelope, format_context_envelope
+
+        shared = {"instrument": "multimeter", "source": "simulated", "unit": "V", "probeA": "uno:5v", "probeB": "uno:gnd"}
+        context = sanitize_context_envelope({"circuit": {
+            "partial": True, "omitted_fields": ["circuit.wires"],
+            "readings": [
+                {**shared, "state": "unavailable", "value": 0},
+                {**shared, "state": "available", "probeA": "", "value": 0},
+                {**shared, "state": "available", "value": float("nan")},
+                {**shared, "state": "available", "value": 0},
+                {"instrument": "oscilloscope", "mode": "CH1", "probeA": "uno:5v",
+                 "source": "simulated", "unit": "V", "value": 5, "state": "available"},
+            ],
+            "meter": {"value": 0, "source": "simulated", "state": "unavailable"},
+        }})
+        readings = context["circuit"]["readings"]
+        self.assertEqual([entry["state"] for entry in readings],
+                         ["unavailable", "not_configured", "invalid", "available", "available"])
+        self.assertTrue(all(entry["source"] == "unknown" and "value" not in entry for entry in readings[:3]))
+        self.assertEqual(readings[3]["value"], 0)
+        self.assertEqual(readings[4]["probeA"], "uno:5v")
+        self.assertIsNone(context["circuit"]["meter"]["value"])
+        formatted = format_context_envelope(context, max_chars=3000)
+        self.assertIn('"partial":true', formatted.replace(" ", ""))
+        self.assertIn("circuit.wires", formatted)
+        self.assertIn("Untrusted simulator", formatted)
+
+    def test_only_established_conversation_allows_vague_inspection(self):
+        from core.xen_intent import is_circuit_specific_query
+
+        env = {"circuit": {"parts": [], "wires": []}}
+        assistant = {"role": "assistant", "content": "Check those circuit pins"}
+        history = [{"role": "user", "content": "Check my LED wiring"}, assistant]
+        self.assertFalse(is_circuit_specific_query("can you check?", [assistant], env))
+        self.assertFalse(is_circuit_specific_query("okay", [assistant], env))
+        self.assertFalse(is_circuit_specific_query("what is a resistor?", history, env))
+        self.assertTrue(is_circuit_specific_query("can you check?", history, env))
+        self.assertTrue(is_circuit_specific_query("done", history, env))

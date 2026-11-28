@@ -66,3 +66,45 @@ class WorkerStreamingTests(unittest.TestCase):
                 self.assertIn("completion", json.loads(await anext(iterator)))
                 await iterator.aclose()
         asyncio.run(check())
+
+    def test_visible_text_strips_post_think_newlines_across_chunk_boundaries(self):
+        visible = VisibleText()
+        parts = ["<thi", "nk>private thought", "</thin", "k>\n\n**Ohm's Law**\n", "$$V = IR$$"]
+        streamed = "".join(visible.feed(part) for part in parts)
+        self.assertEqual(streamed, "**Ohm's Law**\n$$V = IR$$")
+
+        # Short 2-3 token legitimate answer passes unmodified while empty think emits empty string
+        self.assertEqual(VisibleText().feed("I'm good!", final=True), "I'm good!")
+        self.assertEqual(VisibleText().feed("<think>\n\n</think>\n\n", final=True), "")
+        self.assertEqual(VisibleText().feed("   <t", final=True), "   <t")
+
+    def test_worker_relay_preserves_markdown_fences_and_latex_across_chunks(self):
+        uploads = []
+        full_answer = (
+            "### Ohm's Law\n\n**Formula:** $$V = I \\times R$$\n\n"
+            "```python\ndef voltage(i, r):\n    return i * r\n```\n"
+            "Short summary."
+        )
+        # Split strictly across markdown bold, math delimiters, and code fence boundaries
+        splits = [full_answer[:22], full_answer[22:47], full_answer[47:78], full_answer[78:]]
+
+        def events():
+            for s in splits:
+                yield (json.dumps({"delta": s}) + "\n").encode("utf-8")
+            yield (json.dumps({"completion": {"answer": full_answer}}) + "\n").encode("utf-8")
+
+        def handle(request):
+            if request.url.host == "127.0.0.1":
+                return httpx.Response(200, stream=Chunks())
+            uploads.append(json.loads(request.content))
+            return httpx.Response(200)
+
+        class Chunks(httpx.SyncByteStream):
+            def __iter__(self):
+                yield from events()
+
+        with httpx.Client(transport=httpx.MockTransport(handle)) as client:
+            final = relay_generation(client, "internal", "https://fixture.invalid", "fixture", "w", "j-md", {})
+
+        self.assertEqual([u["seq"] for u in uploads], list(range(1, len(uploads) + 1)))
+        self.assertEqual(final["answer"], "".join(u["delta"] for u in uploads))

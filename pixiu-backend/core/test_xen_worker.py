@@ -228,7 +228,8 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
             self.assertEqual(res.data["job"]["id"], str(job_id))
             self.assertEqual(res.data["job"]["prompt"], "Write a Python loop.")
             self.assertIn("Grade 6 Computational Thinking", res.data["job"]["system_prompt"])
-            self.assertIn("8square", res.data["job"]["system_prompt"])
+            self.assertIn("You are Xen", res.data["job"]["system_prompt"])
+            self.assertIn("Never introduce yourself as 8square", res.data["job"]["system_prompt"])
             self.assertIn("Xen Step-700", res.data["job"]["system_prompt"])
 
     def test_worker_heartbeat_extends_lease(self):
@@ -355,7 +356,7 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
 
             self.assertEqual(res.status_code, status.HTTP_200_OK)
             self.assertEqual(res.data["status"], "completed")
-            self.assertEqual(res.data["assistant"], "8square")
+            self.assertEqual(res.data["assistant"], "Xen")
             self.assertEqual(res.data["model"], "xen-step-700")
             self.assertEqual(res.data["response"]["text"], "Result text")
             self.assertTrue(res.data["response"]["syntax_valid"])
@@ -390,7 +391,7 @@ class XenWorkerQueueUnitTests(SimpleTestCase):
             res = self.status_view(req)
 
             self.assertEqual(res.status_code, status.HTTP_200_OK)
-            self.assertEqual(res.data["assistant"], "8square")
+            self.assertEqual(res.data["assistant"], "Xen")
             self.assertEqual(res.data["model"], "xen-step-700")
             self.assertTrue(res.data["worker_online"])
             self.assertEqual(res.data["active_worker_count"], 2)

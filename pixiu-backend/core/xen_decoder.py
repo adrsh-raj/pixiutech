@@ -201,6 +201,179 @@ def format_output_only_response(raw_text: str, actually_executed: bool = False) 
     return f"Expected output (not executed)\n\n{cleaned}"
 
 
+_LATEX_BRACKET_RE = re.compile(r"\\\[([\s\S]*?)\\\]")
+_LATEX_PAREN_RE = re.compile(r"\\\(([^\n]*?)\\\)")
+_MATH_SPAN_RE = re.compile(r"\$\$[\s\S]*?\$\$|(?<!\\)\$(?!\s)([^\n$]*?\S)(?<!\\)\$")
+_INLINE_CODE_RE = re.compile(r"(`+)([^\n]*?)\1")
+
+
+def _decode_html_entities_safe(segment: str) -> str:
+    if not segment:
+        return segment
+    out = re.sub(
+        r"&amp;(amp|lt|gt|quot|apos|nbsp|#x0*20|#0*32|#x0*a0|#0*160|#0*39|#x0*27|#x0*0a|#0*10|#x0*09|#0*9);",
+        r"&\1;",
+        segment,
+        flags=re.IGNORECASE,
+    )
+    out = re.sub(r"&#x0*20;|&#0*32;|&nbsp;|&#0*160;|&#x0*a0;|&#x0*09;|&#0*9;", " ", out, flags=re.IGNORECASE)
+    out = re.sub(r"&#x0*0a;|&#0*10;", "\n", out, flags=re.IGNORECASE)
+    return out
+
+
+def _normalize_latex_delimiters(segment: str) -> str:
+    def _sub_bracket(m: re.Match) -> str:
+        inner = m.group(1).strip()
+        if not inner:
+            return m.group(0)
+        if "\n" in inner:
+            return f"\n$$\n{inner}\n$$\n"
+        return f"$${inner}$$"
+
+    def _sub_paren(m: re.Match) -> str:
+        inner = m.group(1).strip()
+        if not inner:
+            return m.group(0)
+        if re.match(r"^[a-zA-Z]$", inner) or re.search(r"[=+\-*/^_\\{}<>]", inner):
+            return f"${inner}$"
+        return m.group(0)
+
+    out = _LATEX_BRACKET_RE.sub(_sub_bracket, segment)
+    return _LATEX_PAREN_RE.sub(_sub_paren, out)
+
+
+def _unescape_corrupted_markdown_prose(segment: str) -> str:
+    out = _decode_html_entities_safe(segment)
+    out = _normalize_latex_delimiters(out)
+
+    protected_math: List[str] = []
+    math_prefix = "__XEN_PY_MATH_"
+    while math_prefix in out:
+        math_prefix += "X"
+
+    def _stash_math(m: re.Match) -> str:
+        idx = len(protected_math)
+        protected_math.append(_decode_html_entities_safe(m.group(0)))
+        return f"{math_prefix}{idx}__"
+
+    out = _MATH_SPAN_RE.sub(_stash_math, out)
+
+    out = re.sub(
+        r"(^|\n)([ \t]*)((?:\\\\?#){1,6})(?=[ \t]+|$)",
+        lambda m: f"{m.group(1)}{m.group(2)}{re.sub(r'\\\\?#', '#', m.group(3))}",
+        out,
+    )
+    out = re.sub(r"(^|\n)([ \t]*)\\\\?([-*+])([ \t]+)", r"\1\2\3\4", out)
+    out = re.sub(r"(^|\n)([ \t]*\d+)\\\\?\.([ \t]+)", r"\1\2.\3", out)
+    out = re.sub(
+        r"(?:\\\\|\\)\*(?:\\\\|\\)\*(?=\S)([^\n]*?\S)(?:\\\\|\\)\*(?:\\\\|\\)\*",
+        r"**\1**",
+        out,
+    )
+    out = re.sub(
+        r"(?:\\\\|\\)_(?:\\\\|\\)_(?=\S)([^\n]*?\S)(?:\\\\|\\)_(?:\\\\|\\)_",
+        r"__\1__",
+        out,
+    )
+    out = re.sub(
+        r"(?<![\\*])(?:\\\\|\\)\*(?![*\s])([^\n]*?\S)(?<![\\*])(?:\\\\|\\)\*(?!\*)",
+        r"*\1*",
+        out,
+    )
+    out = re.sub(
+        r"(^|[^\w\\])(?:\\\\|\\)_(?![_\s])([^\n]*?\S)(?:\\\\|\\)_(?=$|[^\w])",
+        r"\1_\2_",
+        out,
+    )
+    out = re.sub(
+        r"(?:\\\\|\\)~(?:\\\\|\\)~(?=\S)([^\n]*?\S)(?:\\\\|\\)~(?:\\\\|\\)~",
+        r"~~\1~~",
+        out,
+    )
+
+    return re.sub(
+        rf"{re.escape(math_prefix)}(\d+)__",
+        lambda m: protected_math[int(m.group(1))],
+        out,
+    )
+
+
+def normalize_markdown_and_entities(text: str) -> str:
+    """
+    Repairs escaped Markdown delimiters, LaTeX delimiters, and HTML space/entity leakage
+    in non-code prose while preserving fenced code blocks and inline code spans verbatim.
+    """
+    if not text or not isinstance(text, str):
+        return ""
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    rebuilt: List[str] = []
+    prose_lines: List[str] = []
+    code_lines: List[str] = []
+    in_code = False
+    fence_char = ""
+    fence_len = 0
+
+    def _flush_prose() -> None:
+        if not prose_lines:
+            return
+        raw_prose = "\n".join(prose_lines)
+        prose_lines.clear()
+        inline_codes: List[str] = []
+        code_prefix = "__XEN_PY_CODE_"
+        while code_prefix in raw_prose:
+            code_prefix += "X"
+
+        def _stash_code(m: re.Match) -> str:
+            idx = len(inline_codes)
+            inline_codes.append(m.group(0))
+            return f"{code_prefix}{idx}__"
+
+        masked = _INLINE_CODE_RE.sub(_stash_code, raw_prose)
+        normalized = _unescape_corrupted_markdown_prose(masked)
+        normalized = re.sub(
+            rf"{re.escape(code_prefix)}(\d+)__",
+            lambda m: inline_codes[int(m.group(1))],
+            normalized,
+        )
+        rebuilt.append(normalized)
+
+    for line in lines:
+        if not in_code:
+            open_match = re.match(r"^[ \t]{0,3}(`{3,}|~{3,})([\w+-]*)[ \t]*$", line)
+            if open_match:
+                _flush_prose()
+                in_code = True
+                fence_char = open_match.group(1)[0]
+                fence_len = len(open_match.group(1))
+                code_lines = [line]
+                continue
+            inline_open = re.match(r"^(.*?[^`\s][^\n`]*?)[ \t]*(`{3,}|~{3,})([\w+-]*)[ \t]*$", line)
+            if inline_open and inline_open.group(2) not in inline_open.group(1):
+                if inline_open.group(1).strip():
+                    prose_lines.append(inline_open.group(1).rstrip())
+                _flush_prose()
+                in_code = True
+                fence_char = inline_open.group(2)[0]
+                fence_len = len(inline_open.group(2))
+                code_lines = [inline_open.group(2) + (inline_open.group(3) or "")]
+                continue
+            prose_lines.append(line)
+        else:
+            code_lines.append(line)
+            close_match = re.match(r"^[ \t]{0,3}(`{3,}|~{3,})[ \t]*$", line)
+            if close_match and close_match.group(1)[0] == fence_char and len(close_match.group(1)) >= fence_len:
+                rebuilt.append("\n".join(code_lines))
+                code_lines = []
+                in_code = False
+                fence_char = ""
+                fence_len = 0
+
+    if in_code and code_lines:
+        rebuilt.append("\n".join(code_lines))
+    _flush_prose()
+    return "\n".join(rebuilt)
+
+
 def decode_model_response(
     raw_text: str,
     finish_reason: str = "stop",
@@ -225,6 +398,9 @@ def decode_model_response(
     if cleaned_text.lstrip().startswith("<think>"):
         _, closed, answer = cleaned_text.partition("</think>")
         cleaned_text = answer.lstrip() if closed else ""
+    cleaned_text = cleaned_text.replace("\r\n", "\n").replace("\r", "\n")
+    if format_mode != "CODE_ONLY" and cleaned_text:
+        cleaned_text = normalize_markdown_and_entities(cleaned_text).strip()
 
 
     # 2. Check fence completeness

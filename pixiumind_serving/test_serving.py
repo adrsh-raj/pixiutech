@@ -191,7 +191,7 @@ class TestServingApi(unittest.TestCase):
             "throughput_tok_s": 50.0,
         }
         with patch.object(model_holder, "system_prompt", "Frozen A1 Exact"):
-            with patch.object(model_holder, "composite_system_prompt", "Canonical 8square Composite"):
+            with patch.object(model_holder, "composite_system_prompt", "Canonical Xen Composite"):
                 with patch("server.async_generate", return_value=mock_result) as generate:
                     response = client.post("/v1/chat/completions", json=payload, headers=headers)
         self.assertEqual(response.status_code, 200)
@@ -203,7 +203,7 @@ class TestServingApi(unittest.TestCase):
     def test_exact_canonical_composite_prompt_accepted(self):
         headers = {"X-API-Key": config.api_key}
         payload = {"messages": [
-            {"role": "system", "content": "Canonical 8square Composite"},
+            {"role": "system", "content": "Canonical Xen Composite"},
             {"role": "user", "content": "Hello"},
         ]}
         mock_result = {
@@ -216,14 +216,14 @@ class TestServingApi(unittest.TestCase):
             "throughput_tok_s": 80.0,
         }
         with patch.object(model_holder, "system_prompt", "Frozen A1 Exact"):
-            with patch.object(model_holder, "composite_system_prompt", "Canonical 8square Composite"):
+            with patch.object(model_holder, "composite_system_prompt", "Canonical Xen Composite"):
                 with patch("server.async_generate", return_value=mock_result) as generate:
                     response = client.post("/v1/chat/completions", json=payload, headers=headers)
         self.assertEqual(response.status_code, 200)
         generate.assert_called_once()
         passed_messages = generate.call_args[0][2]
         self.assertEqual(passed_messages[0]["role"], "system")
-        self.assertEqual(passed_messages[0]["content"], "Canonical 8square Composite")
+        self.assertEqual(passed_messages[0]["content"], "Canonical Xen Composite")
 
     def test_canonical_identity_reaches_engine_when_system_prompt_omitted(self):
         headers = {"X-API-Key": config.api_key}
@@ -231,7 +231,7 @@ class TestServingApi(unittest.TestCase):
             {"role": "user", "content": "Who are you?"},
         ]}
         mock_result = {
-            "text": "I am 8square powered by Xen.",
+            "text": "I am Xen, powered by Xen Step-700.",
             "finish_reason": "stop",
             "prompt_tokens": 25,
             "completion_tokens": 10,
@@ -239,7 +239,7 @@ class TestServingApi(unittest.TestCase):
             "latency_seconds": 0.1,
             "throughput_tok_s": 100.0,
         }
-        composite_content = "You are 8square, an AI assistant developed by PixiuTech...\n\nFrozen A1"
+        composite_content = "You are Xen, an AI assistant developed by PixiuTech...\n\nFrozen A1"
         with patch.object(model_holder, "system_prompt", "Frozen A1"):
             with patch.object(model_holder, "composite_system_prompt", composite_content):
                 with patch("server.async_generate", return_value=mock_result) as generate:
@@ -249,7 +249,34 @@ class TestServingApi(unittest.TestCase):
         passed_messages = generate.call_args[0][2]
         self.assertEqual(passed_messages[0]["role"], "system")
         self.assertEqual(passed_messages[0]["content"], composite_content)
-        self.assertIn("8square", passed_messages[0]["content"])
+        self.assertIn("You are Xen", passed_messages[0]["content"])
+
+    def test_legacy_composite_prompt_normalizes_to_xen_composite(self):
+        headers = {"X-API-Key": config.api_key}
+        payload = {"messages": [
+            {"role": "system", "content": "Legacy Composite Compat\n\nFrozen A1"},
+            {"role": "user", "content": "Who are you?"},
+        ]}
+        mock_result = {
+            "text": "I am Xen, powered by Xen Step-700.",
+            "finish_reason": "stop",
+            "prompt_tokens": 25,
+            "completion_tokens": 10,
+            "total_tokens": 35,
+            "latency_seconds": 0.1,
+            "throughput_tok_s": 100.0,
+        }
+        xen_composite = "You are Xen, an AI assistant developed by PixiuTech...\n\nFrozen A1"
+        with (
+            patch.object(model_holder, "system_prompt", "Frozen A1"),
+            patch.object(model_holder, "composite_system_prompt", xen_composite),
+            patch.object(model_holder, "legacy_composite_system_prompt", "Legacy Composite Compat\n\nFrozen A1"),
+            patch("server.async_generate", return_value=mock_result) as generate,
+        ):
+            response = client.post("/v1/chat/completions", json=payload, headers=headers)
+        self.assertEqual(response.status_code, 200)
+        passed_messages = generate.call_args[0][2]
+        self.assertEqual(passed_messages[0]["content"], xen_composite)
 
     def test_timed_out_generation_keeps_its_concurrency_slot(self):
         async def check_capacity():
@@ -555,6 +582,57 @@ class TestModelLifecycle(unittest.TestCase):
             _sync_generate(model, tokenizer, messages, max_new_tokens=2)
         self.assertEqual(tokenizer.apply_chat_template.call_args.args[0], messages)
         model.generate.assert_not_called()
+
+    def test_sync_generate_eos_only_and_premature_length_boundaries(self):
+        import contextlib
+        import types
+
+        class _Tok:
+            def __init__(self, tok_id):
+                self._id = tok_id
+            def item(self):
+                return self._id
+
+        fake_torch = types.SimpleNamespace(
+            tensor=lambda data, device=None: data,
+            no_grad=lambda: contextlib.nullcontext(),
+        )
+
+        tokenizer = MagicMock()
+        tokenizer.all_special_tokens = ["<|im_end|>"]
+        tokenizer.apply_chat_template.return_value = "templated input"
+        tokenizer.encode.return_value = [1] * 20
+
+        with patch.dict("sys.modules", {"torch": fake_torch}):
+            # Case 1: Immediate EOS only (completion_tokens=1 -> empty text, finish_reason='stop')
+            model_eos = MagicMock()
+            model_eos.device = "cpu"
+            model_eos.generate.return_value = [[1] * 20 + [_Tok(151645)]]
+            tokenizer.decode.return_value = ""
+            res_eos = _sync_generate(model_eos, tokenizer, [{"role": "user", "content": "hi"}], max_new_tokens=64, temperature=0.0)
+            self.assertEqual(res_eos["text"], "")
+            self.assertEqual(res_eos["completion_tokens"], 1)
+            self.assertEqual(res_eos["finish_reason"], "stop")
+
+            # Case 2: Think-only output followed by EOS -> VisibleText reduces empty visible text
+            model_think = MagicMock()
+            model_think.device = "cpu"
+            model_think.generate.return_value = [[1] * 20 + [_Tok(101), _Tok(102), _Tok(151645)]]
+            tokenizer.decode.return_value = "<think>\n\n</think>"
+            res_think = _sync_generate(model_think, tokenizer, [{"role": "user", "content": "hi"}], max_new_tokens=64, temperature=0.0)
+            self.assertEqual(res_think["text"], "")
+            self.assertEqual(res_think["completion_tokens"], 3)
+            self.assertEqual(res_think["finish_reason"], "stop")
+
+            # Case 3: Premature budget termination without EOS -> finish_reason='length'
+            model_len = MagicMock()
+            model_len.device = "cpu"
+            model_len.generate.return_value = [[1] * 20 + [_Tok(10), _Tok(11), _Tok(12)]]
+            tokenizer.decode.return_value = "I'm good!"
+            res_len = _sync_generate(model_len, tokenizer, [{"role": "user", "content": "hi"}], max_new_tokens=3, temperature=0.7)
+            self.assertEqual(res_len["text"], "I'm good!")
+            self.assertEqual(res_len["completion_tokens"], 3)
+            self.assertEqual(res_len["finish_reason"], "length")
 
 
 if __name__ == "__main__":

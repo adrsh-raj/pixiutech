@@ -237,12 +237,16 @@ async def handle_chat_completion(req: ChatCompletionRequest, request: Request, e
     messages_dicts = [{"role": m.role, "content": m.content} for m in req.messages]
     if messages_dicts and messages_dicts[0]["role"] == "system":
         supplied_prompt = messages_dicts.pop(0)["content"]
-        if (
+        legacy_prompt = getattr(model_holder, "legacy_composite_system_prompt", None)
+        if legacy_prompt and supplied_prompt == legacy_prompt:
+            active_system_prompt = model_holder.composite_system_prompt or model_holder.system_prompt
+        elif (
             supplied_prompt != model_holder.composite_system_prompt
             and supplied_prompt != model_holder.system_prompt
         ):
             raise HTTPException(status_code=400, detail={"code": "INVALID_SYSTEM_PROMPT"})
-        active_system_prompt = supplied_prompt
+        else:
+            active_system_prompt = supplied_prompt
     if any(message["role"] == "system" for message in messages_dicts):
         raise HTTPException(status_code=400, detail={"code": "INVALID_SYSTEM_PROMPT"})
     for message in messages_dicts:

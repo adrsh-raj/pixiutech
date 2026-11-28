@@ -48,7 +48,7 @@ def compute_sha256(file_path: str) -> str:
 
 def verify_bundle_metadata(base_path, adapter_path):
     allowed_base = set(TRUSTED_BASE_SHARDS) | set(TRUSTED_BASE_METADATA) | {
-        ".cache", ".gitattributes", "README.md", "LICENSE",
+        ".cache", ".gitattributes", "README.md", "LICENSE", ".locks", ".huggingface", ".git",
         # Qualification records stored beside the artifacts. The loader does not use them.
         "M1_COMPLETE_BUNDLE_MANIFEST.json",
         "M2_SYNTHETIC_QUALIFICATION_REPORT.json",
@@ -90,7 +90,16 @@ def verify_bundle_metadata(base_path, adapter_path):
         raise ValueError("Adapter bundle contains an alternate weights file.")
 
 
-CANONICAL_8SQUARE_IDENTITY = (
+CANONICAL_XEN_IDENTITY = (
+    "You are Xen, an AI assistant developed by PixiuTech, currently running Xen Step-700.\n"
+    "Your assistant identity is Xen. Your underlying model identity is Xen (Step-700).\n"
+    "When users ask who you are, identify yourself as Xen. Never introduce yourself as 8square, PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
+    "Maintain your existing educational, reasoning, computational-thinking and programming capabilities. Follow the original pedagogical system instructions."
+)
+
+# Isolated legacy prefix retained solely for backwards compatibility with pre-rename backends.
+# Never exposed as user-facing identity or sent to the model when normalized.
+LEGACY_8SQUARE_IDENTITY_COMPAT = (
     "You are 8square, an AI assistant developed by PixiuTech. You are powered by the Xen model, currently running Xen Step-700.\n"
     "Your assistant identity is 8square. Your underlying model identity is Xen.\n"
     "When users ask who you are, identify yourself as 8square. When users ask which model powers you, identify Xen. Never introduce yourself as PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
@@ -105,6 +114,7 @@ class ModelHolder:
     def reset(self):
         self.system_prompt = None
         self.composite_system_prompt = None
+        self.legacy_composite_system_prompt = None
         self.model = None
         self.tokenizer = None
         self.is_ready = False
@@ -161,7 +171,8 @@ class ModelHolder:
 
         verify_bundle_metadata(base_path, adapter_path)
         self.system_prompt = prompt_bytes.decode("utf-8")
-        self.composite_system_prompt = f"{CANONICAL_8SQUARE_IDENTITY}\n\n{self.system_prompt}"
+        self.composite_system_prompt = f"{CANONICAL_XEN_IDENTITY}\n\n{self.system_prompt}"
+        self.legacy_composite_system_prompt = f"{LEGACY_8SQUARE_IDENTITY_COMPAT}\n\n{self.system_prompt}"
         self.is_verified = True
         self.attestation_data = {
             "base_model": "Qwen/Qwen3-14B",

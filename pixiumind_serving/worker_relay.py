@@ -31,7 +31,7 @@ def relay_generation(client, local_token, django_url, worker_secret, worker_id, 
             last_upload = time.monotonic()
 
     with client.stream("POST", "http://127.0.0.1:8000/internal/worker/generation",
-                       headers={"Authorization": f"Bearer {local_token}"}, json=payload, timeout=120) as stream:
+                       headers={"Authorization": f"Bearer {local_token}"}, json=payload, timeout=300) as stream:
         stream.raise_for_status()
         for line in stream.iter_lines():
             event = json.loads(line)

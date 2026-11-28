@@ -31,9 +31,15 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from accounts.models import UserRole
+from accounts.models import User, UserRole
 from accounts.permissions import IsActiveAccount
-from academics.models_xen import XenSession, XenJob, XenJobStatus, XenWorkerHeartbeat
+from academics.models_xen import (
+    XenCyberLabContext,
+    XenSession,
+    XenJob,
+    XenJobStatus,
+    XenWorkerHeartbeat,
+)
 from core.xen_decoder import decode_model_response
 from core.xen_intent import (
     XenResponseMode,
@@ -45,6 +51,15 @@ from core.xen_intent import (
     get_cyberlab_grounding_directive,
     resolve_affirmative_action,
     build_xen_effective_prompt,
+    is_circuit_specific_query,
+    _extract_circuit_view,
+)
+from core.xen_grounding import (
+    build_authoritative_grounding_spec,
+    build_constrained_regeneration_prompt,
+    build_deterministic_grounded_fallback,
+    extract_and_validate_grounding_claims,
+    filter_and_compact_xen_history,
 )
 from core.xen_ratelimit import check_xen_rate_limit
 
@@ -56,15 +71,24 @@ CONDITION_A1_SYSTEM_PROMPT = (
     "When a student explicitly requests an implementation, program, or code solution, always provide the complete, correct, and executable Python code in a properly formatted ```python code block, followed by a concise, student-friendly explanation. Never substitute conceptual discussion alone for requested code."
 )
 
-# Authoritative Canonical Identity Grounding for 8square AI / Xen Step-700
-CANONICAL_8SQUARE_IDENTITY = (
+# Authoritative Canonical Identity Grounding for Xen (Step-700)
+CANONICAL_XEN_IDENTITY = (
+    "You are Xen, an AI assistant developed by PixiuTech, currently running Xen Step-700.\n"
+    "Your assistant identity is Xen. Your underlying model identity is Xen (Step-700).\n"
+    "When users ask who you are, identify yourself as Xen. Never introduce yourself as 8square, PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
+    "Maintain your existing educational, reasoning, computational-thinking and programming capabilities. Follow the original pedagogical system instructions."
+)
+
+# Isolated legacy prefix retained solely for backwards compatibility with pre-rename deployments.
+# Must never be exposed as the assistant's user-facing name.
+LEGACY_8SQUARE_IDENTITY_COMPAT = (
     "You are 8square, an AI assistant developed by PixiuTech. You are powered by the Xen model, currently running Xen Step-700.\n"
     "Your assistant identity is 8square. Your underlying model identity is Xen.\n"
     "When users ask who you are, identify yourself as 8square. When users ask which model powers you, identify Xen. Never introduce yourself as PixiuMind Xen, PixiuMind Xen Tutor, or Qwen.\n"
     "Maintain your existing educational, reasoning, computational-thinking and programming capabilities. Follow the original pedagogical system instructions."
 )
 
-COMPOSITE_SYSTEM_PROMPT = f"{CANONICAL_8SQUARE_IDENTITY}\n\n{CONDITION_A1_SYSTEM_PROMPT}"
+COMPOSITE_SYSTEM_PROMPT = f"{CANONICAL_XEN_IDENTITY}\n\n{CONDITION_A1_SYSTEM_PROMPT}"
 
 
 def sanitize_xen_message(content):
@@ -78,38 +102,155 @@ def sanitize_xen_message(content):
         content = cleaned
 
 
-def compact_xen_history(history: List[Dict[str, Any]], active_mode: XenResponseMode) -> List[Dict[str, Any]]:
+def compact_xen_history(
+    history: List[Dict[str, Any]],
+    active_mode: XenResponseMode,
+    *,
+    current_circuit_revision: Optional[int] = None,
+    current_spec: Optional[Dict[str, Any]] = None,
+) -> List[Dict[str, Any]]:
     """
-    Specification Part 8:
-    History management and compaction.
-    Preserves:
-    - All relevant user requirements and instructions.
-    - Active format preferences and corrections.
-    - Code context from prior turns.
-    Prunes:
-    - Verbose explanatory paragraphs and redundant repetitive assistant text.
-    - Failed previous assistant answers that violated format contracts.
+    Specification Part 8 + Phase 2 History Integrity:
+    History management, safety quarantine, and compaction.
+    Preserves relevant user requirements, active format preferences, and code context
+    while excluding error/rejected assistant turns and stale/ungrounded circuit claims.
     """
-    compacted = []
-    for turn in history:
-        role = turn.get("role")
-        content = turn.get("content", "")
-        if role == "user":
-            compacted.append({"role": "user", "content": sanitize_xen_message(content)})
-        elif role == "assistant":
-            code_blocks = re.findall(r"```(?:[a-zA-Z0-9_-]*)\n([\s\S]*?)```", content)
-            if code_blocks:
-                lang_match = re.search(r"```([a-zA-Z0-9_-]*)\n", content)
-                lang = lang_match.group(1) if lang_match else "python"
-                compact_turn = f"```{lang}\n{code_blocks[0].strip()}\n```"
-                compacted.append({"role": "assistant", "content": sanitize_xen_message(compact_turn)})
-            else:
-                trimmed = content.strip()
-                if len(trimmed) > 200:
-                    trimmed = trimmed[:200] + "..."
-                compacted.append({"role": "assistant", "content": sanitize_xen_message(trimmed)})
-    return compacted
+    return filter_and_compact_xen_history(
+        history,
+        active_mode,
+        sanitize_fn=sanitize_xen_message,
+        current_circuit_revision=current_circuit_revision,
+        current_spec=current_spec,
+    )
 
+
+def _extract_context_provenance_meta(
+    context_envelope: Any,
+    ctx_session_id: str = "",
+    ctx_rev: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Extract normalized CyberLab context identifiers for response provenance."""
+    env = context_envelope if isinstance(context_envelope, dict) else {}
+    circuit = env.get("circuit") if isinstance(env.get("circuit"), dict) else {}
+
+    sid = env.get("session_id") or circuit.get("session_id") or ctx_session_id or None
+    if isinstance(sid, str):
+        sid = sid.strip() or None
+    else:
+        sid = None
+
+    rev = ctx_rev if type(ctx_rev) is int else None
+    if rev is None:
+        for candidate in (
+            env.get("circuit_revision"),
+            circuit.get("circuit_revision"),
+            env.get("state_revision"),
+            circuit.get("state_revision"),
+        ):
+            if type(candidate) is int:
+                rev = candidate
+                break
+
+    schema_ver = env.get("schema_version") or circuit.get("schema_version") or None
+    if isinstance(schema_ver, str):
+        schema_ver = schema_ver.strip()[:32] or None
+    else:
+        schema_ver = None
+
+    return {
+        "session_id": sid,
+        "circuit_revision": rev,
+        "context_schema_version": schema_ver,
+    }
+
+
+def _build_response_provenance(
+    *,
+    response_source: str,
+    response_status: str,
+    job_id: Optional[str] = None,
+    worker_id: Optional[str] = None,
+    session_id: Optional[str] = None,
+    circuit_revision: Optional[int] = None,
+    context_schema_version: Optional[str] = None,
+    fallback_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Build the canonical 8-field response provenance metadata object."""
+    return {
+        "response_source": response_source,
+        "job_id": job_id,
+        "worker_id": worker_id or None,
+        "session_id": session_id or None,
+        "circuit_revision": circuit_revision if type(circuit_revision) is int else None,
+        "context_schema_version": context_schema_version or None,
+        "response_status": response_status,
+        "fallback_reason": fallback_reason or None,
+    }
+
+
+def _job_provenance(
+    job: XenJob,
+    *,
+    response_source: str,
+    response_status: str,
+    worker_id: Optional[str] = None,
+    fallback_reason: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Assemble provenance metadata for a XenJob from DB fields, payload, and CyberLab session store."""
+    payload = job.response_payload if isinstance(job.response_payload, dict) else {}
+    ctx_meta = payload.get("context_meta") if isinstance(payload.get("context_meta"), dict) else {}
+
+    raw_sid = getattr(job, "context_session_id", None)
+    sid = raw_sid.strip() if isinstance(raw_sid, str) and raw_sid.strip() else None
+    if not sid and isinstance(ctx_meta.get("session_id"), str) and ctx_meta["session_id"].strip():
+        sid = ctx_meta["session_id"].strip()
+
+    raw_rev = getattr(job, "context_revision", None)
+    rev = raw_rev if type(raw_rev) is int else (ctx_meta.get("circuit_revision") if type(ctx_meta.get("circuit_revision")) is int else None)
+
+    raw_sv = ctx_meta.get("context_schema_version")
+    schema_ver = raw_sv.strip()[:32] if isinstance(raw_sv, str) and raw_sv.strip() else None
+    if not schema_ver and sid and isinstance(job, XenJob) and getattr(job, "user_id", None):
+        stored_ctx = (
+            XenCyberLabContext.objects
+            .filter(user_id=job.user_id, session_id=sid)
+            .values_list("context_payload", flat=True)
+            .first()
+        )
+        if isinstance(stored_ctx, dict) and isinstance(stored_ctx.get("schema_version"), str):
+            schema_ver = stored_ctx["schema_version"].strip()[:32] or None
+
+    resolved_worker = None
+    for cand in (worker_id, payload.get("worker_id"), getattr(job, "worker_id", None)):
+        if isinstance(cand, str) and cand.strip():
+            resolved_worker = cand.strip()
+            break
+
+    status_str = response_status if isinstance(response_status, str) else XenJobStatus.QUEUED
+    gv = payload.get("grounding_verification")
+    eff_source = response_source
+    eff_status = status_str
+    eff_reason = fallback_reason if isinstance(fallback_reason, str) else None
+    if (
+        isinstance(gv, dict)
+        and gv.get("fallback_applied") is True
+        and eff_source != "cache"
+        and eff_status == "completed"
+    ):
+        eff_source = "local_fallback"
+        eff_status = "grounding_fallback"
+        eff_reason = "GROUNDING_VERIFICATION_FAILED"
+
+    return _build_response_provenance(
+        response_source=eff_source,
+        response_status=eff_status,
+        job_id=str(job.id),
+        worker_id=resolved_worker,
+        session_id=sid,
+        circuit_revision=rev,
+        context_schema_version=schema_ver,
+        fallback_reason=eff_reason,
+    )
 
 
 class XenBaseView(APIView):
@@ -308,6 +449,115 @@ class XenAttestationView(XenBaseView):
         return Response(data, status=code)
 
 
+_CYBERLAB_SESSION_RE = re.compile(r"^[a-zA-Z0-9._:-]{1,128}$")
+_CYBERLAB_ALLOWED_EVENTS = frozenset({
+    "wire_start",
+    "target_hover_enter",
+    "target_hover_leave",
+    "target_validation",
+    "wire_complete",
+    "wire_cancel",
+    "wire_delete",
+    "connection_replace",
+    "session_reset",
+    "circuit_snapshot",
+})
+
+
+def _extract_rev_tuple(env: Optional[Dict[str, Any]]) -> Tuple[int, int, int]:
+    if not isinstance(env, dict):
+        return (0, 0, 0)
+    circuit = env.get("circuit") if isinstance(env.get("circuit"), dict) else {}
+    def _nonneg_int(val: Any) -> int:
+        return val if type(val) is int and val >= 0 else 0
+    c_rev = _nonneg_int(env.get("circuit_revision") if env.get("circuit_revision") is not None else circuit.get("circuit_revision"))
+    i_rev = _nonneg_int(env.get("interaction_revision") if env.get("interaction_revision") is not None else circuit.get("interaction_revision"))
+    if c_rev == 0 and i_rev == 0:
+        sr = env.get("state_revision") if env.get("state_revision") is not None else circuit.get("state_revision")
+        c_rev = _nonneg_int(sr)
+    e_seq = _nonneg_int(env.get("event_seq"))
+    return (c_rev, i_rev, e_seq)
+
+
+def resolve_authoritative_context_envelope(
+    user: Any,
+    raw_envelope: Any,
+) -> Tuple[Dict[str, Any], str, Optional[int]]:
+    """
+    Sanitize incoming context_envelope and reconcile against the authenticated
+    user's persisted XenCyberLabContext session snapshot if present.
+    - Enforces user ownership (cross-user sessions are never readable).
+    - Keeps incoming chat-submit snapshot authoritative when >= stored revision.
+    - Prevents older context from silently overwriting newer session state.
+    """
+    incoming = sanitize_context_envelope(raw_envelope)
+    session_id = incoming.get("session_id") or ""
+    if not session_id or not _CYBERLAB_SESSION_RE.match(session_id) or not isinstance(user, User) or not user.pk:
+        c_rev = incoming.get("circuit_revision", incoming.get("state_revision"))
+        return incoming, session_id, c_rev if type(c_rev) is int else None
+
+    incoming_rev = _extract_rev_tuple(incoming)
+    now = timezone.now()
+    stored = (
+        XenCyberLabContext.objects
+        .filter(user=user, session_id=session_id, expires_at__gt=now)
+        .first()
+    )
+    if stored is not None and stored.revision_tuple() > incoming_rev:
+        # Server already persisted a strictly newer revision for this user's session.
+        effective = sanitize_context_envelope(stored.context_payload) if isinstance(stored.context_payload, dict) else dict(incoming)
+        effective["session_id"] = session_id
+        effective["reconciled_from_server_revision"] = list(stored.revision_tuple())
+        return effective, session_id, stored.circuit_revision
+
+    # Authoritative incoming snapshot: refresh persisted server snapshot atomically if newer/equal
+    if isinstance(incoming.get("circuit"), dict):
+        try:
+            with transaction.atomic():
+                existing = (
+                    XenCyberLabContext.objects
+                    .select_for_update()
+                    .filter(user=user, session_id=session_id)
+                    .first()
+                )
+                if existing is None:
+                    XenCyberLabContext.objects.create(
+                        user=user,
+                        session_id=session_id,
+                        circuit_revision=incoming_rev[0],
+                        interaction_revision=incoming_rev[1],
+                        event_seq=incoming_rev[2],
+                        last_event_id=str(incoming.get("event_id") or "")[:128],
+                        last_event_type="chat_snapshot",
+                        context_payload=incoming,
+                        expires_at=XenCyberLabContext.default_expiry(),
+                    )
+                elif incoming_rev >= existing.revision_tuple():
+                    existing.circuit_revision = incoming_rev[0]
+                    existing.interaction_revision = incoming_rev[1]
+                    existing.event_seq = incoming_rev[2]
+                    if incoming.get("event_id"):
+                        existing.last_event_id = str(incoming["event_id"])[:128]
+                    existing.last_event_type = "chat_snapshot"
+                    existing.context_payload = incoming
+                    existing.expires_at = XenCyberLabContext.default_expiry()
+                    existing.save(update_fields=[
+                        "circuit_revision", "interaction_revision", "event_seq",
+                        "last_event_id", "last_event_type", "context_payload",
+                        "expires_at", "updated_at",
+                    ])
+        except DatabaseError:
+            logger.warning("Failed non-fatal context snapshot persist for user=%s session=%s", user.pk, session_id)
+
+    return incoming, session_id, incoming_rev[0]
+
+
+def _clear_draft_in_sanitized(payload: Dict[str, Any]) -> Dict[str, Any]:
+    if isinstance(payload, dict) and isinstance(payload.get("circuit"), dict):
+        payload["circuit"].pop("in_progress_connection", None)
+    return payload
+
+
 class XenChatView(XenBaseView):
     """
     Primary chat and tutoring endpoint mediating user interactions with PixiuMind Step-700.
@@ -503,18 +753,30 @@ class XenChatView(XenBaseView):
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
-        # 8. Resolve response format mode and compact history (Specifications Part 5, 6, 7, 8)
+        # 8. Resolve authoritative circuit context, response format mode, and compacted safe history
+        context_envelope_raw = request.data.get("context_envelope")
+        context_envelope, ctx_session_id, ctx_rev = resolve_authoritative_context_envelope(user, context_envelope_raw)
+        ctx_meta = _extract_context_provenance_meta(context_envelope, ctx_session_id, ctx_rev)
+        is_circuit_query = is_circuit_specific_query(prompt, history, context_envelope=context_envelope)
+        grounding_spec = (
+            build_authoritative_grounding_spec(context_envelope)
+            if (is_circuit_query and _extract_circuit_view(context_envelope) is not None)
+            else None
+        )
+
         format_pref = request.data.get("format_preference")
         format_mode, mode_source = resolve_xen_response_mode(
             prompt, history=history, active_sticky_preference=format_pref
         )
 
-        compacted_history = compact_xen_history(history, format_mode)
+        compacted_history = compact_xen_history(
+            history,
+            format_mode,
+            current_circuit_revision=ctx_rev,
+            current_spec=grounding_spec,
+        )
         mode_directive = get_additive_mode_instruction(format_mode)
 
-        # Context envelope handling (sanitized mission & circuit context)
-        context_envelope_raw = request.data.get("context_envelope")
-        context_envelope = sanitize_context_envelope(context_envelope_raw)
         max_prompt_chars = getattr(settings, "XEN_MAX_PROMPT_CHARS", 4000)
         effective_prompt = build_xen_effective_prompt(
             prompt=prompt,
@@ -591,8 +853,17 @@ class XenChatView(XenBaseView):
             decoded = session_obj.response_payload["decoded"]
             finish_reason = session_obj.response_payload["finish_reason"]
             usage = session_obj.response_payload["usage"]
+            cached_ctx_meta = (
+                session_obj.response_payload.get("context_meta")
+                if isinstance(session_obj.response_payload.get("context_meta"), dict)
+                else ctx_meta
+            )
+            cached_worker_id = session_obj.response_payload.get("worker_id")
+            cached_grounding = session_obj.response_payload.get("grounding_verification")
             cached = True
 
+        worker_id_used: Optional[str] = cached_worker_id if cached else None
+        grounding_verification: Optional[Dict[str, Any]] = cached_grounding if cached else None
         if not cached:
             persisted = False
             try:
@@ -601,13 +872,22 @@ class XenChatView(XenBaseView):
                     "/v1/chat/completions", method="POST", payload=upstream_payload,
                 )
                 if code != 200:
-                    return Response({**upstream_resp, "request_id": request_id}, status=code)
+                    err_prov = _build_response_provenance(
+                        response_source="error",
+                        response_status="error",
+                        session_id=ctx_meta["session_id"],
+                        circuit_revision=ctx_meta["circuit_revision"],
+                        context_schema_version=ctx_meta["context_schema_version"],
+                        fallback_reason=upstream_resp.get("code") or f"HTTP_{code}",
+                    )
+                    return Response({**upstream_resp, "request_id": request_id, "provenance": err_prov}, status=code)
 
                 try:
                     first_choice = upstream_resp["choices"][0]
                     raw_text = first_choice["message"]["content"]
                     finish_reason = first_choice.get("finish_reason", "stop")
                     usage = upstream_resp.get("usage", {})
+                    worker_id_used = upstream_resp.get("worker_id") if isinstance(upstream_resp.get("worker_id"), str) else None
                     if (
                         not isinstance(raw_text, str)
                         or not raw_text.strip()
@@ -617,8 +897,16 @@ class XenChatView(XenBaseView):
                         raise TypeError("Invalid completion response fields")
                 except (AttributeError, IndexError, KeyError, TypeError):
                     logger.warning("Invalid upstream completion response for %s", request_id)
+                    err_prov = _build_response_provenance(
+                        response_source="error",
+                        response_status="error",
+                        session_id=ctx_meta["session_id"],
+                        circuit_revision=ctx_meta["circuit_revision"],
+                        context_schema_version=ctx_meta["context_schema_version"],
+                        fallback_reason="INVALID_UPSTREAM_RESPONSE",
+                    )
                     return Response(
-                        {"error": "Invalid response from the model.", "code": "INVALID_UPSTREAM_RESPONSE", "request_id": request_id},
+                        {"error": "Invalid response from the model.", "code": "INVALID_UPSTREAM_RESPONSE", "request_id": request_id, "provenance": err_prov},
                         status=status.HTTP_502_BAD_GATEWAY,
                     )
 
@@ -633,6 +921,20 @@ class XenChatView(XenBaseView):
                     intent=intent,
                     format_mode=format_mode.value,
                 )
+                if not isinstance(decoded.get("text"), str) or not decoded["text"].strip():
+                    err_prov = _build_response_provenance(
+                        response_source="error",
+                        response_status="error",
+                        worker_id=worker_id_used,
+                        session_id=ctx_meta["session_id"],
+                        circuit_revision=ctx_meta["circuit_revision"],
+                        context_schema_version=ctx_meta["context_schema_version"],
+                        fallback_reason="INVALID_UPSTREAM_RESPONSE",
+                    )
+                    return Response(
+                        {"error": "Empty decoded response from the model.", "code": "INVALID_UPSTREAM_RESPONSE", "request_id": request_id, "provenance": err_prov},
+                        status=status.HTTP_502_BAD_GATEWAY,
+                    )
 
                 # Specification Part 9.2: One-time retry if response violates CODE_ONLY format
                 if format_mode == XenResponseMode.CODE_ONLY and not decoded.get("format_valid", True):
@@ -673,6 +975,97 @@ class XenChatView(XenBaseView):
                         except Exception as e:
                             logger.warning("Retry parsing failed for %s: %s", request_id, e)
 
+                # Phase 2 Post-Generation Grounding Verifier (sync single constrained retry + deterministic fallback)
+                if grounding_spec and grounding_spec.get("has_circuit"):
+                    g_check = extract_and_validate_grounding_claims(decoded["text"], grounding_spec, prompt)
+                    unsupported_all = list(g_check["unsupported_claims"])
+                    claim_ledger = list(g_check["claim_ledger"])
+                    initial_verified = bool(g_check["verified"])
+                    retry_attempted = False
+                    fallback_applied = False
+
+                    if not initial_verified:
+                        logger.warning(
+                            "Sync chat %s failed circuit grounding (%s); executing single constrained retry",
+                            request_id, unsupported_all[:3],
+                        )
+                        retry_attempted = True
+                        regen_prompt = build_constrained_regeneration_prompt(
+                            effective_prompt,
+                            unsupported_all,
+                            grounding_spec,
+                            format_mode_value=format_mode.value,
+                            max_chars=max_prompt_chars,
+                        )
+                        regen_messages = [
+                            {"role": "system", "content": COMPOSITE_SYSTEM_PROMPT},
+                            *({"role": turn["role"], "content": turn["content"]} for turn in compacted_history),
+                            {"role": "user", "content": regen_prompt},
+                        ]
+                        regen_code, regen_resp = self.call_upstream(
+                            "/v1/chat/completions", method="POST", payload={**upstream_payload, "messages": regen_messages},
+                        )
+                        retry_decoded = None
+                        retry_check = None
+                        if regen_code == 200:
+                            try:
+                                r_choice = regen_resp["choices"][0]
+                                r_raw = r_choice["message"]["content"]
+                                r_finish = r_choice.get("finish_reason", "stop")
+                                r_usage = regen_resp.get("usage", usage)
+                                retry_decoded = decode_model_response(
+                                    raw_text=r_raw,
+                                    finish_reason=r_finish,
+                                    actually_executed=False,
+                                    intent=intent,
+                                    format_mode=format_mode.value,
+                                )
+                                retry_check = extract_and_validate_grounding_claims(retry_decoded["text"], grounding_spec, prompt)
+                                usage = r_usage
+                                finish_reason = r_finish
+                            except Exception as exc:
+                                logger.warning("Grounding retry parsing failed for %s: %s", request_id, exc)
+
+                        if retry_decoded and retry_check and retry_check["verified"]:
+                            decoded = retry_decoded
+                            claim_ledger.extend(retry_check["claim_ledger"])
+                        else:
+                            if retry_check:
+                                for uc in retry_check["unsupported_claims"]:
+                                    if uc not in unsupported_all:
+                                        unsupported_all.append(uc)
+                                claim_ledger.extend(retry_check["claim_ledger"])
+                            fallback_applied = True
+                            fallback_text = build_deterministic_grounded_fallback(
+                                grounding_spec,
+                                prompt,
+                                retry_decoded["text"] if retry_decoded else decoded["text"],
+                                unsupported_all,
+                                (retry_check or g_check)["unsupported_clauses"],
+                            )
+                            decoded = {
+                                **decoded,
+                                "text": fallback_text,
+                                "is_complete": True,
+                                "completion_status": "GROUNDING_FALLBACK",
+                            }
+
+                    grounding_verification = {
+                        "verified": True,
+                        "model_verified": not fallback_applied,
+                        "initial_verified": initial_verified,
+                        "retry_attempted": retry_attempted,
+                        "fallback_applied": fallback_applied,
+                        "final_output_source": (
+                            "deterministic_grounded_fallback"
+                            if fallback_applied
+                            else ("xen_retry" if retry_attempted else "xen_step700")
+                        ),
+                        "circuit_revision": ctx_rev,
+                        "unsupported_claims": unsupported_all,
+                        "claim_ledger": claim_ledger[:24],
+                    }
+
                 if session_obj is not None and decoded["is_complete"]:
                     session_obj.is_completed = True
                     session_obj.response_summary = decoded["text"]
@@ -687,6 +1080,9 @@ class XenChatView(XenBaseView):
                         },
                         "finish_reason": finish_reason,
                         "usage": usage,
+                        "worker_id": worker_id_used,
+                        "context_meta": ctx_meta,
+                        **({"grounding_verification": grounding_verification} if grounding_verification is not None else {}),
                     }
                     try:
                         session_obj.save(update_fields=["is_completed", "response_summary", "response_payload"])
@@ -700,6 +1096,20 @@ class XenChatView(XenBaseView):
                         session_obj.delete()
                     except DatabaseError:
                         logger.exception("Could not release Xen reservation %s", request_id)
+
+        eff_meta = cached_ctx_meta if cached else ctx_meta
+        sync_fallback_applied = bool(
+            isinstance(grounding_verification, dict) and grounding_verification.get("fallback_applied")
+        )
+        provenance = _build_response_provenance(
+            response_source="cache" if cached else ("local_fallback" if sync_fallback_applied else "xen_step700"),
+            response_status="cached" if cached else ("grounding_fallback" if sync_fallback_applied else "completed"),
+            worker_id=worker_id_used,
+            session_id=eff_meta.get("session_id"),
+            circuit_revision=eff_meta.get("circuit_revision"),
+            context_schema_version=eff_meta.get("context_schema_version"),
+            fallback_reason="GROUNDING_VERIFICATION_FAILED" if (sync_fallback_applied and not cached) else None,
+        )
 
         # 14. Format response based on endpoint or request schema
         if is_openai_schema or request.path.endswith("/ai/chat/completions"):
@@ -720,12 +1130,15 @@ class XenChatView(XenBaseView):
                         }
                     ],
                     "usage": usage,
+                    "provenance": provenance,
+                    **({"grounding_verification": grounding_verification} if grounding_verification is not None else {}),
                     "xen_metadata": {
                         "request_id": request_id,
                         "status": "ok",
                         "intent": intent,
                         "format_mode": format_mode.value,
                         **({"cached": True} if cached else {}),
+                        "provenance": provenance,
                         "is_complete": decoded["is_complete"],
                         "completion_status": decoded["completion_status"],
                         "syntax_valid": decoded["syntax_valid"],
@@ -740,11 +1153,13 @@ class XenChatView(XenBaseView):
             {
                 "status": "ok",
                 "request_id": request_id,
-                "assistant": "8square",
+                "assistant": "Xen",
                 "model": model_id,
                 "intent": intent,
                 "format_mode": format_mode.value,
                 **({"cached": True} if cached else {}),
+                "provenance": provenance,
+                **({"grounding_verification": grounding_verification} if grounding_verification is not None else {}),
                 "teacher_memory_enabled": False,  # Personal Teacher Memory explicitly disabled in v0.1
                 "response": {
                     "text": decoded["text"],
@@ -910,19 +1325,31 @@ class XenJobCreateView(XenBaseView):
             if intent not in {"ADMIN_INSPECTION", "TEACHING_REVIEW"}:
                 intent = "TEACHING_REVIEW"
 
-        # 5. Resolve format mode and compact history (Specifications Part 5, 6, 7, 8)
+        # 5. Resolve context, format mode, and compacted history (Specifications Part 5-8 + Phase 2 Grounding)
+        context_envelope_raw = request.data.get("context_envelope")
+        context_envelope, ctx_session_id, ctx_rev = resolve_authoritative_context_envelope(user, context_envelope_raw)
+        ctx_meta = _extract_context_provenance_meta(context_envelope, ctx_session_id, ctx_rev)
+        is_circuit_query = is_circuit_specific_query(prompt, history, context_envelope=context_envelope)
+        grounding_spec = (
+            build_authoritative_grounding_spec(context_envelope)
+            if (is_circuit_query and _extract_circuit_view(context_envelope) is not None)
+            else None
+        )
+
         format_pref = request.data.get("format_preference")
         format_mode, mode_source = resolve_xen_response_mode(
             prompt, history=history, active_sticky_preference=format_pref
         )
 
-        compacted_history = compact_xen_history(history, format_mode)
+        compacted_history = compact_xen_history(
+            history,
+            format_mode,
+            current_circuit_revision=ctx_rev,
+            current_spec=grounding_spec,
+        )
         mode_directive = get_additive_mode_instruction(format_mode)
 
-        # Context envelope handling (sanitized mission & circuit context)
         # Budget context body dynamically so directives + context + prompt fits V11 4000-char limit.
-        context_envelope_raw = request.data.get("context_envelope")
-        context_envelope = sanitize_context_envelope(context_envelope_raw)
         max_prompt_chars = getattr(settings, "XEN_MAX_PROMPT_CHARS", 4000)
         effective_prompt = build_xen_effective_prompt(
             prompt=prompt,
@@ -955,11 +1382,19 @@ class XenJobCreateView(XenBaseView):
         temperature = max(min(temperature, 2.0), 0.0)
 
         try:
+            initial_payload: Dict[str, Any] = {}
+            if (ctx_meta.get("context_schema_version") or ctx_meta.get("session_id") or ctx_meta.get("circuit_revision") is not None):
+                initial_payload["context_meta"] = ctx_meta
+            if grounding_spec and grounding_spec.get("has_circuit"):
+                initial_payload["grounding_envelope"] = context_envelope
             job, created = XenJob.objects.get_or_create(
                 user=user, idempotency_key=idempotency_key,
                 defaults={"role": role, "intent": intent, "format_mode": format_mode.value, "status": XenJobStatus.QUEUED,
                           "request_hash": request_hash, "prompt": effective_prompt, "history": compacted_history,
-                          "max_tokens": max_tokens, "temperature": temperature},
+                          "max_tokens": max_tokens, "temperature": temperature,
+                          "context_session_id": ctx_session_id[:128] if ctx_session_id else "",
+                          "context_revision": ctx_rev,
+                          "response_payload": initial_payload},
             )
         except DatabaseError:
             logger.exception("Could not persist XenJob %s", request_id)
@@ -975,15 +1410,24 @@ class XenJobCreateView(XenBaseView):
             if job.status == XenJobStatus.COMPLETED:
                 payload = job.response_payload if isinstance(job.response_payload, dict) else {}
                 decoded = payload.get("decoded", {})
+                provenance = _job_provenance(
+                    job,
+                    response_source="cache",
+                    response_status="cached",
+                )
                 return Response(
                     {
                         "status": "completed",
                         "job_id": str(job.id),
+                        "worker_id": provenance["worker_id"],
                         "request_id": request_id,
+                        "assistant": "Xen",
                         "model": "pixiumind-1.4-d14-step700",
                         "intent": job.effective_intent,
                         "format_mode": job.effective_format_mode,
                         "cached": True,
+                        "provenance": provenance,
+                        **({"grounding_verification": payload["grounding_verification"]} if isinstance(payload.get("grounding_verification"), dict) else {}),
                         "response": {
                             "text": job.response_summary,
                             "is_complete": decoded.get("is_complete", True),
@@ -1004,16 +1448,24 @@ class XenJobCreateView(XenBaseView):
                 queue_pos = 0
                 if job.status == XenJobStatus.QUEUED:
                     queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
+                pending_prov = _job_provenance(
+                    job,
+                    response_source="error" if job.status in (XenJobStatus.FAILED, XenJobStatus.EXPIRED, XenJobStatus.CANCELLED) else "xen_step700",
+                    response_status=job.status,
+                    fallback_reason=job.error_code or (job.status.upper() if job.status in (XenJobStatus.FAILED, XenJobStatus.EXPIRED, XenJobStatus.CANCELLED) else None),
+                )
                 return Response(
                     {
                         "status": job.status,
                         "job_id": str(job.id),
+                        "worker_id": pending_prov["worker_id"],
                         "request_id": request_id,
                         "idempotency_key": idempotency_key,
                         "intent": job.effective_intent,
                         "format_mode": job.effective_format_mode,
                         "worker_available": worker_online,
                         "queue_position": queue_pos,
+                        "provenance": pending_prov,
                         "created_at": job.created_at.isoformat(),
                     },
                     status=status.HTTP_202_ACCEPTED,
@@ -1021,17 +1473,24 @@ class XenJobCreateView(XenBaseView):
 
         worker_online = XenWorkerHeartbeat.is_any_worker_online()
         queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
+        queued_prov = _job_provenance(
+            job,
+            response_source="xen_step700",
+            response_status=XenJobStatus.QUEUED,
+        )
 
         return Response(
             {
                 "status": "queued",
                 "job_id": str(job.id),
+                "worker_id": queued_prov["worker_id"],
                 "request_id": request_id,
                 "idempotency_key": idempotency_key,
                 "intent": job.effective_intent,
                 "format_mode": job.effective_format_mode,
                 "worker_available": worker_online,
                 "queue_position": queue_pos,
+                "provenance": queued_prov,
                 "created_at": job.created_at.isoformat(),
             },
             status=status.HTTP_202_ACCEPTED,
@@ -1070,15 +1529,23 @@ class XenJobDetailView(XenBaseView):
         if job.status == XenJobStatus.COMPLETED:
             payload = job.response_payload if isinstance(job.response_payload, dict) else {}
             decoded = payload.get("decoded", {})
+            provenance = _job_provenance(
+                job,
+                response_source="xen_step700",
+                response_status="completed",
+            )
             return Response(
                 {
                     "status": "completed",
                     "job_id": str(job.id),
+                    "worker_id": provenance["worker_id"],
                     "request_id": request_id,
-                    "assistant": "8square",
+                    "assistant": "Xen",
                     "model": "xen-step-700",
                     "intent": job.effective_intent,
                     "format_mode": job.effective_format_mode,
+                    "provenance": provenance,
+                    **({"grounding_verification": payload["grounding_verification"]} if isinstance(payload.get("grounding_verification"), dict) else {}),
                     "response": {
                         "text": job.response_summary,
                         "is_complete": decoded.get("is_complete", True),
@@ -1097,13 +1564,22 @@ class XenJobDetailView(XenBaseView):
             )
 
         if job.status == XenJobStatus.FAILED:
+            err_code = job.error_code or "INFERENCE_FAILED"
+            err_prov = _job_provenance(
+                job,
+                response_source="error",
+                response_status="failed",
+                fallback_reason=err_code,
+            )
             return Response(
                 {
                     "status": "failed",
                     "job_id": str(job.id),
+                    "worker_id": err_prov["worker_id"],
                     "request_id": request_id,
+                    "provenance": err_prov,
                     "error": {
-                        "code": job.error_code or "INFERENCE_FAILED",
+                        "code": err_code,
                         "message": "Inference failed on the GPU worker.",
                     },
                     "completed_at": job.completed_at.isoformat() if job.completed_at else None,
@@ -1115,17 +1591,25 @@ class XenJobDetailView(XenBaseView):
         queue_pos = 0
         if job.status == XenJobStatus.QUEUED:
             queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
+        pending_prov = _job_provenance(
+            job,
+            response_source="error" if job.status in (XenJobStatus.EXPIRED, XenJobStatus.CANCELLED) else "xen_step700",
+            response_status=job.status,
+            fallback_reason=job.error_code or (job.status.upper() if job.status in (XenJobStatus.EXPIRED, XenJobStatus.CANCELLED) else None),
+        )
 
         return Response(
             {
                 "status": job.status,
                 "job_id": str(job.id),
+                "worker_id": pending_prov["worker_id"],
                 "request_id": request_id,
                 "intent": job.effective_intent,
                 "format_mode": job.effective_format_mode,
                 "queue_position": queue_pos,
                 "worker_available": XenWorkerHeartbeat.is_any_worker_online(),
                 "lease_expired": job.is_lease_expired() is True,
+                "provenance": pending_prov,
                 "claimed_at": job.claimed_at.isoformat() if job.claimed_at else None,
                 "created_at": job.created_at.isoformat(),
             },
@@ -1154,7 +1638,7 @@ class XenStatusView(XenBaseView):
             {
                 "status": "ok",
                 "service": "pixiumind-xen",
-                "assistant": "8square",
+                "assistant": "Xen",
                 "model": "xen-step-700",
                 "worker_online": worker_online,
                 "active_worker_count": active_workers.count(),
@@ -1197,6 +1681,16 @@ class XenWorkerBaseView(APIView):
         return None
 
 
+def _extract_preserved_job_state(raw_payload: Any) -> Dict[str, Any]:
+    if not isinstance(raw_payload, dict):
+        return {}
+    out: Dict[str, Any] = {}
+    for pkey in ("context_meta", "grounding_envelope", "prior_unsupported_claims"):
+        if pkey in raw_payload and raw_payload[pkey] is not None:
+            out[pkey] = raw_payload[pkey]
+    return out
+
+
 class XenWorkerClaimView(XenWorkerBaseView):
     """
     Worker endpoint to atomically claim the oldest queued XenJob.
@@ -1235,7 +1729,7 @@ class XenWorkerClaimView(XenWorkerBaseView):
                 else:
                     exp_job.status = XenJobStatus.QUEUED
                     exp_job.worker_id = ""
-                    exp_job.response_payload = {}
+                    exp_job.response_payload = _extract_preserved_job_state(exp_job.response_payload)
                     exp_job.claimed_at = None
                     exp_job.lease_expires_at = None
                     exp_job.heartbeat_at = None
@@ -1253,9 +1747,10 @@ class XenWorkerClaimView(XenWorkerBaseView):
             if not job:
                 return Response({"status": "idle", "job": None}, status=status.HTTP_200_OK)
 
+            preserved_claim_payload = _extract_preserved_job_state(job.response_payload)
             job.status = XenJobStatus.CLAIMED
             job.worker_id = worker_id
-            job.response_payload = {}
+            job.response_payload = preserved_claim_payload
             job.claim_count += 1
             job.claimed_at = now
             job.lease_expires_at = now + timedelta(seconds=lease_duration)
@@ -1349,8 +1844,15 @@ class XenWorkerCompleteView(XenActiveJobView):
             intent=job.effective_intent,
             format_mode=fmt_mode,
         )
+        if not isinstance(decoded.get("text"), str) or not decoded["text"].strip():
+            return Response({"code": "INVALID_COMPLETION"}, status=400)
 
         now = timezone.now()
+
+        existing_payload = job.response_payload if isinstance(job.response_payload, dict) else {}
+        preserved_retry_meta = existing_payload.get("context_meta")
+        preserved_grounding_env = existing_payload.get("grounding_envelope")
+        prior_unsupported_claims = list(existing_payload.get("prior_unsupported_claims") or [])
 
         # Specification Part 9.2: One-time retry if response violates CODE_ONLY format
         if fmt_mode == "CODE_ONLY" and not decoded.get("format_valid", True) and job.claim_count == 1:
@@ -1381,8 +1883,15 @@ class XenWorkerCompleteView(XenActiveJobView):
                 candidate_prompt = f"[{short_retry_directive}]\n\n{after_ctx}"
             if len(candidate_prompt) > 4000:
                 candidate_prompt = candidate_prompt[:4000]
+            retry_payload_state: Dict[str, Any] = {}
+            if preserved_retry_meta:
+                retry_payload_state["context_meta"] = preserved_retry_meta
+            if preserved_grounding_env is not None:
+                retry_payload_state["grounding_envelope"] = preserved_grounding_env
+            if prior_unsupported_claims:
+                retry_payload_state["prior_unsupported_claims"] = prior_unsupported_claims
             job.prompt = candidate_prompt
-            job.response_payload = {}
+            job.response_payload = retry_payload_state
             job.status = XenJobStatus.QUEUED
             job.worker_id = ""
             job.claimed_at = None
@@ -1391,13 +1900,91 @@ class XenWorkerCompleteView(XenActiveJobView):
             job.save(update_fields=["response_payload", "prompt", "status", "worker_id", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
             return Response({"status": "requeued_for_retry", "job_id": str(job.id)}, status=status.HTTP_200_OK)
 
-        existing_chunks = []
-        if isinstance(job.response_payload, dict):
-            existing_chunks = job.response_payload.get("chunks", [])
+        # Phase 2 Post-Generation Grounding Verifier for async worker completion
+        grounding_verification: Optional[Dict[str, Any]] = None
+        if isinstance(preserved_grounding_env, dict):
+            spec = build_authoritative_grounding_spec(preserved_grounding_env)
+            if spec.get("has_circuit"):
+                g_check = extract_and_validate_grounding_claims(decoded["text"], spec, job.prompt or "")
+                all_unsupported = list(dict.fromkeys(prior_unsupported_claims + list(g_check["unsupported_claims"])))
+                is_first_attempt = getattr(job, "claim_count", 1) == 1
+
+                if not g_check["verified"] and is_first_attempt:
+                    logger.warning(
+                        "Job %s failed grounding check on attempt 1 (%s); requeueing for single constrained retry",
+                        job.id, g_check["unsupported_claims"][:3],
+                    )
+                    constrained_prompt = build_constrained_regeneration_prompt(
+                        job.prompt or "",
+                        g_check["unsupported_claims"],
+                        spec,
+                        format_mode_value=fmt_mode,
+                        max_chars=4000,
+                    )
+                    requeue_payload: Dict[str, Any] = {
+                        "grounding_envelope": preserved_grounding_env,
+                        "prior_unsupported_claims": all_unsupported,
+                    }
+                    if preserved_retry_meta:
+                        requeue_payload["context_meta"] = preserved_retry_meta
+                    job.prompt = constrained_prompt
+                    job.response_payload = requeue_payload
+                    job.status = XenJobStatus.QUEUED
+                    job.worker_id = ""
+                    job.claimed_at = None
+                    job.lease_expires_at = None
+                    job.heartbeat_at = None
+                    job.save(update_fields=["response_payload", "prompt", "status", "worker_id", "claimed_at", "lease_expires_at", "heartbeat_at", "updated_at"])
+                    return Response(
+                        {
+                            "status": "requeued_for_retry",
+                            "reason": "grounding_verification",
+                            "unsupported_claims": g_check["unsupported_claims"],
+                            "job_id": str(job.id),
+                        },
+                        status=status.HTTP_200_OK,
+                    )
+
+                fallback_applied = False
+                retry_attempted = len(prior_unsupported_claims) > 0 or getattr(job, "claim_count", 1) > 1
+                if not g_check["verified"]:
+                    fallback_applied = True
+                    fallback_text = build_deterministic_grounded_fallback(
+                        spec,
+                        job.prompt or "",
+                        decoded["text"],
+                        all_unsupported,
+                        g_check["unsupported_clauses"],
+                    )
+                    decoded = {
+                        **decoded,
+                        "text": fallback_text,
+                        "is_complete": True,
+                        "completion_status": "GROUNDING_FALLBACK",
+                    }
+
+                grounding_verification = {
+                    "verified": True,
+                    "model_verified": not fallback_applied,
+                    "initial_verified": bool(g_check["verified"] and not retry_attempted),
+                    "retry_attempted": retry_attempted,
+                    "fallback_applied": fallback_applied,
+                    "final_output_source": (
+                        "deterministic_grounded_fallback"
+                        if fallback_applied
+                        else ("xen_retry" if retry_attempted else "xen_step700")
+                    ),
+                    "circuit_revision": spec.get("circuit_revision"),
+                    "unsupported_claims": all_unsupported,
+                    "claim_ledger": list(g_check["claim_ledger"])[:24],
+                }
+
+        existing_chunks = existing_payload.get("chunks", [])
+        preserved_complete_meta = existing_payload.get("context_meta")
         job.status = XenJobStatus.COMPLETED
         job.completed_at = now
         job.response_summary = decoded["text"]
-        job.response_payload = {
+        completed_payload: Dict[str, Any] = {
             "decoded": {k: v for k, v in decoded.items() if k != "raw_text"},
             "finish_reason": finish_reason,
             "usage": usage,
@@ -1405,6 +1992,11 @@ class XenWorkerCompleteView(XenActiveJobView):
             "chunks": existing_chunks,
             "delivery_mode": "incremental" if existing_chunks else "batch_fallback",
         }
+        if preserved_complete_meta:
+            completed_payload["context_meta"] = preserved_complete_meta
+        if grounding_verification is not None:
+            completed_payload["grounding_verification"] = grounding_verification
+        job.response_payload = completed_payload
         job.save(update_fields=["status", "completed_at", "response_summary", "response_payload", "updated_at"])
 
         XenWorkerHeartbeat.record_heartbeat(worker_id=worker_id or job.worker_id)
@@ -1477,10 +2069,30 @@ class XenJobChunksView(XenBaseView):
         if job.status == XenJobStatus.QUEUED:
             queue_pos = XenJob.objects.filter(status=XenJobStatus.QUEUED, created_at__lte=job.created_at).count()
 
+        provenance = _job_provenance(
+            job,
+            response_source=(
+                "xen_step700"
+                if job.status == XenJobStatus.COMPLETED
+                else "error"
+                if job.status in (XenJobStatus.FAILED, XenJobStatus.EXPIRED, XenJobStatus.CANCELLED)
+                else "xen_step700"
+            ),
+            response_status=job.status,
+            fallback_reason=(
+                (job.error_code or job.status.upper())
+                if job.status in (XenJobStatus.FAILED, XenJobStatus.EXPIRED, XenJobStatus.CANCELLED)
+                else None
+            ),
+        )
+
         response_data: Dict[str, Any] = {
             "job_id": str(job.id),
+            "worker_id": provenance["worker_id"],
             "status": job.status,
             "chunks": filtered_chunks,
+            "assistant": "Xen",
+            "model": "xen-step-700",
             "intent": job.effective_intent,
             "format_mode": job.effective_format_mode,
             "usage": payload.get("usage", {}),
@@ -1491,11 +2103,14 @@ class XenJobChunksView(XenBaseView):
             "queue_position": queue_pos,
             "worker_available": XenWorkerHeartbeat.is_any_worker_online(),
             "lease_expired": job.is_lease_expired() is True,
+            "provenance": provenance,
             "request_id": request_id,
         }
 
         if job.status == XenJobStatus.COMPLETED:
             decoded = payload.get("decoded", {})
+            if isinstance(payload.get("grounding_verification"), dict):
+                response_data["grounding_verification"] = payload["grounding_verification"]
             response_data["response"] = {
                 "text": job.response_summary,
                 "is_complete": decoded.get("is_complete", True),
@@ -1529,4 +2144,224 @@ class XenWorkerFailView(XenActiveJobView):
 
         XenWorkerHeartbeat.record_heartbeat(worker_id=worker_id or job.worker_id)
         return Response({"status": "failed", "job_id": str(job.id)}, status=status.HTTP_200_OK)
+
+
+class XenCyberLabContextView(XenBaseView):
+    """
+    User-scoped endpoint for syncing and retrieving live CyberLab circuit and
+    wire construction snapshots across Gunicorn workers without exposing
+    cross-user context, secrets, or stale overwrites.
+    """
+    throttle_classes = []
+    MAX_BODY_BYTES = 131_072
+
+    def get(self, request):
+        request_id = f"xen-ctx-{uuid.uuid4().hex[:12]}"
+        user = request.user
+        if denial := self.cohort_denial(user, request_id):
+            return denial
+
+        is_allowed, _, rl_error = check_xen_rate_limit(f"{user.id}:cyberlab_ctx", limit=180, window_seconds=60)
+        if not is_allowed:
+            return Response(
+                {
+                    "error": "Rate limit exceeded." if rl_error == "RATE_LIMIT_EXCEEDED" else "Shared rate limiter is unavailable.",
+                    "code": rl_error or "RATE_LIMITER_UNAVAILABLE",
+                    "request_id": request_id,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS if rl_error == "RATE_LIMIT_EXCEEDED" else status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        XenCyberLabContext.prune_expired()
+        now = timezone.now()
+        session_id = request.query_params.get("session_id")
+        if session_id is not None:
+            session_id = str(session_id).strip()
+            if not _CYBERLAB_SESSION_RE.match(session_id):
+                return Response(
+                    {"error": "Invalid session_id.", "code": "INVALID_SESSION_ID", "request_id": request_id},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            ctx = XenCyberLabContext.objects.filter(user=user, session_id=session_id, expires_at__gt=now).first()
+        else:
+            ctx = XenCyberLabContext.objects.filter(user=user, expires_at__gt=now).order_by("-updated_at").first()
+
+        if ctx is None:
+            return Response(
+                {"error": "CyberLab session context not found.", "code": "CONTEXT_NOT_FOUND", "request_id": request_id},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "session_id": ctx.session_id,
+                "circuit_revision": ctx.circuit_revision,
+                "interaction_revision": ctx.interaction_revision,
+                "event_seq": ctx.event_seq,
+                "last_event_id": ctx.last_event_id,
+                "last_event_type": ctx.last_event_type,
+                "expires_at": ctx.expires_at.isoformat(),
+                "updated_at": ctx.updated_at.isoformat(),
+                "context_envelope": ctx.context_payload,
+                "request_id": request_id,
+            },
+            status=status.HTTP_200_OK,
+            headers={"Cache-Control": "private, no-store"},
+        )
+
+    def post(self, request):
+        request_id = f"xen-ctx-{uuid.uuid4().hex[:12]}"
+        user = request.user
+        if denial := self.cohort_denial(user, request_id):
+            return denial
+
+        is_allowed, _, rl_error = check_xen_rate_limit(f"{user.id}:cyberlab_ctx", limit=180, window_seconds=60)
+        if not is_allowed:
+            return Response(
+                {
+                    "error": "Rate limit exceeded." if rl_error == "RATE_LIMIT_EXCEEDED" else "Shared rate limiter is unavailable.",
+                    "code": rl_error or "RATE_LIMITER_UNAVAILABLE",
+                    "request_id": request_id,
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS if rl_error == "RATE_LIMIT_EXCEEDED" else status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        raw_body = getattr(request, "body", b"") or b""
+        if len(raw_body) > self.MAX_BODY_BYTES:
+            return Response(
+                {"error": "Context payload exceeds 128KB maximum size.", "code": "PAYLOAD_TOO_LARGE", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not isinstance(request.data, Mapping):
+            return Response(
+                {"error": "JSON object required.", "code": "INVALID_REQUEST", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session_id = request.data.get("session_id")
+        if not isinstance(session_id, str) or not _CYBERLAB_SESSION_RE.match(session_id.strip()):
+            return Response(
+                {"error": "Valid session_id is required.", "code": "INVALID_SESSION_ID", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        session_id = session_id.strip()
+
+        event_type = request.data.get("event_type", "circuit_snapshot")
+        if not isinstance(event_type, str) or event_type not in _CYBERLAB_ALLOWED_EVENTS:
+            return Response(
+                {"error": "Unsupported CyberLab context event_type.", "code": "INVALID_EVENT_TYPE", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        event_id = request.data.get("event_id", "")
+        if event_id is not None and (not isinstance(event_id, str) or len(event_id) > 128 or "\x00" in event_id):
+            return Response(
+                {"error": "Invalid event_id.", "code": "INVALID_EVENT_ID", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        event_id = (event_id or "").strip()
+
+        c_rev = request.data.get("circuit_revision", 0)
+        i_rev = request.data.get("interaction_revision", 0)
+        e_seq = request.data.get("event_seq", 0)
+        for name, val in (("circuit_revision", c_rev), ("interaction_revision", i_rev), ("event_seq", e_seq)):
+            if type(val) is not int or not (0 <= val <= 10_000_000):
+                return Response(
+                    {"error": f"{name} must be a non-negative integer.", "code": "INVALID_REVISION", "request_id": request_id},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        raw_env = request.data.get("context_envelope")
+        if raw_env is not None and not isinstance(raw_env, dict):
+            return Response(
+                {"error": "context_envelope must be an object.", "code": "INVALID_CONTEXT_ENVELOPE", "request_id": request_id},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        sanitized_payload = sanitize_context_envelope(raw_env or {})
+        sanitized_payload["session_id"] = session_id
+        sanitized_payload["circuit_revision"] = c_rev
+        sanitized_payload["interaction_revision"] = i_rev
+        sanitized_payload["state_revision"] = c_rev + i_rev
+        sanitized_payload["event_seq"] = e_seq
+        if event_id:
+            sanitized_payload["event_id"] = event_id
+        if event_type in {"wire_cancel", "wire_complete", "wire_delete", "session_reset"}:
+            sanitized_payload = _clear_draft_in_sanitized(sanitized_payload)
+
+        incoming_tuple = (c_rev, i_rev, e_seq)
+        XenCyberLabContext.prune_expired()
+
+        with transaction.atomic():
+            existing = (
+                XenCyberLabContext.objects
+                .select_for_update()
+                .filter(user=user, session_id=session_id)
+                .first()
+            )
+            if existing is not None:
+                if event_id and existing.last_event_id == event_id:
+                    return Response(
+                        {
+                            "status": "duplicate_ignored",
+                            "session_id": session_id,
+                            "circuit_revision": existing.circuit_revision,
+                            "interaction_revision": existing.interaction_revision,
+                            "event_seq": existing.event_seq,
+                            "request_id": request_id,
+                        },
+                        status=status.HTTP_200_OK,
+                    )
+                if event_type != "session_reset" and incoming_tuple < existing.revision_tuple():
+                    return Response(
+                        {
+                            "error": "Stale circuit context revision rejected.",
+                            "code": "STALE_CONTEXT_REVISION",
+                            "current_revision": list(existing.revision_tuple()),
+                            "received_revision": list(incoming_tuple),
+                            "request_id": request_id,
+                        },
+                        status=status.HTTP_409_CONFLICT,
+                    )
+                existing.circuit_revision = c_rev
+                existing.interaction_revision = i_rev
+                existing.event_seq = e_seq
+                existing.last_event_id = event_id
+                existing.last_event_type = event_type
+                existing.context_payload = sanitized_payload
+                existing.expires_at = XenCyberLabContext.default_expiry()
+                existing.save(update_fields=[
+                    "circuit_revision", "interaction_revision", "event_seq",
+                    "last_event_id", "last_event_type", "context_payload",
+                    "expires_at", "updated_at",
+                ])
+                ctx = existing
+            else:
+                ctx = XenCyberLabContext.objects.create(
+                    user=user,
+                    session_id=session_id,
+                    circuit_revision=c_rev,
+                    interaction_revision=i_rev,
+                    event_seq=e_seq,
+                    last_event_id=event_id,
+                    last_event_type=event_type,
+                    context_payload=sanitized_payload,
+                    expires_at=XenCyberLabContext.default_expiry(),
+                )
+
+        return Response(
+            {
+                "status": "synced",
+                "session_id": ctx.session_id,
+                "circuit_revision": ctx.circuit_revision,
+                "interaction_revision": ctx.interaction_revision,
+                "event_seq": ctx.event_seq,
+                "last_event_type": ctx.last_event_type,
+                "expires_at": ctx.expires_at.isoformat(),
+                "request_id": request_id,
+            },
+            status=status.HTTP_200_OK,
+            headers={"Cache-Control": "private, no-store"},
+        )
 

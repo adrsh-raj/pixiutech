@@ -480,6 +480,8 @@ class XenJob(models.Model):
     history = models.JSONField(default=list, blank=True)
     max_tokens = models.PositiveIntegerField(default=1024)
     temperature = models.FloatField(default=0.0)
+    context_session_id = models.CharField(max_length=128, blank=True, db_index=True)
+    context_revision = models.PositiveIntegerField(null=True, blank=True)
 
     # Worker lease & tracking
     worker_id = models.CharField(max_length=128, blank=True, null=True, db_index=True)
@@ -583,4 +585,54 @@ class XenWorkerHeartbeat(models.Model):
 
     def __str__(self):
         return f"XenWorker {self.worker_id} (last seen: {self.last_seen})"
+
+
+class XenCyberLabContext(models.Model):
+    """
+    Bounded, user-scoped persistence of the active CyberLab circuit & live wire
+    construction context for the authenticated session.
+    """
+    DEFAULT_TTL_SECONDS = 7200  # 2 hours
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="xen_cyberlab_contexts",
+    )
+    session_id = models.CharField(max_length=128, db_index=True)
+    circuit_revision = models.PositiveIntegerField(default=0)
+    interaction_revision = models.PositiveIntegerField(default=0)
+    event_seq = models.PositiveIntegerField(default=0)
+    last_event_id = models.CharField(max_length=128, blank=True)
+    last_event_type = models.CharField(max_length=48, blank=True)
+    context_payload = models.JSONField(default=dict, blank=True)
+    expires_at = models.DateTimeField(db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "session_id"], name="xen_cyberlab_user_session_unique"),
+        ]
+        indexes = [
+            models.Index(fields=["user", "updated_at"], name="academics_x_user_id_cyb_idx"),
+        ]
+        verbose_name = "Xen CyberLab Context"
+        verbose_name_plural = "Xen CyberLab Contexts"
+
+    @classmethod
+    def default_expiry(cls):
+        return timezone.now() + timedelta(seconds=cls.DEFAULT_TTL_SECONDS)
+
+    @classmethod
+    def prune_expired(cls) -> int:
+        deleted, _ = cls.objects.filter(expires_at__lte=timezone.now()).delete()
+        return deleted
+
+    def revision_tuple(self) -> tuple:
+        return (self.circuit_revision, self.interaction_revision, self.event_seq)
+
+    def __str__(self):
+        return f"CyberLabContext {self.session_id} (user={self.user_id}, rev={self.circuit_revision}.{self.interaction_revision})"
 

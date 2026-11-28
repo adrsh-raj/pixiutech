@@ -93,7 +93,7 @@ class VisibleText:
         if closed:
             self.answer_started = True
             self.buffer = ""
-            return answer
+            return answer.lstrip("\r\n")
         # Only a partial closing delimiter can affect the next emission.
         self.buffer = self.buffer[-(len("</think>") - 1):]
         return ""

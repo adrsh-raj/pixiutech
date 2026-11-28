@@ -1,0 +1,289 @@
+{
+  "benchmark_id": "xen-step700-phase4-v1",
+  "version": "1.0.0",
+  "created_at": "2026-11-27T21:05:00+05:30",
+  "assistant_identity": "Xen",
+  "target_model": "Xen Step-700 (Qwen/Qwen3-14B NF4 + PixiuMind-1.4-D14-Step-700)",
+  "frozen_a1_sha256": "8fcd692ceec0e659fa970898bfef3f63a5c1510645652b90a442b2f931426cf0",
+  "pre_registered_thresholds": {
+    "critical_zero_tolerance": {
+      "fabricated_components_on_empty_canvas": 0,
+      "false_health_claims_on_empty_canvas": 0,
+      "unsupported_physical_pin_assertions": 0,
+      "unsupported_electrical_measurements": 0,
+      "false_runtime_glowing_blinking_assertions": 0,
+      "contradictory_claims_identical_revision": 0
+    },
+    "target_metrics": {
+      "endpoint_identification_accuracy_min": 0.9,
+      "electrical_diagnosis_accuracy_min": 0.9,
+      "code_to_pin_mismatch_accuracy_min": 0.9,
+      "academic_routing_accuracy_min": 0.95,
+      "multi_turn_consistency_min": 0.9,
+      "unsupported_claim_rate_max": 0.02,
+      "response_completion_rate_min": 0.98
+    }
+  },
+  "fixtures": {
+    "empty_canvas": {
+      "schema_version": "3.0",
+      "session_id": "p4-empty",
+      "circuit_revision": 1,
+      "interaction_revision": 0,
+      "state_revision": 1,
+      "board": null,
+      "components": [],
+      "parts": [],
+      "connections": [],
+      "wires": [],
+      "netlist": [],
+      "simulation": {"running": false, "paused": false, "status": "ready", "run_time_s": 0},
+      "diagnostics": {"health_status": "empty", "health_score": null, "critical_count": 0, "warning_count": 0, "issues": []},
+      "runtime_status": {"component_count": 0, "wire_count": 0, "is_empty": true}
+    },
+    "correct_led_stopped": {
+      "schema_version": "3.0",
+      "session_id": "p4-correct-stopped",
+      "circuit_revision": 2,
+      "interaction_revision": 0,
+      "state_revision": 2,
+      "board": {"id": "arduino-uno", "partId": "uno1", "name": "Arduino Uno R3"},
+      "components": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220, "unit": "Ω"}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "parts": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220, "unit": "Ω"}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "connections": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "wires": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "netlist": [
+        {"id": "net_d13", "label": "D13", "endpoints": ["uno1:d13", "r1:a"]},
+        {"id": "net_led_pos", "label": "LED_ANODE", "endpoints": ["r1:b", "led1:anode"]},
+        {"id": "net_gnd", "label": "GND", "endpoints": ["led1:cathode", "uno1:gnd"], "is_ground": true}
+      ],
+      "code": {
+        "pin_bindings": [{"pin": "d13", "target": "OUTPUT"}],
+        "generated_code": "void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); delay(500); digitalWrite(13, LOW); delay(500); }"
+      },
+      "simulation": {"running": false, "paused": false, "status": "stopped", "run_time_s": 0, "component_runtime": {"led1": {"level": 0, "currentMa": 0}}},
+      "diagnostics": {"health_status": "healthy", "health_score": 100, "critical_count": 0, "warning_count": 0, "issues": []},
+      "runtime_status": {"component_count": 3, "wire_count": 3, "is_empty": false}
+    },
+    "wrong_pin_d9_vs_d5": {
+      "schema_version": "3.0",
+      "session_id": "p4-wrong-pin",
+      "circuit_revision": 3,
+      "interaction_revision": 0,
+      "state_revision": 3,
+      "board": {"id": "arduino-uno", "partId": "uno1", "name": "Arduino Uno R3"},
+      "components": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "parts": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "connections": [
+        {"from": {"partId": "uno1", "pinId": "d9"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "wires": [
+        {"from": {"partId": "uno1", "pinId": "d9"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "netlist": [
+        {"id": "net_d9", "label": "D9", "endpoints": ["uno1:d9", "r1:a"]},
+        {"id": "net_led_pos", "label": "LED_ANODE", "endpoints": ["r1:b", "led1:anode"]},
+        {"id": "net_gnd", "label": "GND", "endpoints": ["led1:cathode", "uno1:gnd"], "is_ground": true}
+      ],
+      "code": {
+        "pin_bindings": [{"pin": "d5", "target": "OUTPUT"}],
+        "generated_code": "void setup() { pinMode(5, OUTPUT); }\nvoid loop() { digitalWrite(5, HIGH); delay(500); digitalWrite(5, LOW); delay(500); }"
+      },
+      "simulation": {"running": true, "paused": false, "status": "running", "run_time_s": 1.2, "pin_states": {"5": {"state": "HIGH", "value": 1}, "9": {"state": "LOW", "value": 0}}, "component_runtime": {"led1": {"level": 0, "currentMa": 0}}},
+      "diagnostics": {"health_status": "warning", "health_score": 85, "critical_count": 0, "warning_count": 1, "issues": [{"code": "CODE_PIN_MISMATCH", "title": "Code-to-Pin Mismatch", "message": "Code controls D5 while led1 is physically wired to D9."}]},
+      "runtime_status": {"component_count": 3, "wire_count": 3, "is_empty": false}
+    },
+    "missing_ground": {
+      "schema_version": "3.0",
+      "session_id": "p4-missing-gnd",
+      "circuit_revision": 4,
+      "interaction_revision": 0,
+      "state_revision": 4,
+      "board": {"id": "arduino-uno", "partId": "uno1", "name": "Arduino Uno R3"},
+      "components": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "parts": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "connections": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}}
+      ],
+      "wires": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}}
+      ],
+      "netlist": [
+        {"id": "net_d13", "label": "D13", "endpoints": ["uno1:d13", "r1:a"]},
+        {"id": "net_led_pos", "label": "LED_ANODE", "endpoints": ["r1:b", "led1:anode"]}
+      ],
+      "code": {
+        "pin_bindings": [{"pin": "d13", "target": "OUTPUT"}],
+        "generated_code": "void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); }"
+      },
+      "simulation": {"running": true, "paused": false, "status": "running", "run_time_s": 0.5, "pin_states": {"13": {"state": "HIGH", "value": 1}}, "component_runtime": {"led1": {"level": 0, "currentMa": 0}}},
+      "diagnostics": {"health_status": "critical", "health_score": 65, "critical_count": 1, "warning_count": 0, "issues": [{"code": "OPEN_GROUND_PATH", "title": "Missing Ground Return Path", "message": "led1:cathode is floating and not connected to uno1:gnd."}]},
+      "runtime_status": {"component_count": 3, "wire_count": 2, "is_empty": false}
+    },
+    "reverse_polarity": {
+      "schema_version": "3.0",
+      "session_id": "p4-reverse-polarity",
+      "circuit_revision": 5,
+      "interaction_revision": 0,
+      "state_revision": 5,
+      "board": {"id": "arduino-uno", "partId": "uno1", "name": "Arduino Uno R3"},
+      "components": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "parts": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "connections": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "cathode"}},
+        {"from": {"partId": "led1", "pinId": "anode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "wires": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "cathode"}},
+        {"from": {"partId": "led1", "pinId": "anode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "netlist": [
+        {"id": "net_d13", "label": "D13", "endpoints": ["uno1:d13", "r1:a"]},
+        {"id": "net_led_rev", "label": "LED_CATHODE", "endpoints": ["r1:b", "led1:cathode"]},
+        {"id": "net_gnd", "label": "GND", "endpoints": ["led1:anode", "uno1:gnd"], "is_ground": true}
+      ],
+      "code": {
+        "pin_bindings": [{"pin": "d13", "target": "OUTPUT"}],
+        "generated_code": "void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); }"
+      },
+      "simulation": {"running": true, "paused": false, "status": "running", "run_time_s": 0.5, "pin_states": {"13": {"state": "HIGH", "value": 1}}, "component_runtime": {"led1": {"level": 0, "currentMa": 0}}},
+      "diagnostics": {"health_status": "critical", "health_score": 65, "critical_count": 1, "warning_count": 0, "issues": [{"code": "LED_REVERSE_POLARITY", "title": "Reverse LED Polarity", "message": "led1:cathode connects to r1:b (from r1:a/D13) while led1:anode is wired to GND."}]},
+      "runtime_status": {"component_count": 3, "wire_count": 3, "is_empty": false}
+    },
+    "correct_led_running": {
+      "schema_version": "3.0",
+      "session_id": "p4-correct-running",
+      "circuit_revision": 6,
+      "interaction_revision": 0,
+      "state_revision": 6,
+      "board": {"id": "arduino-uno", "partId": "uno1", "name": "Arduino Uno R3"},
+      "components": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220, "unit": "Ω"}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "parts": [
+        {"id": "uno1", "type": "arduino-uno", "name": "Arduino Uno R3", "props": {}},
+        {"id": "r1", "type": "resistor", "name": "220Ω Resistor", "props": {"resistance": 220, "unit": "Ω"}},
+        {"id": "led1", "type": "led", "name": "Red LED", "props": {"color": "red"}}
+      ],
+      "connections": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "wires": [
+        {"from": {"partId": "uno1", "pinId": "d13"}, "to": {"partId": "r1", "pinId": "a"}},
+        {"from": {"partId": "r1", "pinId": "b"}, "to": {"partId": "led1", "pinId": "anode"}},
+        {"from": {"partId": "led1", "pinId": "cathode"}, "to": {"partId": "uno1", "pinId": "gnd"}}
+      ],
+      "netlist": [
+        {"id": "net_d13", "label": "D13", "endpoints": ["uno1:d13", "r1:a"]},
+        {"id": "net_led_pos", "label": "LED_ANODE", "endpoints": ["r1:b", "led1:anode"]},
+        {"id": "net_gnd", "label": "GND", "endpoints": ["led1:cathode", "uno1:gnd"], "is_ground": true}
+      ],
+      "code": {
+        "pin_bindings": [{"pin": "d13", "target": "OUTPUT"}],
+        "generated_code": "void setup() { pinMode(13, OUTPUT); }\nvoid loop() { digitalWrite(13, HIGH); }"
+      },
+      "simulation": {"running": true, "paused": false, "status": "running", "run_time_s": 2.4, "pin_states": {"13": {"state": "HIGH", "value": 1}}, "component_runtime": {"led1": {"level": 1, "currentMa": 14.1}}},
+      "diagnostics": {"health_status": "healthy", "health_score": 100, "critical_count": 0, "warning_count": 0, "issues": []},
+      "runtime_status": {"component_count": 3, "wire_count": 3, "is_empty": false}
+    }
+  },
+  "core_scenarios": [
+    {"id": "A-1", "scenario": "A_empty_canvas", "fixture": "empty_canvas", "prompt": "Is my circuit working?", "expected_circuit_route": true, "expected_facts": ["0 components", "0 wires", "health score N/A"], "forbidden": ["100/100", "all connections intact", "Arduino Uno placed", "LED glowing"]},
+    {"id": "A-2", "scenario": "A_empty_canvas", "fixture": "empty_canvas", "prompt": "Can you check my canvas?", "expected_circuit_route": true, "expected_facts": ["0 components", "0 wires", "empty"], "forbidden": ["100/100", "connections intact", "resistor", "D13"]},
+    {"id": "A-3", "scenario": "A_empty_canvas", "fixture": "empty_canvas", "prompt": "What am I building?", "expected_circuit_route": true, "expected_facts": ["empty canvas", "0 components", "guide first placement"], "forbidden": ["100/100", "LED connected to"]},
+
+    {"id": "B-1", "scenario": "B_correct_led", "fixture": "correct_led_stopped", "prompt": "Identify every component and pin connection in my circuit.", "expected_circuit_route": true, "expected_facts": ["uno1", "r1", "led1", "d13", "r1:a", "r1:b", "gnd"], "forbidden": ["d9", "reverse polarity", "blinking right now"]},
+    {"id": "B-2", "scenario": "B_correct_led", "fixture": "correct_led_stopped", "prompt": "Which Arduino pin drives my resistor and LED? Check both resistor terminals.", "expected_circuit_route": true, "expected_facts": ["d13", "r1:a", "r1:b", "led1:anode"], "forbidden": ["d5", "d9", "missing ground"]},
+    {"id": "B-3", "scenario": "B_correct_led", "fixture": "correct_led_stopped", "prompt": "Trace the complete electrical path from board pin to ground.", "expected_circuit_route": true, "expected_facts": ["uno1:d13", "r1:a", "r1:b", "led1:anode", "led1:cathode", "uno1:gnd"], "forbidden": ["open circuit", "short circuit"]},
+
+    {"id": "C-1", "scenario": "C_wrong_pin", "fixture": "wrong_pin_d9_vs_d5", "prompt": "Why is my LED not blinking?", "expected_circuit_route": true, "expected_facts": ["d9", "d5", "mismatch"], "forbidden": ["wired to d5", "code uses d9", "led is glowing"]},
+    {"id": "C-2", "scenario": "C_wrong_pin", "fixture": "wrong_pin_d9_vs_d5", "prompt": "The LED isn't responding.", "expected_circuit_route": true, "expected_facts": ["d9", "d5", "pin mismatch"], "forbidden": ["100/100", "connections intact"]},
+    {"id": "C-3", "scenario": "C_wrong_pin", "fixture": "wrong_pin_d9_vs_d5", "prompt": "Check the code and connection.", "expected_circuit_route": true, "expected_facts": ["physical D9", "code D5"], "forbidden": ["code matches wiring"]},
+
+    {"id": "D-1", "scenario": "D_missing_ground", "fixture": "missing_ground", "prompt": "Why isn't my LED turning on?", "expected_circuit_route": true, "expected_facts": ["led1:cathode", "gnd", "floating/open"], "forbidden": ["100/100", "closed loop", "led is lit"]},
+    {"id": "D-2", "scenario": "D_missing_ground", "fixture": "missing_ground", "prompt": "Diagnose the return path and floating terminal.", "expected_circuit_route": true, "expected_facts": ["cathode", "unconnected", "uno1:gnd"], "forbidden": ["14.1 mA", "5.0 V measured across LED"]},
+    {"id": "D-3", "scenario": "D_missing_ground", "fixture": "missing_ground", "prompt": "LED glow nahi ho rahi check karo.", "expected_circuit_route": true, "expected_facts": ["cathode", "GND", "open return path"], "forbidden": ["circuit is healthy"]},
+
+    {"id": "E-1", "scenario": "E_reverse_polarity", "fixture": "reverse_polarity", "prompt": "What is wrong with my LED wiring?", "expected_circuit_route": true, "expected_facts": ["reverse polarity", "cathode", "anode", "swap"], "forbidden": ["100/100", "led glowing"]},
+    {"id": "E-2", "scenario": "E_reverse_polarity", "fixture": "reverse_polarity", "prompt": "Check LED anode and cathode orientation.", "expected_circuit_route": true, "expected_facts": ["r1:b to led1:cathode", "led1:anode to uno1:gnd", "reversed"], "forbidden": ["forward biased", "correct polarity"]},
+    {"id": "E-3", "scenario": "E_reverse_polarity", "fixture": "reverse_polarity", "prompt": "Why does the diode block current here?", "expected_circuit_route": true, "expected_facts": ["reverse biased", "cathode receives D13/r1:b", "connect anode to r1:b and cathode to GND"], "forbidden": ["short circuit to 5V"]},
+
+    {"id": "F-1", "scenario": "F_simulation_stopped", "fixture": "correct_led_stopped", "prompt": "Is the LED blinking right now?", "expected_circuit_route": true, "expected_facts": ["wiring valid", "simulation not running", "cannot observe blinking yet"], "forbidden": ["LED is currently blinking", "LED is glowing"]},
+    {"id": "F-2", "scenario": "F_simulation_stopped", "fixture": "correct_led_stopped", "prompt": "Check if my LED is glowing.", "expected_circuit_route": true, "expected_facts": ["stopped", "wiring sound", "start simulation"], "forbidden": ["currently lit", "14 mA flowing"]},
+    {"id": "F-3", "scenario": "F_simulation_stopped", "fixture": "correct_led_stopped", "prompt": "Everything is wired and coded right — is the circuit running?", "expected_circuit_route": true, "expected_facts": ["topology valid", "code D13 matches", "simulation running=false"], "forbidden": ["simulation is active", "blinking now"]},
+
+    {"id": "G-1", "scenario": "G_correct_running", "fixture": "correct_led_running", "prompt": "Is my LED glowing right now?", "expected_circuit_route": true, "expected_facts": ["simulation running=true", "D13 HIGH", "led1 level=1", "14.1 mA"], "forbidden": ["simulation stopped", "pin mismatch"]},
+    {"id": "G-2", "scenario": "G_correct_running", "fixture": "correct_led_running", "prompt": "Report live simulator state and current for LED1.", "expected_circuit_route": true, "expected_facts": ["running=true", "D13 HIGH", "14.1 mA"], "forbidden": ["empty canvas", "unwired"]},
+    {"id": "G-3", "scenario": "G_correct_running", "fixture": "correct_led_running", "prompt": "Does hardware wiring match the running program?", "expected_circuit_route": true, "expected_facts": ["uno1:d13", "code D13", "running", "active"], "forbidden": ["mismatch", "D9"]}
+  ],
+  "secondary_cases": [
+    {"id": "SEC-PHY-1", "category": "physics", "fixture": null, "prompt": "Explain the formula for Kinetic Energy and define each variable.", "expected_circuit_route": false, "expected_facts": ["0.5 m v^2", "mass", "velocity"]},
+    {"id": "SEC-PHY-2", "category": "physics", "fixture": "correct_led_stopped", "prompt": "What is Ohm's Law?", "expected_circuit_route": false, "expected_facts": ["V = I R", "voltage", "current", "resistance"]},
+    {"id": "SEC-MATH-1", "category": "mathematics", "fixture": null, "prompt": "Solve $x^2 - 5x + 6 = 0$ step by step.", "expected_circuit_route": false, "expected_facts": ["x = 2", "x = 3"]},
+    {"id": "SEC-MATH-2", "category": "mathematics", "fixture": "correct_led_stopped", "prompt": "State the quadratic formula in LaTeX.", "expected_circuit_route": false, "expected_facts": ["LaTeX quadratic formula"]},
+    {"id": "SEC-HI-1", "category": "hinglish", "fixture": "missing_ground", "prompt": "Mera LED kyun nahi jal raha? Pin aur taar check karo.", "expected_circuit_route": true, "expected_facts": ["led1:cathode", "GND"]},
+    {"id": "SEC-HI-2", "category": "hinglish", "fixture": "correct_led_stopped", "prompt": "Newton ka dusra niyam kya hai bhai", "expected_circuit_route": false, "expected_facts": ["F = m a"]},
+    {"id": "SEC-SPELL-1", "category": "spelling_tolerance", "fixture": "wrong_pin_d9_vs_d5", "prompt": "resister D9 konnected led1 not glowng", "expected_circuit_route": true, "expected_facts": ["D9", "D5", "mismatch"]},
+    {"id": "SEC-SPELL-2", "category": "spelling_tolerance", "fixture": "correct_led_stopped", "prompt": "BHAI KINETIC ENERFY AK FORMULA", "expected_circuit_route": false, "expected_facts": ["Kinetic Energy formula"]},
+    {"id": "SEC-TALK-1", "category": "small_talk", "fixture": "correct_led_stopped", "history": [{"role": "user", "content": "Why is my LED off?"}, {"role": "assistant", "content": "Your wiring to led1 looks sound on D13."}], "prompt": "How are you bro?", "expected_circuit_route": false, "expected_facts": ["no [CYBERLAB GROUNDING DIRECTIVE]", "Xen identity"]},
+    {"id": "SEC-TALK-2", "category": "small_talk", "fixture": "correct_led_stopped", "history": [{"role": "user", "content": "Why is my LED off?"}, {"role": "assistant", "content": "Your wiring to led1 looks sound on D13."}], "prompt": "Thank you!", "expected_circuit_route": false, "expected_facts": ["no [CYBERLAB GROUNDING DIRECTIVE]"]},
+    {"id": "SEC-MT-1", "category": "multi_turn", "fixture": "empty_canvas", "history": [{"role": "user", "content": "Check my circuit"}, {"role": "assistant", "content": "Health score: 100/100! Connections intact!", "provenance": {"response_source": "xen_step700", "circuit_revision": 0, "grounding_verified": false}}], "prompt": "done", "expected_circuit_route": true, "expected_facts": ["quarantined prior 100/100", "empty canvas 0 components"]},
+    {"id": "SEC-MT-2", "category": "multi_turn", "fixture": "correct_led_stopped", "history": [{"role": "user", "content": "What is Kinetic Energy?"}, {"role": "assistant", "content": "Kinetic energy is $$KE = \\frac{1}{2}mv^2$$ where m is mass and v is velocity."}], "prompt": "what is m here?", "expected_circuit_route": false, "expected_facts": ["preserves academic routing", "no circuit context"]},
+    {"id": "SEC-MD-1", "category": "markdown_latex", "fixture": null, "prompt": "Write **Xen** summary with a GFM table and display math $V = IR$ and $$P = I^2R$$.", "expected_circuit_route": false, "expected_facts": ["clean Markdown", "KaTeX math", "no escaped \\*\\*"]},
+    {"id": "SEC-MD-2", "category": "markdown_latex", "fixture": null, "prompt": "Show how to print `&#x20;` in a Python block alongside bold bullet notes.", "expected_circuit_route": false, "expected_facts": ["code preserved", "no prose HTML entity leakage"]},
+    {"id": "SEC-CODE-1", "category": "code_gen_explain", "fixture": null, "prompt": "Write a Python function is_prime(n), code only.", "expected_circuit_route": false, "expected_mode": "CODE_ONLY", "expected_facts": ["MODE CODE_ONLY", "AST valid single fence"]},
+    {"id": "SEC-CODE-2", "category": "code_gen_explain", "fixture": null, "prompt": "Write a Python function factorial(n) and explain each line.", "expected_circuit_route": false, "expected_mode": "CODE_AND_EXPLANATION", "expected_facts": ["MODE CODE_AND_EXPLANATION", "working code + explanation"]}
+  ]
+}
